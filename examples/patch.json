@@ -1,0 +1,13 @@
+{
+  "set": {
+    "title": "Michelson 干涉仪往返光程差",
+    "difficulty": 3,
+    "status": "reviewed",
+    "solution_md": "反射镜移动时，光束经历往返传播，因此 $\\Delta L=2\\Delta x=3.0\\,\\mathrm{mm}$。"
+  },
+  "add_topics": [
+    "round-trip-propagation"
+  ],
+  "remove_topics": []
+}
+

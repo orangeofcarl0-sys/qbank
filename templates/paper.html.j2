@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    body { max-width: 920px; margin: 2rem auto; padding: 0 1rem;
+           font: 16px/1.65 system-ui, sans-serif; color: #172033; }
+    h1, h2, h3 { line-height: 1.25; }
+    h2 { border-bottom: 1px solid #ccd3df; padding-bottom: .35rem; }
+    img { max-width: 100%; height: auto; }
+    code { background: #f3f5f8; padding: .1rem .3rem; border-radius: 4px; }
+    .meta { color: #596579; }
+    @media print { body { max-width: none; margin: 0; } }
+  </style>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+{{ body_html | safe }}
+</body>
+</html>

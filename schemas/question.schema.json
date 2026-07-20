@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "QuestionStatus": {
+      "description": "Supported review states.",
+      "enum": [
+        "draft",
+        "reviewed",
+        "verified",
+        "deprecated"
+      ],
+      "title": "QuestionStatus",
+      "type": "string"
+    },
+    "QuestionType": {
+      "description": "Supported question types.",
+      "enum": [
+        "single_choice",
+        "multiple_choice",
+        "true_false",
+        "fill_blank",
+        "calculation",
+        "short_answer",
+        "proof",
+        "essay",
+        "composite",
+        "other"
+      ],
+      "title": "QuestionType",
+      "type": "string"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "Short provenance metadata.",
+      "properties": {
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Source",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete AI exchange representation of one question.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/QuestionType"
+    },
+    "subject": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "title": "Subject",
+      "type": "string"
+    },
+    "chapter": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Chapter"
+    },
+    "topics": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Topics",
+      "type": "array"
+    },
+    "difficulty": {
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Difficulty",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/QuestionStatus"
+    },
+    "language": {
+      "minLength": 1,
+      "title": "Language",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "assets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assets",
+      "type": "array"
+    },
+    "created_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "format": "date-time",
+      "title": "Created At"
+    },
+    "updated_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "format": "date-time",
+      "title": "Updated At"
+    },
+    "stem_md": {
+      "title": "Stem Md",
+      "type": "string"
+    },
+    "options_md": {
+      "default": "",
+      "title": "Options Md",
+      "type": "string"
+    },
+    "answer_md": {
+      "default": "",
+      "title": "Answer Md",
+      "type": "string"
+    },
+    "solution_md": {
+      "default": "",
+      "title": "Solution Md",
+      "type": "string"
+    },
+    "rubric_md": {
+      "default": "",
+      "title": "Rubric Md",
+      "type": "string"
+    },
+    "review_notes_md": {
+      "default": "",
+      "title": "Review Notes Md",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "type",
+    "subject",
+    "topics",
+    "difficulty",
+    "status",
+    "language",
+    "source",
+    "assets",
+    "stem_md"
+  ],
+  "title": "Question",
+  "type": "object"
+}

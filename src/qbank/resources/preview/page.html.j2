@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>qbank 题库预览</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; }
+    body { margin: 0; background: #f5f7fb; }
+    .wrap { max-width: 1040px; margin: auto; padding: 2rem 1rem 4rem; }
+    .toolbar { display: grid; grid-template-columns: 2fr repeat(4, 1fr); gap: .6rem;
+               position: sticky; top: 0; background: #f5f7fb; padding: .7rem 0; z-index: 2; }
+    input, select { padding: .65rem; border: 1px solid #b8c0ce; border-radius: 8px; background: white; }
+    .question { background: white; padding: 1.3rem; margin: 1rem 0; border-radius: 12px;
+                box-shadow: 0 2px 12px #24324a12; }
+    h1, h2 { line-height: 1.25; } h2 { margin-bottom: .3rem; }
+    .meta, .source { color: #627086; font-size: .9rem; }
+    details { margin-top: .7rem; border-top: 1px solid #e2e7ef; padding-top: .6rem; }
+    summary { cursor: pointer; font-weight: 650; }
+    img { max-width: 100%; height: auto; }
+    .hidden { display: none; }
+    @media (max-width: 760px) {
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      #search { grid-column: 1 / -1; }
+    }
+  </style>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body><main class="wrap">
+  <h1>qbank 题库预览</h1>
+  <p><span id="visible-count">{{ questions|length }}</span> / {{ questions|length }} 道题</p>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="搜索标题、题干或主题">
+    <select id="subject"><option value="">全部学科</option>{{ subject_options | safe }}</select>
+    <select id="type"><option value="">全部题型</option>{{ type_options | safe }}</select>
+    <select id="status"><option value="">全部状态</option>{{ status_options | safe }}</select>
+    <select id="difficulty"><option value="">全部难度</option>{{ difficulty_options | safe }}</select>
+  </div>
+  <section id="questions">{{ cards | safe }}</section>
+</main>
+<script>
+  const controls = ['search','subject','type','status','difficulty'].map(id => document.getElementById(id));
+  function filter() {
+    const [search, subject, type, status, difficulty] = controls.map(el => el.value.toLowerCase());
+    let visible = 0;
+    document.querySelectorAll('.question').forEach(card => {
+      const show = (!search || card.dataset.search.includes(search))
+        && (!subject || card.dataset.subject === subject)
+        && (!type || card.dataset.type === type)
+        && (!status || card.dataset.status === status)
+        && (!difficulty || card.dataset.difficulty === difficulty);
+      card.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+    document.getElementById('visible-count').textContent = visible;
+  }
+  controls.forEach(el => el.addEventListener('input', filter));
+</script>
+</body></html>

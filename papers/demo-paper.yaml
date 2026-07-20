@@ -1,0 +1,32 @@
+schema_version: "1.0"
+title: 光学与理工基础测试
+subtitle: qbank 示例试卷
+language: zh-CN
+date: "2026-07-18"
+metadata:
+  author:
+  duration_minutes: 60
+  total_score: 40
+sections:
+  - title: 一、选择与判断
+    instructions: 请选择或判断正确答案。
+    questions:
+      - id: OPT-DIF-0001
+        score: 5
+      - id: ELEC-AMP-0001
+        score: 5
+  - title: 二、计算与简答
+    instructions: 请写出必要过程。
+    questions:
+      - id: OPT-INT-0001
+        score: 10
+      - id: MATH-CALC-0001
+        score: 10
+      - id: SIG-FFT-0001
+        score: 10
+options:
+  show_scores: true
+  show_question_ids: false
+  include_answers: false
+  include_solutions: false
+  include_rubric: false

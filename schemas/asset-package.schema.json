@@ -1,0 +1,238 @@
+{
+  "$defs": {
+    "AssetFormat": {
+      "description": "Representations understood by the built-in adapters.",
+      "enum": [
+        "png",
+        "jpeg",
+        "pdf",
+        "svg",
+        "tikz",
+        "ipe",
+        "webp",
+        "gif",
+        "bmp",
+        "url",
+        "other"
+      ],
+      "title": "AssetFormat",
+      "type": "string"
+    },
+    "AssetPackageRepresentation": {
+      "additionalProperties": false,
+      "description": "One untrusted representation supplied by an input package.",
+      "properties": {
+        "representation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Representation Id",
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/$defs/AssetFormat"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "data_uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Uri"
+        },
+        "base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base64"
+        },
+        "inline_tikz": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inline Tikz"
+        },
+        "purpose": {
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "editable": {
+          "default": false,
+          "title": "Editable",
+          "type": "boolean"
+        },
+        "derived_from": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Derived From"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Hash"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "representation_id",
+        "format",
+        "purpose"
+      ],
+      "title": "AssetPackageRepresentation",
+      "type": "object"
+    },
+    "AssetStatus": {
+      "description": "Lifecycle states for one logical asset.",
+      "enum": [
+        "raw",
+        "needs_redraw",
+        "editing",
+        "reviewed",
+        "final",
+        "failed"
+      ],
+      "title": "AssetStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Stable exchange contract produced by digitization projects.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "question_id": {
+      "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$",
+      "title": "Question Id",
+      "type": "string"
+    },
+    "asset_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "role": {
+      "minLength": 1,
+      "title": "Role",
+      "type": "string"
+    },
+    "representations": {
+      "items": {
+        "$ref": "#/$defs/AssetPackageRepresentation"
+      },
+      "minItems": 1,
+      "title": "Representations",
+      "type": "array"
+    },
+    "provenance": {
+      "additionalProperties": true,
+      "title": "Provenance",
+      "type": "object"
+    },
+    "suggested_editor": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Suggested Editor"
+    },
+    "suggested_render": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Suggested Render"
+    },
+    "status": {
+      "$ref": "#/$defs/AssetStatus",
+      "default": "raw"
+    },
+    "review_notes": {
+      "default": "",
+      "title": "Review Notes",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "question_id",
+    "asset_id",
+    "role",
+    "representations"
+  ],
+  "title": "AssetPackage",
+  "type": "object"
+}

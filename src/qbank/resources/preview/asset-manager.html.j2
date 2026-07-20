@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>qbank 资产管理</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+    .asset { border: 1px solid #8886; border-radius: .75rem; padding: 1rem; margin: 1rem 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; }
+    figure { margin: 0; border: 1px solid #8885; border-radius: .5rem; padding: .5rem; }
+    img, object { display: block; max-width: 100%; max-height: 220px; margin: .4rem auto; }
+    button, select, input { margin: .25rem; padding: .35rem .5rem; }
+    code, pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+    .status { min-height: 1.5rem; padding: .5rem; border-radius: .4rem; }
+    .error { background: #b0002033; } .ok { background: #008a2033; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>qbank 资产管理</h1>
+    <p>此页面仅通过本机 qbank 服务操作已登记的资产；<a href="{{ preview_url }}">打开静态题库预览</a>。</p>
+    <p id="status" class="status" aria-live="polite"></p>
+  </header>
+  {% for asset in assets %}
+  <article class="asset" data-question="{{ asset.question_id }}" data-asset="{{ asset.asset_id }}">
+    <h2><code>{{ asset.question_id }}/{{ asset.asset_id }}</code> · {{ asset.role }}</h2>
+    <p>状态：<strong>{{ asset.status }}</strong>；首选编辑：<code>{{ asset.preferred_editor }}</code>；首选渲染：<code>{{ asset.preferred_render }}</code></p>
+    <div class="grid">
+      <figure><figcaption>原始参考</figcaption>{% if asset.original.is_image %}<img src="{{ asset.original.uri }}" alt="{{ asset.asset_id }} 原始参考">{% else %}<a href="{{ asset.original.uri }}">{{ asset.original.id }}</a>{% endif %}<code>{{ asset.original.id }} · {{ asset.original.format }}</code></figure>
+      <figure><figcaption>当前预览</figcaption>{% if asset.current.is_image %}<img src="{{ asset.current.uri }}" alt="{{ asset.asset_id }} 当前预览">{% else %}<a href="{{ asset.current.uri }}">{{ asset.current.id }}</a>{% endif %}<code>{{ asset.current.id }} · {{ asset.current.format }}</code></figure>
+    </div>
+    <p>
+      <button data-action="edit">在 Ipe / 文本编辑器中编辑</button>
+      <button data-action="open">打开当前文件</button>
+      <button data-action="open-directory">打开所在目录</button>
+      <button data-action="render">重新渲染</button>
+      <button data-action="finalize">标记为 final</button>
+    </p>
+    <label>首选编辑 <select data-preference="set-editor"><option value="">选择 representation</option>{% for item in asset.representations if item.editable %}<option value="{{ item.id }}">{{ item.id }} · {{ item.format }}</option>{% endfor %}</select></label>
+    <label>首选预览 <select data-preference="set-render"><option value="">选择 representation</option>{% for item in asset.representations if item.is_image %}<option value="{{ item.id }}">{{ item.id }} · {{ item.format }}</option>{% endfor %}</select></label>
+    <label>替换文件 <input type="file" data-replace><button data-action="replace">保留旧版本并替换</button></label>
+    <h3>全部 representations</h3>
+    <ul>{% for item in asset.representations %}<li><a href="{{ item.uri }}">{{ item.id }}</a> · {{ item.format }} · {{ item.purpose }}{% if item.editable %} · 可编辑{% endif %}{% if item.derived_from %} · derived from <code>{{ item.derived_from }}</code>{% endif %}</li>{% endfor %}</ul>
+    <details><summary>来源与审阅说明</summary><pre>{{ asset.provenance }}</pre><p>{{ asset.review_notes }}</p></details>
+  </article>
+  {% else %}<p>尚未登记逻辑资产。</p>{% endfor %}
+  <script>
+    const token = {{ token | tojson }};
+    const status = document.getElementById('status');
+    const extensionFormat = (name, type) => {
+      const ext = name.split('.').pop().toLowerCase();
+      return ({jpg:'jpeg',jpeg:'jpeg',png:'png',pdf:'pdf',svg:'svg',ipe:'ipe',tex:'tikz',webp:'webp',gif:'gif',bmp:'bmp'})[ext] || (type === 'image/jpeg' ? 'jpeg' : 'other');
+    };
+    async function invoke(card, action, payload = {}) {
+      const url = `/api/assets/${encodeURIComponent(card.dataset.question)}/${encodeURIComponent(card.dataset.asset)}/${action}`;
+      const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-QBank-Token': token}, body: JSON.stringify(payload)});
+      const data = await response.json();
+      status.textContent = data.ok ? `完成：${data.action || action}` : `失败：${data.error || '未知错误'}`;
+      status.className = `status ${data.ok ? 'ok' : 'error'}`;
+      if (data.ok && ['render','replace','set-render','set-editor','finalize'].includes(action)) window.setTimeout(() => window.location.reload(), 250);
+    }
+    document.querySelectorAll('.asset').forEach((card) => {
+      card.querySelectorAll('button[data-action]').forEach((button) => button.addEventListener('click', async () => {
+        const action = button.dataset.action;
+        if (action === 'replace') {
+          const input = card.querySelector('input[data-replace]');
+          const file = input.files[0];
+          if (!file) { status.textContent = '请选择替换文件。'; status.className = 'status error'; return; }
+          const reader = new FileReader();
+          reader.onload = () => invoke(card, action, {data_uri: reader.result, format: extensionFormat(file.name, file.type), representation_id: file.name.replace(/[^A-Za-z0-9_.-]+/g, '-'), editable: ['ipe','tikz'].includes(extensionFormat(file.name, file.type))});
+          reader.readAsDataURL(file);
+        } else { await invoke(card, action); }
+      }));
+      card.querySelectorAll('select[data-preference]').forEach((select) => select.addEventListener('change', () => {
+        if (select.value) invoke(card, select.dataset.preference, {representation_id: select.value});
+      }));
+    });
+  </script>
+</body>
+</html>

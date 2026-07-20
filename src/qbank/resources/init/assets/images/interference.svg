@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox="0 0 640 220">
+  <rect width="640" height="220" fill="#f8fafc"/>
+  <g stroke="#2563eb" stroke-width="3" fill="none">
+    <path d="M40 110 C90 25, 140 195, 190 110 S290 25, 340 110 S440 195, 490 110 S590 25, 630 110"/>
+    <path d="M40 110 C90 195, 140 25, 190 110 S290 195, 340 110 S440 25, 490 110 S590 195, 630 110" opacity=".55"/>
+  </g>
+  <text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#334155">
+    qbank generated interference sketch
+  </text>
+</svg>

@@ -1,0 +1,193 @@
+{
+  "$defs": {
+    "PaperMetadata": {
+      "additionalProperties": false,
+      "description": "Paper-level metadata.",
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "duration_minutes": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Minutes"
+        },
+        "total_score": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Score"
+        }
+      },
+      "title": "PaperMetadata",
+      "type": "object"
+    },
+    "PaperOptions": {
+      "additionalProperties": false,
+      "description": "Paper rendering defaults.",
+      "properties": {
+        "show_scores": {
+          "default": true,
+          "title": "Show Scores",
+          "type": "boolean"
+        },
+        "show_question_ids": {
+          "default": false,
+          "title": "Show Question Ids",
+          "type": "boolean"
+        },
+        "include_answers": {
+          "default": false,
+          "title": "Include Answers",
+          "type": "boolean"
+        },
+        "include_solutions": {
+          "default": false,
+          "title": "Include Solutions",
+          "type": "boolean"
+        },
+        "include_rubric": {
+          "default": false,
+          "title": "Include Rubric",
+          "type": "boolean"
+        }
+      },
+      "title": "PaperOptions",
+      "type": "object"
+    },
+    "PaperQuestion": {
+      "additionalProperties": false,
+      "description": "One scored paper question reference.",
+      "properties": {
+        "id": {
+          "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "score": {
+          "exclusiveMinimum": 0,
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "score"
+      ],
+      "title": "PaperQuestion",
+      "type": "object"
+    },
+    "PaperSection": {
+      "additionalProperties": false,
+      "description": "A titled paper section.",
+      "properties": {
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "instructions": {
+          "default": "",
+          "title": "Instructions",
+          "type": "string"
+        },
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/PaperQuestion"
+          },
+          "minItems": 1,
+          "title": "Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "questions"
+      ],
+      "title": "PaperSection",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "paper.yaml structure.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "subtitle": {
+      "default": "",
+      "title": "Subtitle",
+      "type": "string"
+    },
+    "language": {
+      "default": "zh-CN",
+      "title": "Language",
+      "type": "string"
+    },
+    "date": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Date"
+    },
+    "metadata": {
+      "$ref": "#/$defs/PaperMetadata"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/PaperSection"
+      },
+      "minItems": 1,
+      "title": "Sections",
+      "type": "array"
+    },
+    "options": {
+      "$ref": "#/$defs/PaperOptions"
+    }
+  },
+  "required": [
+    "schema_version",
+    "title",
+    "sections"
+  ],
+  "title": "Paper",
+  "type": "object"
+}

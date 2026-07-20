@@ -1,0 +1,56 @@
+# Changelog
+
+## 0.1.0 - 2026-07-18
+
+- Added native logical multi-representation assets, authoritative `asset.yaml`
+  manifests, package exchange schemas, lifecycle/history validation, immutable
+  replacement and Ipe PDF/SVG/PNG rendering commands.
+- Added `qbank asset` management commands and a token-protected,
+  `127.0.0.1`-only `qbank preview --serve` management page.
+- Added the asset-package boundary for the Zhejiang University 841 Ipe
+  digitization workflow; it emits packages rather than writing qbank asset
+  directories directly.
+- Paper builds now copy only assets referenced by the selected student or
+  answer content, preventing answer-only figures from entering student
+  artifact manifests.
+
+- Initial local-first Markdown question bank CLI.
+- Added JSON/JSONL import, validation, structured patching, history, querying, FTS5
+  search, static preview, exports, and Markdown/HTML/DOCX paper builds.
+- Added machine-readable schemas, eight sample questions, documentation, and tests.
+- Hardened configured-path containment, fail-closed initialization, malformed-source
+  protection, and rollback-capable source/history transactions.
+- Added strict Markdown image diagnostics, sandboxed Jinja HTML rendering, atomic
+  preview replacement, and two-character SQLite search fallback.
+- Added line-aware JSONL recovery, durable dirty-index reporting, paper/patch schemas,
+  tri-state paper flags, strict timestamps and query filters, and expanded doctor/status
+  diagnostics.
+- Added immutable project contexts, single-pass repository snapshots, typed application
+  results, named mutation plans, and small repository/index/history/rendering ports.
+- Split SQLite into explicit read-only and writable modes and centralized all schema,
+  writes, searches, and stale checks on one `IndexDocument` projection.
+- Unified Markdown image handling and sandboxed rendering through shared asset/render
+  services; moved initialization and preview templates into packaged resources.
+- Split the CLI into project, question, and artifact command modules; added strict
+  Pyright, complexity limits, import-graph checks, wheel-resource tests, and documented
+  internal dependency boundaries.
+- Added repository `AGENTS.md`, the discoverable `$qbank` Skill and workflow references,
+  Codex discovery fixtures, and packaged integration files for newly initialized banks.
+- Added `qbank codex check`, `qbank codex instructions`, and confirmation-gated
+  `qbank codex install-skill`, backed by a reusable service layer for a future MCP wrapper.
+- Added explicit domain/application/infrastructure boundaries, a centralized composition
+  root, a reusable `QuestionService`, executable Import Linter contracts, deptry, and
+  branch-coverage quality gates.
+- Added architecture, review, compatibility, and ADR documentation plus lossless
+  JSON/Markdown round-trip and in-memory port probes.
+- Added the registry-based `txt` question exporter without changing repository, parser,
+  query, or validation internals.
+- Centralized diagnostic codes and JSON failure envelopes, including pre-dispatch CLI
+  usage errors and unavailable-index states.
+- Completed composition-root injection for mutations, diagnostics, and rendering,
+  removed the unused parallel ports module, and reduced legacy storage APIs to
+  repository wrappers.
+- Made exports and paper artifacts rollback-capable with dependency preflight and
+  zero-partial-output failure behavior.
+- Locked build tooling alongside runtime/development dependencies, exercised installed
+  wheel entry points, and hardened the branch-coverage report gate against empty input.

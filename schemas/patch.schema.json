@@ -1,0 +1,154 @@
+{
+  "additionalProperties": false,
+  "description": "Structured question patch.",
+  "properties": {
+    "set": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "description": "Supported question types.",
+          "enum": [
+            "single_choice",
+            "multiple_choice",
+            "true_false",
+            "fill_blank",
+            "calculation",
+            "short_answer",
+            "proof",
+            "essay",
+            "composite",
+            "other"
+          ],
+          "title": "QuestionType",
+          "type": "string"
+        },
+        "subject": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Subject",
+          "type": "string"
+        },
+        "chapter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Chapter"
+        },
+        "difficulty": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "status": {
+          "description": "Supported review states.",
+          "enum": [
+            "draft",
+            "reviewed",
+            "verified",
+            "deprecated"
+          ],
+          "title": "QuestionStatus",
+          "type": "string"
+        },
+        "language": {
+          "minLength": 1,
+          "title": "Language",
+          "type": "string"
+        },
+        "source": {
+          "additionalProperties": false,
+          "description": "Short provenance metadata.",
+          "properties": {
+            "type": {
+              "minLength": 1,
+              "title": "Type",
+              "type": "string"
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reference"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "Source",
+          "type": "object"
+        },
+        "assets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "stem_md": {
+          "title": "Stem Md",
+          "type": "string"
+        },
+        "options_md": {
+          "default": "",
+          "title": "Options Md",
+          "type": "string"
+        },
+        "answer_md": {
+          "default": "",
+          "title": "Answer Md",
+          "type": "string"
+        },
+        "solution_md": {
+          "default": "",
+          "title": "Solution Md",
+          "type": "string"
+        },
+        "rubric_md": {
+          "default": "",
+          "title": "Rubric Md",
+          "type": "string"
+        },
+        "review_notes_md": {
+          "default": "",
+          "title": "Review Notes Md",
+          "type": "string"
+        }
+      },
+      "title": "Set",
+      "type": "object"
+    },
+    "add_topics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Add Topics",
+      "type": "array"
+    },
+    "remove_topics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Remove Topics",
+      "type": "array"
+    }
+  },
+  "title": "QuestionPatch",
+  "type": "object"
+}

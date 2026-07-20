@@ -1,0 +1,4 @@
+interface:
+  display_name: "qbank Question Bank"
+  short_description: "Manage and publish the local Markdown question bank"
+  default_prompt: "Use $qbank to inspect this local question bank and follow the dry-run-first workflow."

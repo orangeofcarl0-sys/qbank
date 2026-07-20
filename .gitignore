@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.import_linter_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+Thumbs.db
+.DS_Store
+
+# Local verification projects
+demo-bank/
+demo-smoke/
