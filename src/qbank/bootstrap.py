@@ -14,7 +14,8 @@ from qbank.infrastructure import (
     RepositoryValidationAdapter,
     SafeAssetLauncher,
 )
-from qbank.operations import MutationServices
+from qbank.models import PatchQuestionResult, QuestionPatch
+from qbank.operations import MutationServices, apply_patch_in_context
 from qbank.rendering import RenderService
 from qbank.repository import MarkdownQuestionRepository
 from qbank.search_index import SQLiteSearchIndex
@@ -32,24 +33,52 @@ class ProjectServices:
     assets: AssetApplicationService
 
 
+@dataclass(frozen=True, slots=True)
+class QuestionMutationAdapter:
+    """Bind the context-aware mutation use case to the application port."""
+
+    context: ProjectContext
+    services: MutationServices
+
+    def apply_patch(
+        self,
+        question_id: str,
+        patch: QuestionPatch,
+        *,
+        dry_run: bool,
+        command: str,
+    ) -> PatchQuestionResult:
+        """Apply one validated question patch."""
+        return apply_patch_in_context(
+            self.context,
+            question_id,
+            patch,
+            services=self.services,
+            dry_run=dry_run,
+            command=command,
+        )
+
+
 def create_project_services(context: ProjectContext) -> ProjectServices:
     """Wire shared adapters exactly once at the explicit composition root."""
     repository = MarkdownQuestionRepository(context)
     index = SQLiteSearchIndex(context)
     validator = RepositoryValidationAdapter(context)
     asset_repository = FileAssetRepository(context)
+    mutations = MutationServices(
+        repository=repository,
+        index=index,
+        history=JsonHistoryStore(context),
+    )
     return ProjectServices(
         repository=repository,
         questions=QuestionService(
             repository=repository,
             validator=validator,
             index=index,
+            mutations=QuestionMutationAdapter(context, mutations),
         ),
-        mutations=MutationServices(
-            repository=repository,
-            index=index,
-            history=JsonHistoryStore(context),
-        ),
+        mutations=mutations,
         diagnostics=DiagnosticServices(
             repository=repository,
             validator=validator,

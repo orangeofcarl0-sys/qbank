@@ -9,6 +9,7 @@ from pydantic import Field
 
 from qbank.models.asset import AssetManifest
 from qbank.models.common import ResultModel
+from qbank.models.question import Question
 
 Severity = Literal["error", "warning", "info"]
 
@@ -30,6 +31,7 @@ class DiagnosticCode(StrEnum):
     ASSET_PACKAGE_INVALID = "asset_package_invalid"
     ASSET_PATH_ESCAPE = "asset_path_escape"
     ASSET_REPRESENTATION_MISSING = "asset_representation_missing"
+    ASSET_RENDER_STALE = "asset_render_stale"
     CLI_USAGE = "cli_usage"
     CONFLICT = "conflict"
     CONTENT_IN_YAML = "content_in_yaml"
@@ -108,6 +110,10 @@ ValidationIssue = Diagnostic
 
 
 def _diagnostic_list() -> list[Diagnostic]:
+    return []
+
+
+def _change_dict_list() -> list[dict[str, Any]]:
     return []
 
 
@@ -280,6 +286,8 @@ class AssetMutationResult(ResultModel):
         "set_editor",
         "finalize",
         "normalize",
+        "reconcile",
+        "restore",
     ]
     question_id: str
     asset_id: str
@@ -316,6 +324,54 @@ class AssetRenderResult(ResultModel):
     question_updated: bool = False
     generated: list[str]
     commands: list[list[str]]
+    warnings: list[Diagnostic] = Field(default_factory=_diagnostic_list)
+
+
+class AssetHistoryEntry(ResultModel):
+    """One append-only logical-asset history event."""
+
+    timestamp: str
+    operation: str
+    question_id: str
+    asset_id: str
+    representation_ids: list[str]
+    changes: list[dict[str, Any]] = Field(default_factory=_change_dict_list)
+
+
+class AssetHistoryResult(ResultModel):
+    """History events for one logical asset or all assets of a question."""
+
+    ok: bool
+    question_id: str
+    asset_id: str | None = None
+    events: list[AssetHistoryEntry]
+
+
+class DesktopQuestionSummary(ResultModel):
+    """One lightweight navigation row for the desktop editor."""
+
+    id: str
+    title: str
+    subject: str
+    status: str
+    question_type: str
+    difficulty: int
+    needs_redraw: bool
+
+
+class DesktopQuestionDocument(ResultModel):
+    """One editable question and its current logical-asset state."""
+
+    question: Question
+    source: str
+    assets: list[AssetManifest]
+    history: list[AssetHistoryEntry]
+
+
+class DesktopPreviewResult(ResultModel):
+    """Rendered interactive preview fragment and lifecycle warnings."""
+
+    html: str
     warnings: list[Diagnostic] = Field(default_factory=_diagnostic_list)
 
 

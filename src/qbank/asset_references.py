@@ -40,11 +40,14 @@ class AssetReference:
     representation_id: str | None = None
 
 
+TEX_ASSET_PATTERN = re.compile(rf"\\qbankasset\s*\{{\s*({ASSET_ID_PATTERN[1:-1]})\s*\}}")
+
+
 def classify_resource_uri(uri: str) -> AssetReference:
     """Classify and normalize one Markdown or YAML resource reference."""
     value = uri.strip()
     parsed = urlsplit(value)
-    if parsed.scheme == "asset":
+    if parsed.scheme in {"asset", "qbank-asset"}:
         asset_id = parsed.path
         representation_id = parsed.fragment or None
         valid = (
@@ -61,9 +64,9 @@ def classify_resource_uri(uri: str) -> AssetReference:
                 raw=uri,
                 kind=AssetKind.LOGICAL,
                 normalized=(
-                    f"asset:{asset_id}#{representation_id}"
+                    f"qbank-asset:{asset_id}#{representation_id}"
                     if representation_id is not None
-                    else f"asset:{asset_id}"
+                    else f"qbank-asset:{asset_id}"
                 ),
                 asset_id=asset_id,
                 representation_id=representation_id,
@@ -95,8 +98,11 @@ def extract_image_resources(question: Question) -> dict[str, set[str]]:
     parser.validateLink = _allow_link
     resources: dict[str, set[str]] = {}
     for field in QUESTION_CONTENT_FIELDS:
-        for source in _image_sources(parser.parse(getattr(question, field))):
+        value = getattr(question, field)
+        for source in _image_sources(parser.parse(value)):
             resources.setdefault(source, set()).add(field)
+        for asset_id in extract_tex_asset_ids(value):
+            resources.setdefault(f"qbank-asset:{asset_id}", set()).add(field)
     return resources
 
 
@@ -104,7 +110,14 @@ def extract_markdown_image_resources(markdown: str) -> set[str]:
     """Extract image destinations from one already-rendered Markdown document."""
     parser = MarkdownIt("commonmark", {"html": False})
     parser.validateLink = _allow_link
-    return set(_image_sources(parser.parse(markdown)))
+    resources = set(_image_sources(parser.parse(markdown)))
+    resources.update(f"qbank-asset:{asset_id}" for asset_id in extract_tex_asset_ids(markdown))
+    return resources
+
+
+def extract_tex_asset_ids(text: str) -> tuple[str, ...]:
+    """Return stable IDs referenced by ``\\qbankasset{...}`` commands."""
+    return tuple(match.group(1) for match in TEX_ASSET_PATTERN.finditer(text))
 
 
 def _image_sources(tokens: list[Token]) -> list[str]:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from hashlib import sha256
 from pathlib import Path
 
 from qbank.application.assets import AssetApplicationService
@@ -112,7 +113,24 @@ class AssetService:
         require_final: bool = False,
     ) -> tuple[Question, list[Diagnostic]]:
         """Project all registered references in one question deterministically."""
+        projected, warnings, _ = self.project_question_with_bindings(
+            question,
+            target=target,
+            require_final=require_final,
+        )
+        return projected, warnings
+
+    def project_question_with_bindings(
+        self,
+        question: Question,
+        *,
+        target: AssetTarget,
+        require_final: bool = False,
+    ) -> tuple[Question, list[Diagnostic], dict[str, str]]:
+        """Project one question and bind selected URIs back to stable asset IDs."""
         replacements: dict[str, str] = {}
+        tex_replacements: dict[str, str] = {}
+        bindings: dict[str, str] = {}
         declarations: list[str] = []
         warnings: list[Diagnostic] = []
         seen_manifests: set[str] = set()
@@ -121,6 +139,8 @@ class AssetService:
             manifest = self._manifest_for_reference(question.id, reference, raw)
             if manifest is None:
                 declarations.append(raw)
+                if reference.kind in {AssetKind.LOCAL, AssetKind.EXTERNAL}:
+                    bindings[raw] = stable_legacy_asset_id(raw)
                 continue
             selected = self.registry.select(
                 manifest,
@@ -129,6 +149,16 @@ class AssetService:
             )
             resolved = self._selected_uri(manifest, selected.representation_id)
             replacements[raw] = resolved
+            if reference.kind == AssetKind.LOGICAL:
+                suffix = (
+                    f"#{reference.representation_id}"
+                    if reference.representation_id is not None
+                    else ""
+                )
+                replacements[f"asset:{manifest.asset_id}{suffix}"] = resolved
+                replacements[f"qbank-asset:{manifest.asset_id}{suffix}"] = resolved
+                tex_replacements[manifest.asset_id] = resolved
+            bindings[resolved] = manifest.asset_id
             declarations.append(resolved)
             if manifest.asset_id not in seen_manifests:
                 warnings.extend(
@@ -142,16 +172,18 @@ class AssetService:
             "assets": list(dict.fromkeys(declarations)),
         }
         for field in QUESTION_CONTENT_FIELDS:
-            updates[field] = replace_image_uris(
+            markdown = replace_image_uris(
                 getattr(question, field),
                 replacements,
             )
-        return Question.model_validate(
+            updates[field] = replace_tex_asset_references(markdown, tex_replacements)
+        projected = Question.model_validate(
             {
                 **question.model_dump(mode="python"),
                 **updates,
             }
-        ), warnings
+        )
+        return projected, warnings, bindings
 
     def _manifest_for_reference(
         self,
@@ -211,3 +243,23 @@ def replace_image_uris(markdown: str, replacements: dict[str, str]) -> str:
         return f"{match.group(1)}{replacements.get(raw, raw)}{match.group(3)}"
 
     return pattern.sub(replace, markdown)
+
+
+def replace_tex_asset_references(markdown: str, replacements: dict[str, str]) -> str:
+    """Render stable TeX asset commands as target-selected Markdown images."""
+    if not replacements:
+        return markdown
+    pattern = re.compile(r"\\qbankasset\s*\{\s*([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\}")
+
+    def replace(match: re.Match[str]) -> str:
+        asset_id = match.group(1)
+        uri = replacements.get(asset_id)
+        return match.group(0) if uri is None else f"![{asset_id}]({uri})"
+
+    return pattern.sub(replace, markdown)
+
+
+def stable_legacy_asset_id(reference: str) -> str:
+    """Return a deterministic pending logical ID for a legacy image URI."""
+    digest = sha256(reference.strip().encode("utf-8")).hexdigest()
+    return f"legacy-{digest[:12]}"

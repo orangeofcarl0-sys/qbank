@@ -16,11 +16,14 @@ from qbank.domain import (
 )
 from qbank.models import (
     AssetFormat,
+    AssetHistoryEntry,
     AssetManifest,
     AssetPackageRepresentation,
     Diagnostic,
     IndexHealth,
+    PatchQuestionResult,
     Question,
+    QuestionPatch,
     SearchHit,
     ValidationReport,
 )
@@ -59,6 +62,19 @@ class MutationIndexPort(Protocol):
     ) -> None: ...
 
     def mark_dirty(self, reason: str) -> None: ...
+
+
+class QuestionMutationPort(Protocol):
+    """Structured authoritative question mutations used by interactive clients."""
+
+    def apply_patch(
+        self,
+        question_id: str,
+        patch: QuestionPatch,
+        *,
+        dry_run: bool,
+        command: str,
+    ) -> PatchQuestionResult: ...
 
 
 class IndexHealthPort(Protocol):
@@ -152,6 +168,12 @@ class AssetRepositoryPort(Protocol):
     ) -> None: ...
 
     def record(self, event: AssetHistoryEvent) -> None: ...
+
+    def history(
+        self,
+        question_id: str,
+        asset_id: str | None = None,
+    ) -> tuple[AssetHistoryEntry, ...]: ...
 
     def diagnostics(self) -> tuple[Diagnostic, ...]: ...
 

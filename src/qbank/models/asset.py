@@ -77,6 +77,7 @@ class AssetRepresentation(StrictModel):
     purpose: str = Field(min_length=1)
     editable: bool = False
     derived_from: str | None = Field(default=None, pattern=ASSET_ID_PATTERN)
+    stale: bool = False
     content_hash: str | None = Field(default=None, pattern=CONTENT_HASH_PATTERN)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

@@ -7,6 +7,7 @@ import binascii
 import hashlib
 import json
 import re
+import time
 import urllib.request
 import uuid
 from collections.abc import Mapping
@@ -32,6 +33,7 @@ from qbank.errors import (
 from qbank.models import (
     ASSET_ID_PATTERN,
     AssetFormat,
+    AssetHistoryEntry,
     AssetManifest,
     AssetPackageRepresentation,
     AssetRepresentation,
@@ -173,6 +175,33 @@ class FileAssetRepository:
         transaction.write(path, text)
         transaction.commit()
 
+    def history(
+        self,
+        question_id: str,
+        asset_id: str | None = None,
+    ) -> tuple[AssetHistoryEntry, ...]:
+        """Read append-only events for one question or one logical asset."""
+        root = self.context.paths.state / "asset-history"
+        if not root.is_dir():
+            return ()
+        events: list[AssetHistoryEntry] = []
+        paths = sorted(
+            root.glob("*.json"),
+            key=lambda item: (item.stat().st_mtime_ns, item.name),
+        )
+        for path in paths:
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                event = AssetHistoryEntry.model_validate(value)
+            except (OSError, UnicodeError, json.JSONDecodeError, ValidationError):
+                continue
+            if event.question_id != question_id:
+                continue
+            if asset_id is not None and event.asset_id != asset_id:
+                continue
+            events.append(event)
+        return tuple(events)
+
     def diagnostics(self) -> tuple[Diagnostic, ...]:
         return self._scan()[1]
 
@@ -209,11 +238,12 @@ class FileAssetRepository:
     def _history(self, event: AssetHistoryEvent) -> tuple[Path, str]:
         timestamp = utc_now()
         compact = timestamp.replace(":", "").replace("-", "")
+        sequence = time.time_ns()
         path = (
             self.context.paths.state
             / "asset-history"
             / (
-                f"{compact}-{event.operation}-{event.question_id}-"
+                f"{compact}-{sequence}-{event.operation}-{event.question_id}-"
                 f"{event.asset_id}-{uuid.uuid4().hex[:8]}.json"
             )
         )

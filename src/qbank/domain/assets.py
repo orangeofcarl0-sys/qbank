@@ -27,7 +27,6 @@ TARGET_FORMAT_PREFERENCES: dict[AssetTarget, tuple[AssetFormat, ...]] = {
         AssetFormat.JPEG,
         AssetFormat.WEBP,
         AssetFormat.GIF,
-        AssetFormat.PDF,
         AssetFormat.URL,
     ),
     "html": (
@@ -115,7 +114,7 @@ def select_asset_representation(
         return candidate if candidate is not None and candidate.format in preferences else None
     if manifest.preferred_render is not None:
         candidate = by_id[manifest.preferred_render]
-        if candidate.format in preferences:
+        if candidate.format in preferences and not candidate.stale:
             return candidate
     rank = {format_: index for index, format_ in enumerate(preferences)}
     compatible = [
@@ -123,6 +122,13 @@ def select_asset_representation(
     ]
     if not compatible:
         return None
+    fresh = [item for item in compatible if not item.stale]
+    if fresh:
+        compatible = fresh
+    elif manifest.preferred_render is not None:
+        preferred = by_id[manifest.preferred_render]
+        if preferred in compatible:
+            return preferred
     return min(
         compatible,
         key=lambda item: (rank[item.format], item.representation_id),

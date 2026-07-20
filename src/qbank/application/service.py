@@ -7,10 +7,18 @@ from dataclasses import dataclass
 
 from qbank.application.ports import (
     QuestionIndexPort,
+    QuestionMutationPort,
     QuestionRepositoryPort,
     RepositoryValidatorPort,
 )
-from qbank.models import QueryFilters, Question, SearchHit, ValidationReport
+from qbank.models import (
+    PatchQuestionResult,
+    QueryFilters,
+    Question,
+    QuestionPatch,
+    SearchHit,
+    ValidationReport,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +28,7 @@ class QuestionService:
     repository: QuestionRepositoryPort
     validator: RepositoryValidatorPort
     index: QuestionIndexPort
+    mutations: QuestionMutationPort | None = None
 
     def query_questions(self, filters: QueryFilters | None = None) -> list[Question]:
         """Return deterministically filtered authoritative questions."""
@@ -69,6 +78,24 @@ class QuestionService:
         snapshot = self.repository.scan()
         snapshot.require_consistent()
         return self.index.rebuild(snapshot)
+
+    def patch_question(
+        self,
+        question_id: str,
+        patch: QuestionPatch,
+        *,
+        dry_run: bool,
+        command: str = "qbank desktop",
+    ) -> PatchQuestionResult:
+        """Apply one structured mutation through the injected application port."""
+        if self.mutations is None:
+            raise RuntimeError("question mutation service is not configured")
+        return self.mutations.apply_patch(
+            question_id,
+            patch,
+            dry_run=dry_run,
+            command=command,
+        )
 
 
 def question_matches(question: Question, filters: QueryFilters) -> bool:

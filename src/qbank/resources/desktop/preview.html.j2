@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="{{ question.language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {inlineMath: [['$', '$'], ['\\(', '\\)']]},
+      svg: {fontCache: 'global'}
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root { color-scheme: light; font: 15px/1.65 system-ui, "Microsoft YaHei", sans-serif; }
+    body { margin: 0; padding: 28px 34px 80px; color: #25282c; background: #fff; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .meta { color: #68717d; margin-bottom: 24px; }
+    section { margin: 24px 0; }
+    section > h2 { color: #66717d; font-size: 13px; letter-spacing: .08em; }
+    img[data-asset-id] {
+      max-width: 100%; min-width: 48px; border: 2px solid transparent;
+      border-radius: 5px; cursor: context-menu;
+    }
+    img[data-asset-id]:hover, img.asset-target { border-color: #4c8bf5; }
+    .asset-state { margin-top: 32px; border-top: 1px solid #e8eaed; padding-top: 10px; }
+    .asset-state span { display: inline-block; margin: 4px; padding: 2px 7px;
+      border-radius: 10px; background: #eef1f5; font-size: 12px; }
+    .asset-state .stale { color: #9a4d00; background: #fff1dc; }
+    #asset-menu {
+      position: fixed; z-index: 1000; display: none; min-width: 190px;
+      padding: 5px; border: 1px solid #cfd4dc; border-radius: 7px;
+      background: #fff; box-shadow: 0 8px 28px #0002;
+    }
+    #asset-menu button { display: block; width: 100%; border: 0; padding: 7px 10px;
+      text-align: left; background: transparent; border-radius: 4px; }
+    #asset-menu button:hover { background: #edf3ff; }
+    .drop-hint { position: fixed; right: 14px; bottom: 12px; color: #7a838f; font-size: 12px; }
+  </style>
+</head>
+<body data-question-id="{{ question.id }}">
+  <h1>{{ question.title }}</h1>
+  <div class="meta"><code>{{ question.id }}</code> · {{ question.subject }} · {{ question.status }}</div>
+  {% for section in sections %}
+  {% if section.html %}
+  <section data-field="{{ section.field }}">
+    <h2>{{ section.title }}</h2>
+    <div class="content">{{ section.html | safe }}</div>
+  </section>
+  {% endif %}
+  {% endfor %}
+  <div class="asset-state">
+    {% for asset in assets %}
+    <span class="{% if asset.status != 'final' or asset.representations | selectattr('stale') | list %}stale{% endif %}">
+      {{ asset.asset_id }} · {{ asset.status }}
+      {% if asset.representations | selectattr('stale') | list %}· stale{% endif %}
+    </span>
+    {% endfor %}
+  </div>
+  <div class="drop-hint">拖入图片：落在题图上替换，落在空白处新建资产</div>
+  <div id="asset-menu">
+    <button data-action="edit">用 Ipe 编辑</button>
+    <button data-action="replace-file">替换为本地文件</button>
+    <button data-action="replace-clipboard">从剪贴板替换</button>
+    <button data-action="open-original">打开原始参考图</button>
+    <button data-action="render">重新渲染</button>
+    <button data-action="set-render">设为首选表示</button>
+    <button data-action="show-directory">在资源管理器中显示</button>
+    <button data-action="restore">恢复上一版本</button>
+  </div>
+  <script>
+    let bridge = null;
+    let menuAsset = null;
+    const menu = document.getElementById('asset-menu');
+    new QWebChannel(qt.webChannelTransport, channel => { bridge = channel.objects.previewBridge; });
+
+    function assetImage(node) {
+      return node && node.closest ? node.closest('img[data-asset-id]') : null;
+    }
+    document.addEventListener('contextmenu', event => {
+      const image = assetImage(event.target);
+      if (!image) return;
+      event.preventDefault();
+      menuAsset = image.dataset.assetId;
+      menu.style.left = `${Math.min(event.clientX, innerWidth - 210)}px`;
+      menu.style.top = `${Math.min(event.clientY, innerHeight - 280)}px`;
+      menu.style.display = 'block';
+    });
+    document.addEventListener('click', event => {
+      const action = event.target.closest('#asset-menu button')?.dataset.action;
+      if (action && menuAsset && bridge) bridge.requestAction(menuAsset, action);
+      menu.style.display = 'none';
+    });
+    document.addEventListener('dblclick', event => {
+      const image = assetImage(event.target);
+      if (image && bridge) bridge.requestAction(image.dataset.assetId, 'edit');
+    });
+    document.addEventListener('dragover', event => {
+      event.preventDefault();
+      const image = assetImage(event.target);
+      document.querySelectorAll('.asset-target').forEach(node => node.classList.remove('asset-target'));
+      if (image) image.classList.add('asset-target');
+    });
+    document.addEventListener('dragleave', event => {
+      if (!event.relatedTarget) document.querySelectorAll('.asset-target')
+        .forEach(node => node.classList.remove('asset-target'));
+    });
+    document.addEventListener('drop', event => {
+      event.preventDefault();
+      document.querySelectorAll('.asset-target').forEach(node => node.classList.remove('asset-target'));
+      const file = event.dataTransfer.files[0];
+      if (!file || !bridge) return;
+      const image = assetImage(event.target);
+      const reader = new FileReader();
+      reader.onload = () => bridge.assetDropped(image?.dataset.assetId || '', file.name, reader.result);
+      reader.readAsDataURL(file);
+    });
+  </script>
+</body>
+</html>

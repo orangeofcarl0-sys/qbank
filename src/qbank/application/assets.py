@@ -29,6 +29,7 @@ from qbank.errors import (
 from qbank.models import (
     AssetCommandResult,
     AssetFormat,
+    AssetHistoryResult,
     AssetListResult,
     AssetManifest,
     AssetMutationResult,
@@ -77,6 +78,19 @@ class AssetApplicationService:
             ok=True,
             asset=manifest,
             manifest_path=self.repository.location(question_id, asset_id).relative_manifest,
+        )
+
+    def history(
+        self,
+        question_id: str,
+        asset_id: str | None = None,
+    ) -> AssetHistoryResult:
+        """Return append-only events through the registered repository port."""
+        return AssetHistoryResult(
+            ok=True,
+            question_id=question_id,
+            asset_id=asset_id,
+            events=list(self.repository.history(question_id, asset_id)),
         )
 
     def ingest_package(
@@ -250,6 +264,34 @@ class AssetApplicationService:
         representation = self.select(manifest, "preview")
         return self._launch(manifest, representation, "open", dry_run=dry_run)
 
+    def open_original(
+        self,
+        question_id: str,
+        asset_id: str,
+        *,
+        dry_run: bool,
+    ) -> AssetCommandResult:
+        """Open the earliest registered original/reference representation."""
+        manifest = self.repository.get(question_id, asset_id)
+        candidates = [
+            item
+            for item in manifest.representations
+            if item.purpose in {"original", "reference", "source-context"}
+            or item.derived_from is None
+        ]
+        if not candidates:
+            raise DataValidationError(
+                f"asset_representation_missing: asset has no original reference: {asset_id}"
+            )
+        representation = min(
+            candidates,
+            key=lambda item: (
+                0 if item.purpose == "original" else 1,
+                item.representation_id,
+            ),
+        )
+        return self._launch(manifest, representation, "open", dry_run=dry_run)
+
     def edit_asset(
         self,
         question_id: str,
@@ -271,6 +313,115 @@ class AssetApplicationService:
                     question_id=question_id,
                     asset_id=asset_id,
                     representation_ids=(representation.representation_id,),
+                ),
+            )
+        return result
+
+    def begin_edit_session(
+        self,
+        question_id: str,
+        asset_id: str,
+        *,
+        dry_run: bool,
+    ) -> AssetCommandResult:
+        """Create and open a versioned editable working copy."""
+        manifest = self.repository.get(question_id, asset_id)
+        editor = _editor_representation(manifest)
+        source = self.repository.representation_path(manifest, editor.representation_id)
+        if source is None or not source.is_file():
+            raise DataValidationError(
+                f"asset_representation_missing: editable source is missing: {editor.path}"
+            )
+        if dry_run:
+            command = self.launcher.edit_file(source, editor.format, execute=False)
+            return _edit_command_result(manifest, editor, source, command, dry_run=True)
+        content = source.read_bytes()
+        updated, working = _edit_working_copy(manifest, editor, content)
+        self.repository.commit(
+            updated,
+            {working.path or "": content},
+            AssetHistoryEvent(
+                operation="asset_edit_begin",
+                question_id=question_id,
+                asset_id=asset_id,
+                representation_ids=(working.representation_id,),
+                changes=(
+                    {
+                        "from": editor.representation_id,
+                        "to": working.representation_id,
+                    },
+                ),
+            ),
+        )
+        target = self.repository.representation_path(updated, working.representation_id)
+        if target is None:
+            raise DataValidationError("asset_representation_missing: working copy has no path")
+        command = self.launcher.edit_file(target, working.format, execute=True)
+        return _edit_command_result(updated, working, target, command, dry_run=False)
+
+    def reconcile_editor_change(
+        self,
+        question_id: str,
+        asset_id: str,
+        *,
+        dry_run: bool,
+    ) -> AssetMutationResult:
+        """Re-hash a saved working copy and mark previous renders stale."""
+        manifest = self.repository.get(question_id, asset_id)
+        editor = _editor_representation(manifest)
+        path = self.repository.representation_path(manifest, editor.representation_id)
+        if path is None or not path.is_file():
+            raise DataValidationError(
+                f"asset_representation_missing: editable source is missing: {editor.path}"
+            )
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest == editor.content_hash:
+            return self._mutation_result(manifest, "reconcile", dry_run=dry_run)
+        updated = _reconciled_editor_manifest(manifest, editor, digest)
+        result = self._mutation_result(updated, "reconcile", dry_run=dry_run)
+        if not dry_run:
+            self.repository.commit(
+                updated,
+                {},
+                AssetHistoryEvent(
+                    operation="asset_edit_saved",
+                    question_id=question_id,
+                    asset_id=asset_id,
+                    representation_ids=(editor.representation_id,),
+                    changes=(
+                        {
+                            "before_hash": editor.content_hash,
+                            "after_hash": digest,
+                            "renders_stale": True,
+                        },
+                    ),
+                ),
+            )
+        return result
+
+    def restore_previous(
+        self,
+        question_id: str,
+        asset_id: str,
+        *,
+        dry_run: bool,
+    ) -> AssetMutationResult:
+        """Restore previous editor/render preferences without deleting versions."""
+        manifest = self.repository.get(question_id, asset_id)
+        updated, changes = _restored_manifest(manifest)
+        result = self._mutation_result(updated, "restore", dry_run=dry_run)
+        if not dry_run:
+            self.repository.commit(
+                updated,
+                {},
+                AssetHistoryEvent(
+                    operation="asset_restore",
+                    question_id=question_id,
+                    asset_id=asset_id,
+                    representation_ids=tuple(
+                        value for value in changes.values() if isinstance(value, str)
+                    ),
+                    changes=(changes,),
                 ),
             )
         return result
@@ -438,6 +589,8 @@ class AssetApplicationService:
             "set_editor",
             "finalize",
             "normalize",
+            "reconcile",
+            "restore",
         ],
         *,
         dry_run: bool,
@@ -745,21 +898,27 @@ def _merge_rendered(
     representations = list(manifest.representations)
     files: dict[str, bytes] = {}
     generated: list[str] = []
-    known_hashes = {
-        item.content_hash: item.representation_id
-        for item in representations
-        if item.content_hash is not None
-    }
+    known_hashes = _known_representation_hashes(representations)
+    previous = _optional_representation(manifest, manifest.preferred_render)
     for value in rendered:
         content = value.content
         format_ = value.format
         digest = hashlib.sha256(content).hexdigest()
         existing_id = known_hashes.get(digest)
         if existing_id is not None:
+            representations = [
+                item.model_copy(update={"stale": False})
+                if item.representation_id == existing_id
+                else item
+                for item in representations
+            ]
             generated.append(existing_id)
             continue
         identifier = f"render-{format_.value}-{digest[:8]}"
         filename = f"{identifier}.{_extension(format_)}"
+        metadata = dict(value.metadata)
+        if previous is not None and previous.format == format_:
+            metadata["supersedes"] = previous.representation_id
         representation = AssetRepresentation(
             representation_id=identifier,
             format=format_,
@@ -767,14 +926,15 @@ def _merge_rendered(
             purpose="render",
             editable=False,
             derived_from=source.representation_id,
+            stale=False,
             content_hash=digest,
-            metadata=value.metadata,
+            metadata=metadata,
         )
         representations.append(representation)
         files[filename] = content
         generated.append(identifier)
         known_hashes[digest] = identifier
-    preferred = manifest.preferred_render or (generated[0] if generated else None)
+    preferred = _render_preference(manifest, representations, generated)
     updated = _updated_manifest(
         manifest,
         representations=representations,
@@ -782,6 +942,195 @@ def _merge_rendered(
         status=AssetStatus.EDITING,
     )
     return updated, files, generated
+
+
+def _known_representation_hashes(
+    representations: Sequence[AssetRepresentation],
+) -> dict[str, str]:
+    return {
+        item.content_hash: item.representation_id
+        for item in representations
+        if item.content_hash is not None
+    }
+
+
+def _render_preference(
+    manifest: AssetManifest,
+    representations: Sequence[AssetRepresentation],
+    generated: list[str],
+) -> str | None:
+    previous = _optional_representation(manifest, manifest.preferred_render)
+    if previous is not None and not previous.stale:
+        return previous.representation_id
+    by_id = {item.representation_id: item for item in representations}
+    if previous is not None:
+        same_format = [
+            identifier for identifier in generated if by_id[identifier].format == previous.format
+        ]
+        if same_format:
+            return same_format[0]
+    return generated[0] if generated else manifest.preferred_render
+
+
+def _edit_working_copy(
+    manifest: AssetManifest,
+    editor: AssetRepresentation,
+    content: bytes,
+) -> tuple[AssetManifest, AssetRepresentation]:
+    identifier = _next_edit_identifier(manifest, editor.representation_id)
+    suffix = Path(editor.path or "").suffix.lower()
+    working = AssetRepresentation.model_validate(
+        {
+            **editor.model_dump(mode="python"),
+            "representation_id": identifier,
+            "path": f"{identifier}{suffix}",
+            "derived_from": editor.representation_id,
+            "content_hash": hashlib.sha256(content).hexdigest(),
+            "metadata": {
+                **editor.metadata,
+                "working_copy": True,
+                "edit_base_hash": editor.content_hash,
+            },
+        }
+    )
+    return (
+        _updated_manifest(
+            manifest,
+            preferred_editor=identifier,
+            representations=[*manifest.representations, working],
+            status=AssetStatus.EDITING,
+        ),
+        working,
+    )
+
+
+def _next_edit_identifier(manifest: AssetManifest, base: str) -> str:
+    occupied = {item.representation_id for item in manifest.representations}
+    index = 1
+    while f"{base}-edit-{index}" in occupied:
+        index += 1
+    return f"{base}-edit-{index}"
+
+
+def _edit_command_result(
+    manifest: AssetManifest,
+    editor: AssetRepresentation,
+    target: Path,
+    command: tuple[str, ...],
+    *,
+    dry_run: bool,
+) -> AssetCommandResult:
+    return AssetCommandResult(
+        ok=True,
+        dry_run=dry_run,
+        action="edit",
+        question_id=manifest.question_id,
+        asset_id=manifest.asset_id,
+        representation_id=editor.representation_id,
+        target=str(target),
+        command=list(command),
+    )
+
+
+def _reconciled_editor_manifest(
+    manifest: AssetManifest,
+    editor: AssetRepresentation,
+    digest: str,
+) -> AssetManifest:
+    representations: list[AssetRepresentation] = []
+    for item in manifest.representations:
+        if item.representation_id == editor.representation_id:
+            metadata = {
+                **item.metadata,
+                "previous_content_hash": item.content_hash,
+            }
+            representations.append(
+                item.model_copy(update={"content_hash": digest, "metadata": metadata})
+            )
+        elif item.renderable and item.purpose == "render":
+            representations.append(item.model_copy(update={"stale": True}))
+        else:
+            representations.append(item)
+    return _updated_manifest(
+        manifest,
+        representations=representations,
+        status=AssetStatus.EDITING,
+    )
+
+
+def _restored_manifest(
+    manifest: AssetManifest,
+) -> tuple[AssetManifest, dict[str, object]]:
+    editor = _optional_representation(manifest, manifest.preferred_editor)
+    render = _optional_representation(manifest, manifest.preferred_render)
+    previous_editor = _editable_parent(manifest, editor)
+    previous_render = _render_parent(manifest, render, previous_editor)
+    if previous_editor is None and previous_render is None:
+        raise DataValidationError(
+            f"asset_command_rejected: no previous version for asset: {manifest.asset_id}"
+        )
+    changes: dict[str, object] = {}
+    values: dict[str, object] = {"status": AssetStatus.EDITING}
+    if previous_editor is not None:
+        values["preferred_editor"] = previous_editor.representation_id
+        changes["preferred_editor"] = previous_editor.representation_id
+    if previous_render is not None:
+        values["preferred_render"] = previous_render.representation_id
+        values["representations"] = [
+            item.model_copy(update={"stale": False})
+            if item.representation_id == previous_render.representation_id
+            else item
+            for item in manifest.representations
+        ]
+        changes["preferred_render"] = previous_render.representation_id
+    return _updated_manifest(manifest, **values), changes
+
+
+def _editable_parent(
+    manifest: AssetManifest,
+    current: AssetRepresentation | None,
+) -> AssetRepresentation | None:
+    if current is None or current.derived_from is None:
+        return None
+    parent = _optional_representation(manifest, current.derived_from)
+    return parent if parent is not None and parent.editable else None
+
+
+def _render_parent(
+    manifest: AssetManifest,
+    current: AssetRepresentation | None,
+    previous_editor: AssetRepresentation | None,
+) -> AssetRepresentation | None:
+    if current is not None:
+        supersedes = current.metadata.get("supersedes")
+        if isinstance(supersedes, str):
+            candidate = _optional_representation(manifest, supersedes)
+            if candidate is not None and candidate.renderable:
+                return candidate
+        if current.derived_from is not None:
+            candidate = _optional_representation(manifest, current.derived_from)
+            if candidate is not None and candidate.renderable:
+                return candidate
+    if previous_editor is None:
+        return None
+    candidates = [
+        item
+        for item in manifest.representations
+        if item.renderable and item.derived_from == previous_editor.representation_id
+    ]
+    return candidates[-1] if candidates else None
+
+
+def _optional_representation(
+    manifest: AssetManifest,
+    representation_id: str | None,
+) -> AssetRepresentation | None:
+    if representation_id is None:
+        return None
+    return next(
+        (item for item in manifest.representations if item.representation_id == representation_id),
+        None,
+    )
 
 
 def _extension(format_: AssetFormat) -> str:

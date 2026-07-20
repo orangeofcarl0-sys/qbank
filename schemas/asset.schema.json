@@ -77,6 +77,11 @@
           "default": null,
           "title": "Derived From"
         },
+        "stale": {
+          "default": false,
+          "title": "Stale",
+          "type": "boolean"
+        },
         "content_hash": {
           "anyOf": [
             {

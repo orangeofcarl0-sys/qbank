@@ -118,6 +118,31 @@ SQLite 字段由唯一的 `IndexDocument` 投影定义。Markdown 与 history �
 dirty marker。`AssetService` 和 `RenderService` 统一资源分类、复制、MarkdownIt
 图片路径重写、禁用原始 HTML 与 Jinja 沙箱策略。
 
+## 桌面编辑器
+
+可选的轻量桌面编辑器复用相同的应用服务，不引入 Web 后端、第二套数据模型或数据库。
+建议在标准 CPython 虚拟环境中安装桌面依赖（Anaconda 自带的 Qt DLL 可能与 PySide6
+冲突）：
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[desktop]"
+qbank desktop
+```
+
+界面采用“题库导航与检索 / Markdown 或 TeX 源码与实时预览 / 属性、资源、来源和历史”
+的两栏半布局。正文保存仍通过结构化 patch，并且程序自动先 dry-run 再提交和校验。
+预览中的每张图绑定稳定逻辑 ID；推荐使用 `qbank-asset:<asset-id>`，TeX 源码可用
+`\qbankasset{<asset-id>}`。旧 `asset:` 和受管本地路径继续可读，首次执行资源操作时
+才会规范化，单纯打开和预览不会写入。
+
+图片右键菜单固定提供八项操作：用 Ipe 编辑、替换为本地文件、从剪贴板替换、打开原始
+参考图、重新渲染、设为首选表示、在资源管理器中显示、恢复上一版本。Ipe 编辑使用新的
+版本化工作副本；保存后旧渲染会标为 stale，必须显式重新渲染，且不会自动标记为 final。
+替换和恢复同样保留原文件与历史。拖到已有图片会替换，拖到空白预览区会创建资源并插入
+稳定引用。公式继续由 MathJax CDN 渲染，离线时显示 TeX 源文。
+
 维护默认资源或内部边界后应运行完整质量门：
 
 ```powershell

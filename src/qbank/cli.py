@@ -31,6 +31,7 @@ from qbank.commands.codex import (
     codex_install_skill_command,
     codex_instructions_command,
 )
+from qbank.commands.desktop import desktop_command
 from qbank.commands.project import (
     doctor_command,
     init_command,
@@ -79,6 +80,7 @@ app.command("query")(query_command)
 app.command("search")(search_command)
 app.command("patch")(patch_command)
 app.command("delete")(delete_command)
+app.command("desktop")(desktop_command)
 index_app.command("rebuild")(index_rebuild_command)
 app.command("preview")(preview_command)
 app.command("export")(export_command)

@@ -325,6 +325,25 @@ def test_cli_questions_has_no_direct_storage_or_sqlite_imports() -> None:
         assert forbidden not in source
 
 
+def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> None:
+    desktop_root = Path(__file__).parents[1] / "src/qbank/desktop"
+    source = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(desktop_root.glob("*.py"))
+    )
+    for forbidden in (
+        "qbank.infrastructure",
+        "qbank.repository",
+        "qbank.search_index",
+        "qbank.storage",
+        "sqlite3",
+        "asset.yaml",
+        "index.sqlite",
+        ".write_text(",
+        ".write_bytes(",
+    ):
+        assert forbidden not in source
+
+
 def test_diagnostic_codes_have_one_closed_machine_contract() -> None:
     assert len({item.value for item in DiagnosticCode}) == len(DiagnosticCode)
     for code in DiagnosticCode:

@@ -2,6 +2,14 @@
 
 ## 0.1.0 - 2026-07-18
 
+- Added the optional PySide6 desktop editor with Zotero-style navigation,
+  embedded CodeMirror 6 Markdown/TeX editing, live MathJax preview, and a
+  collapsible metadata/assets/source/history drawer.
+- Added stable `qbank-asset:` and `\qbankasset{}` references, deterministic
+  bindings for legacy paths, and eight fixed image context actions.
+- Added versioned Ipe edit sessions, saved-file reconciliation, stale render
+  tracking, explicit rerendering, preferred-representation selection, and
+  non-destructive restore/history workflows.
 - Added native logical multi-representation assets, authoritative `asset.yaml`
   manifests, package exchange schemas, lifecycle/history validation, immutable
   replacement and Ipe PDF/SVG/PNG rendering commands.

@@ -83,6 +83,14 @@ arguments into typed requests, call application/use-case APIs, and render
 human or JSON output. Commands must not scan Markdown files, execute SQL, or
 construct SQLite repositories.
 
+`qbank.desktop` is a second, optional presentation adapter. Its Qt Widgets
+shell embeds an offline CodeMirror 6 bundle and a `QWebEngineView`; narrow
+`QWebChannel` bridges carry source changes and a closed set of asset action
+names. The Qt layer never writes question Markdown, asset manifests, history,
+or SQLite directly. `DesktopController` calls the same project, question,
+asset, paper, validation, and rendering services composed by `bootstrap`.
+There is no HTTP backend and no desktop-specific persistence model.
+
 ### Bootstrap
 
 `qbank.bootstrap` creates one `ProjectServices` graph per command. The graph
@@ -128,6 +136,14 @@ manifest.  `qbank preview --serve` is a local-only presentation adapter bound
 to `127.0.0.1`; it has a per-process capability token and same-origin check,
 and delegates each fixed operation to the application service rather than
 accepting paths or command strings from a browser.
+
+Desktop image bindings use the stable `qbank-asset:<asset-id>` form (with
+legacy `asset:` accepted) and the TeX command `\qbankasset{<asset-id>}`.
+Unregistered legacy paths receive deterministic preview bindings and are
+materialized only when the user requests a mutation. Ipe editing creates a
+versioned working representation; a saved hash change marks derived renders
+stale. Rerendering, preferred-representation changes, restore, and finalization
+remain explicit application operations.
 
 ## Enforced boundaries
 

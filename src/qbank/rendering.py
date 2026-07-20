@@ -93,8 +93,34 @@ class RenderService:
         asset_prefix: str | None = None,
     ) -> str:
         """Render Markdown with raw HTML disabled and optional token URI mapping."""
+        return self._render_markdown(
+            markdown,
+            asset_prefix=asset_prefix,
+            asset_bindings={},
+        )
+
+    def interactive_markdown_html(
+        self,
+        markdown: str,
+        *,
+        asset_bindings: Mapping[str, str],
+    ) -> str:
+        """Render images with stable IDs for the desktop interaction bridge."""
+        return self._render_markdown(
+            markdown,
+            asset_prefix=None,
+            asset_bindings=asset_bindings,
+        )
+
+    def _render_markdown(
+        self,
+        markdown: str,
+        *,
+        asset_prefix: str | None,
+        asset_bindings: Mapping[str, str],
+    ) -> str:
         parser = MarkdownIt("commonmark", {"html": False})
-        if asset_prefix is not None:
+        if asset_prefix is not None or asset_bindings:
             renderer = cast(RendererHTML, parser.renderer)
             rules = cast(dict[str, _ImageRule], renderer.rules)
             default_image = rules["image"]
@@ -108,10 +134,15 @@ class RenderService:
                 token = tokens[index]
                 source = token.attrGet("src")
                 if isinstance(source, str) and source:
-                    token.attrSet(
-                        "src",
-                        self.preview_asset_uri(source, asset_prefix),
-                    )
+                    asset_id = asset_bindings.get(source)
+                    if asset_id is not None:
+                        token.attrSet("data-asset-id", asset_id)
+                        token.attrSet("draggable", "true")
+                    if asset_prefix is not None:
+                        token.attrSet(
+                            "src",
+                            self.preview_asset_uri(source, asset_prefix),
+                        )
                 return default_image(tokens, index, options, environment)
 
             rules["image"] = image_rule
