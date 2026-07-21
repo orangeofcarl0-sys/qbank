@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from PySide6.QtCore import QSize, Qt, QUrl, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -36,7 +37,7 @@ from qbank.models import (
 from qbank.presentation.studio.design.controls import ModernComboBox, ModernSpinBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.metrics import METRICS
-from qbank.presentation.studio.design.palette import ThemeName
+from qbank.presentation.studio.design.palette import ThemeName, palette_for
 from qbank.presentation.studio.design.web_theme import css_variables, state_page
 
 WorkspaceMode = Literal["source", "preview", "split"]
@@ -341,6 +342,7 @@ class WebWorkspace(QSplitter):
         self.preview_bridge = PreviewBridge()
         self._wire_channels()
         self._configure_web_settings()
+        self._set_page_backgrounds(theme)
         self.addWidget(self.editor)
         self.addWidget(self.preview)
         self.setStretchFactor(0, 1)
@@ -392,6 +394,7 @@ class WebWorkspace(QSplitter):
     def set_theme(self, theme: ThemeName) -> None:
         """Apply semantic web tokens to the editor; preview updates on render."""
         self.theme_name = theme
+        self._set_page_backgrounds(theme)
         self._apply_editor_theme()
 
     def set_language_mode(self, mode: str) -> None:
@@ -457,13 +460,22 @@ class WebWorkspace(QSplitter):
     def _apply_editor_theme(self) -> None:
         css = json.dumps(css_variables(self.theme_name))
         self.editor.page().runJavaScript(
-            "const old=document.getElementById('qbank-theme');"
-            "if(old)old.remove();"
-            "const style=document.createElement('style');"
+            "(() => {"
+            "let style=document.getElementById('qbank-theme');"
+            "if(!style){"
+            "style=document.createElement('style');"
             "style.id='qbank-theme';"
-            f"style.textContent={css};"
             "document.head.appendChild(style);"
+            "}"
+            f"style.textContent={css};"
+            "})();"
         )
+
+    def _set_page_backgrounds(self, theme: ThemeName) -> None:
+        """Keep unpainted web surfaces aligned during live theme changes."""
+        background = QColor(palette_for(theme).surface_elevated)
+        self.editor.page().setBackgroundColor(background)
+        self.preview.page().setBackgroundColor(background)
 
 
 def _padded(widget: QWidget) -> QWidget:

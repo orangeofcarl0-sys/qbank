@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -245,6 +246,33 @@ def test_codemirror_load_resets_history_and_undo_returns_to_saved_source(qtbot: 
         workspace.undo()
     assert undone.args == [saved]
     assert not snapshot_is_dirty(str(undone.args[0]), {}, saved, {})
+
+
+def test_codemirror_theme_switch_replaces_live_web_theme(qtbot: QtBot) -> None:
+    workspace = WebWorkspace("light")
+    qtbot.addWidget(workspace)
+    with qtbot.waitSignal(workspace.editor_ready, timeout=10_000):
+        workspace.show()
+
+    def live_theme() -> dict[str, str]:
+        values: list[object] = []
+        workspace.editor.page().runJavaScript(
+            "JSON.stringify({"
+            "surface:getComputedStyle(document.documentElement)"
+            ".getPropertyValue('--qbank-surface-elevated').trim(),"
+            "scheme:getComputedStyle(document.documentElement).colorScheme"
+            "})",
+            values.append,
+        )
+        qtbot.waitUntil(lambda: bool(values), timeout=5_000)
+        return json.loads(str(values[0]))
+
+    workspace.set_theme("light")
+    assert live_theme() == {"surface": LIGHT.surface_elevated, "scheme": "light"}
+    workspace.set_theme("dark")
+    assert live_theme() == {"surface": DARK.surface_elevated, "scheme": "dark"}
+    workspace.set_theme("light")
+    assert live_theme() == {"surface": LIGHT.surface_elevated, "scheme": "light"}
 
 
 def test_preview_state_pages_escape_content_and_share_theme() -> None:

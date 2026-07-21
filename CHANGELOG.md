@@ -5,6 +5,9 @@
 - Modernized Studio with centralized light/dark design tokens shared by Qt,
   CodeMirror, and Markdown/MathJax, plus a maintained component gallery and
   repository-scoped `$qbank-ui-design` workflow.
+- Fixed repeated live theme switching so CodeMirror backgrounds, gutters,
+  selections, cursors, search surfaces, and native web-view color schemes follow
+  the Qt shell in both directions.
 - Refined the question-detail drawer into a stacked, accessible property
   inspector with custom single-surface combo boxes and borderless spin controls,
   and made the preview image-drop guidance responsive without overlaying document

@@ -39,7 +39,11 @@ def css_variables(theme: ThemeName) -> str:
         "document-font": ty.document_family,
         "mono-font": ty.mono_family,
     }
-    return ":root{" + "".join(f"--qbank-{name}:{value};" for name, value in values.items()) + "}"
+    return (
+        f":root{{color-scheme:{theme};"
+        + "".join(f"--qbank-{name}:{value};" for name, value in values.items())
+        + "}"
+    )
 
 
 def state_page(theme: ThemeName, title: str, detail: str, *, state: str = "loading") -> str:

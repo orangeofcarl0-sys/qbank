@@ -11,7 +11,11 @@
     .cm-scroller { font-family: var(--qbank-mono-font) !important; }
     .cm-gutters { color: var(--qbank-text-secondary) !important; background: var(--qbank-surface) !important; border-right-color: var(--qbank-border-subtle) !important; }
     .cm-activeLine, .cm-activeLineGutter { background: var(--qbank-surface-hover) !important; }
-    .cm-selectionBackground { background: var(--qbank-selection) !important; }
+    .cm-selectionBackground, .cm-content ::selection { background: var(--qbank-selection) !important; }
+    .cm-cursor { border-left-color: var(--qbank-text-primary) !important; }
+    .cm-panels, .cm-tooltip { color: var(--qbank-text-primary); background: var(--qbank-surface) !important; border-color: var(--qbank-border-subtle) !important; }
+    .cm-panels input { color: var(--qbank-text-primary); background: var(--qbank-surface-elevated); border: 1px solid var(--qbank-border-strong); }
+    .cm-searchMatch { background: var(--qbank-selection); outline-color: var(--qbank-focus); }
     .cm-focused { outline: 1px solid var(--qbank-focus) !important; outline-offset: -1px; }
   </style>
 </head>

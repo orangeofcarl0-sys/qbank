@@ -148,6 +148,8 @@ def _prepare_state(window: Any, target: str, state: str) -> None:
         window.workspace.preview.page().runJavaScript(
             "window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'});"
         )
+    elif state == "theme-switch":
+        window.set_theme("dark" if window.theme_name == "light" else "light")
 
 
 def _open_validation(window: Any) -> None:
@@ -207,6 +209,7 @@ def _arguments() -> argparse.Namespace:
             "loading",
             "validation",
             "preview-bottom",
+            "theme-switch",
         ),
         default="main",
     )
