@@ -226,9 +226,11 @@ def get_command(
 
 
 def query_command(
+    text: Annotated[str | None, typer.Option("--search")] = None,
     subject: Annotated[str | None, typer.Option("--subject")] = None,
     chapter: Annotated[str | None, typer.Option("--chapter")] = None,
     topic: Annotated[list[str] | None, typer.Option("--topic")] = None,
+    exclude_topic: Annotated[list[str] | None, typer.Option("--exclude-topic")] = None,
     topic_mode: Annotated[str, typer.Option("--topic-mode")] = "and",
     question_type: Annotated[str | None, typer.Option("--type")] = None,
     status_value: Annotated[str | None, typer.Option("--status")] = None,
@@ -241,6 +243,7 @@ def query_command(
         typer.Option("--difficulty-max", min=1, max=5),
     ] = None,
     language: Annotated[str | None, typer.Option("--language")] = None,
+    year: Annotated[int | None, typer.Option("--year", min=1, max=9999)] = None,
     limit: Annotated[int, typer.Option("--limit", min=1)] = 100,
     offset: Annotated[int, typer.Option("--offset", min=0)] = 0,
     fields: Annotated[str | None, typer.Option("--fields")] = None,
@@ -252,13 +255,16 @@ def query_command(
             _filters(
                 subject=subject,
                 chapter=chapter,
+                text=text,
                 topics=topic or [],
+                excluded_topics=exclude_topic or [],
                 topic_mode=topic_mode,
                 question_type=question_type,
                 status=status_value,
                 difficulty_min=difficulty_min,
                 difficulty_max=difficulty_max,
                 language=language,
+                year=year,
                 limit=limit,
                 offset=offset,
             )

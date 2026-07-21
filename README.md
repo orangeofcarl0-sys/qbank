@@ -48,7 +48,8 @@ python -m pip wheel . --no-deps --no-build-isolation
 
 `qbank init` 初始化当前目录，`qbank init demo-bank` 初始化指定子目录。命令会创建
 `questions/`、`assets/`、`papers/`、`templates/`、`exports/`、`build/`、
-`schemas/`、`AGENTS.md`、`.agents/skills/qbank/` 和 `.qbank/history/`，并建立空的
+`schemas/`、`taxonomy.yaml`、`views.yaml`、`AGENTS.md`、`.agents/skills/qbank/`
+和 `.qbank/history/`，并建立空的
 FTS5 索引。程序从当前目录向上查找
 `qbank.yaml`，所以可以在任意子目录运行命令。
 
@@ -94,6 +95,12 @@ Markdown 是唯一题目源数据。`.qbank/index.sqlite` 可以安全删除，�
 `qbank index rebuild` 重建。所有真实写操作在 `.qbank/history/` 留下 JSON 摘要；
 仍建议用 Git 管理完整版本历史。
 
+`taxonomy.yaml` 只保存标签的规范 slug、中英文显示名、别名、颜色、说明、父标签和
+整理状态；它不保存题目—标签关系。该关系仍只取自题目 Markdown 的 `topics`。
+`views.yaml` 保存用户命名的组合筛选，可随题库一同用 Git 管理；固定的 `all`、`draft`、
+`needs_redraw` 和 `current_paper` 视图由程序提供，不写入该文件。SQLite 中的全文、计数
+和共现数据都只是可重建投影。
+
 `status`、`doctor`、`search` 和索引更新时间读取使用 SQLite 只读连接，不会创建
 `.qbank`、数据库、表或 dirty marker。索引缺失、损坏或存在 dirty marker 时，
 `search` 会以退出码 3 明确失败并提示执行 `qbank index rebuild`；`doctor` 报告 FAIL，
@@ -136,6 +143,16 @@ qbank desktop
 浅色、深色、Qt 控件、CodeMirror 与预览由同一语义设计 token 生成；运行
 `python -m qbank.studio_gallery` 可检查长期维护的组件与交互状态。Studio 的视觉或交互
 修改必须先遵循仓库 `$qbank-ui-design` Skill，并用隔离题库执行其截图验收脚本。
+左栏底部提供可折叠标签分面：标签数量按当前结果实时计算，单击依次切换“包含 / 排除 /
+未选”，并可用 AND/OR 与文本、状态、题型、章节、年份和难度叠加。筛选芯片可单独移除，
+当前组合可保存、重命名或删除；“全部题目”始终保留。题目列表支持多选后批量添加或移除
+标签，写入仍由应用服务执行 dry-run、逐题 diff、原子 Markdown/history 提交和索引同步。
+
+右侧主题编辑器按中文名、英文名、slug 和别名补全，并显示使用次数；未知输入会转换为
+规范 slug 并标为“待整理”，疑似同义标签会先在状态栏提示。标签管理器支持全局重命名、
+合并、删除、别名和颜色，提交前显示影响题目数及字段 diff，提交后可撤销最近操作。
+“标签概览”只提供频次条形、Top-N 共现矩阵和年份/章节覆盖热力图；点击图元会回填左栏的
+真实筛选，不提供默认全库关系图。
 保存标记按源码和元数据的已保存快照计算；撤销回快照会清除标题星号与关闭提示。
 切换题目会立即显示目标 ID 的加载态，并用生成代次拒绝过期预览。
 预览中的每张图绑定稳定逻辑 ID；推荐使用 `qbank-asset:<asset-id>`，TeX 源码可用
@@ -296,6 +313,29 @@ qbank get OPT-INT-0001 --format json
 ```
 
 多个 `--topic` 默认是 AND；用 `--topic-mode or` 改为 OR。
+`--exclude-topic` 可排除包含某标签的题目，`--search`、`--year` 可与其他字段同时使用。
+
+题库级标签和查询视图：
+
+```powershell
+qbank tag list --format json
+qbank tag normalize --dry-run --format json
+qbank tag normalize --format json
+qbank tag rename old-slug canonical-slug --dry-run --format json
+qbank tag merge alias-slug canonical-slug --dry-run --format json
+qbank tag stats --format json
+qbank tag cooccur --top-n 12 --format json
+
+qbank view save optics-review --subject optics --topic interference `
+  --exclude-topic deprecated-concept --dry-run --format json
+qbank view save optics-review --subject optics --topic interference `
+  --exclude-topic deprecated-concept --format json
+qbank view apply optics-review --format json
+```
+
+所有 `tag` 写操作先计算完整题目 diff，并把 taxonomy、Markdown 和历史作为一个原子提交
+单元；索引随后批量更新。标签合并会把旧名称保留为目标标签的别名。所有 `view` 写操作也
+支持 `--dry-run --format json`。
 
 结构化修改先 dry-run，再正式写入：
 
@@ -368,6 +408,9 @@ qbank preview --serve
 | `qbank add` / `qbank ingest` | 单题或 JSONL 批量导入 |
 | `qbank validate [ID] [--changed]` | 校验题库 |
 | `qbank list` / `get` / `query` | 读取和筛选 |
+| `qbank tag list/show/stats/cooccur` | 读取标签注册表、频次与共现投影 |
+| `qbank tag rename/merge/delete/normalize` | dry-run 后原子维护标签及题目关系 |
+| `qbank view list/save/apply/rename/delete` | 保存和恢复组合筛选 |
 | `qbank search` | SQLite FTS5 全文搜索 |
 | `qbank patch` / `delete` | 结构化修改或删除 |
 | `qbank index rebuild` | 完整重建索引 |

@@ -21,7 +21,7 @@ from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
 from qbank.desktop.controller import DesktopController
 from qbank.desktop.main_window import DesktopMainWindow
-from qbank.models import AssetCapabilities, DesktopAssetItem, Question
+from qbank.models import AssetCapabilities, DesktopAssetItem, QueryFilters, Question
 from qbank.operations import add_question
 from qbank.rendering import RenderService
 
@@ -389,3 +389,53 @@ def test_real_dirty_asset_gate_preserves_or_restores_editor_state(
     assert window.current_source == authoritative
     assert not window.dirty
     assert not window.windowTitle().endswith(" *")
+
+
+def test_real_main_window_saved_views_bulk_tags_and_chart_filter(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: ("review-view", True),
+    )
+    window._save_current_view()
+    assert "review-view" in {view.name for view in controller.navigation_data().views}
+
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: ("renamed-view", True),
+    )
+    window._rename_view("review-view")
+    assert "renamed-view" in {view.name for view in controller.navigation_data().views}
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+    )
+    window._delete_view("renamed-view")
+    assert "renamed-view" not in {view.name for view in controller.navigation_data().views}
+
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: ("bulk-topic", True),
+    )
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Apply,
+    )
+    window.navigation.questions.selectAll()
+    window._bulk_topics(True)
+    assert "bulk-topic" in controller.load_question(question.id).question.topics
+
+    window._pending_topic_created("interference")
+    window._apply_overview_filter(QueryFilters(topics=["bulk-topic"]))
+    assert window.navigation.current_filters().topics == ["bulk-topic"]
+    window._tag_metadata_changed()

@@ -34,10 +34,11 @@ from PySide6.QtWidgets import (
 )
 
 from qbank.assets import stable_legacy_asset_id
-from qbank.desktop.controller import DesktopController, DesktopView
+from qbank.desktop.controller import DesktopController
+from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
 from qbank.desktop.widgets import DetailDrawer, NavigationPane, WebWorkspace, WorkspaceMode
 from qbank.errors import QBankError
-from qbank.models import AssetManifest, DesktopAssetItem, PatchQuestionResult
+from qbank.models import AssetManifest, DesktopAssetItem, PatchQuestionResult, QueryFilters
 from qbank.presentation.studio.design.controls import ModernComboBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.metrics import METRICS
@@ -213,7 +214,15 @@ class DesktopMainWindow(QMainWindow):
     def _wire_events(self) -> None:
         self.navigation.view_changed.connect(self._refresh_navigation)
         self.navigation.search_changed.connect(self._refresh_navigation)
+        self.navigation.filters_changed.connect(self._refresh_navigation)
         self.navigation.question_selected.connect(self._select_question)
+        self.navigation.save_view_requested.connect(self._save_current_view)
+        self.navigation.rename_view_requested.connect(self._rename_view)
+        self.navigation.delete_view_requested.connect(self._delete_view)
+        self.navigation.bulk_add_requested.connect(partial(self._bulk_topics, True))
+        self.navigation.bulk_remove_requested.connect(partial(self._bulk_topics, False))
+        self.navigation.manage_tags_requested.connect(self._show_tag_manager)
+        self.navigation.tag_overview_requested.connect(self._show_tag_overview)
         self.workspace.editor_ready.connect(self._editor_ready)
         self.workspace.source_edited.connect(self._source_changed)
         self.workspace.asset_action.connect(self._asset_action)
@@ -232,6 +241,7 @@ class DesktopMainWindow(QMainWindow):
 
     def _wire_metadata_changes(self) -> None:
         self.drawer.metadata.metadata_changed.connect(self._metadata_changed)
+        self.drawer.metadata.topics.pending_topic_created.connect(self._pending_topic_created)
 
     def _language_mode_changed(self, language: ModernComboBox, index: int) -> None:
         self.workspace.set_language_mode(str(language.itemData(index)))
@@ -252,15 +262,160 @@ class DesktopMainWindow(QMainWindow):
             self.controller.load_current_paper()
         except (QBankError, OSError, ValueError) as exc:
             self.statusBar().showMessage(str(exc), 8000)
+        self._refresh_navigation_data()
         self._refresh_navigation()
 
+    def _refresh_navigation_data(self) -> None:
+        data = self.controller.navigation_data()
+        self.navigation.set_navigation_data(data)
+        self.drawer.metadata.set_taxonomy(data.tags)
+
     def _refresh_navigation(self, *_: object) -> None:
-        view = cast(DesktopView, self.navigation.current_view())
-        rows = self.controller.list_questions(
-            view=view,
-            search=self.navigation.search.text(),
+        try:
+            view = self.navigation.current_view()
+            result = self.controller.navigation_result(
+                view=view,
+                search=self.navigation.search.text(),
+                filters=self.navigation.current_filters(),
+            )
+        except (QBankError, ValueError) as exc:
+            self.statusBar().showMessage(f"筛选条件无效：{exc}", 6000)
+            return
+        self.navigation.set_rows(result.rows, self.current_id)
+        self.navigation.set_tag_rows(result.tags, result.total)
+
+    def _save_current_view(self) -> None:
+        name, accepted = QInputDialog.getText(self, "保存筛选视图", "视图名称：")
+        if not accepted or not name.strip():
+            return
+        try:
+            filters = self.navigation.current_filters()
+            self.controller.save_view(name, filters, dry_run=True)
+            self.controller.save_view(name, filters, dry_run=False)
+            self._refresh_navigation_data()
+            self.navigation.select_view(name.strip())
+            self.statusBar().showMessage(f"已保存视图：{name.strip()}", 4000)
+        except (QBankError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _rename_view(self, old: str) -> None:
+        name, accepted = QInputDialog.getText(
+            self,
+            "重命名筛选视图",
+            "新名称：",
+            text=old,
         )
-        self.navigation.set_rows(rows, self.current_id)
+        if not accepted or not name.strip() or name.strip() == old:
+            return
+        try:
+            self.controller.rename_view(old, name, dry_run=True)
+            self.controller.rename_view(old, name, dry_run=False)
+            self._refresh_navigation_data()
+            self.navigation.select_view(name.strip())
+        except (QBankError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _delete_view(self, name: str) -> None:
+        answer = QMessageBox.question(
+            self,
+            "删除筛选视图",
+            f"删除保存的视图“{name}”？题目不会被删除。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.controller.delete_view(name, dry_run=True)
+            self.controller.delete_view(name, dry_run=False)
+            self._refresh_navigation_data()
+            self.navigation.select_view("all")
+        except (QBankError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _bulk_topics(self, adding: bool) -> None:
+        question_ids = self.navigation.selected_question_ids()
+        if not question_ids and self.current_id is not None:
+            question_ids = [self.current_id]
+        if not question_ids:
+            return
+        label = "添加" if adding else "移除"
+        value, accepted = QInputDialog.getText(
+            self,
+            f"批量{label}标签",
+            f"为 {len(question_ids)} 道题{label}标签：",
+        )
+        if not accepted or not value.strip():
+            return
+        try:
+            planned = self.controller.bulk_edit_topics(
+                question_ids,
+                add=[value] if adding else [],
+                remove=[] if adding else [value],
+                dry_run=True,
+            )
+            details = "\n".join(
+                f"{change.id}: {', '.join(change.before)} → {', '.join(change.after)}"
+                for change in planned.changes[:8]
+            )
+            if len(planned.changes) > 8:
+                details += f"\n…另有 {len(planned.changes) - 8} 道题"
+            answer = QMessageBox.question(
+                self,
+                f"确认批量{label}标签",
+                f"将影响 {planned.affected_questions} 道题：\n\n{details}",
+                QMessageBox.StandardButton.Apply | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Apply:
+                return
+            self.controller.bulk_edit_topics(
+                question_ids,
+                add=[value] if adding else [],
+                remove=[] if adding else [value],
+                dry_run=False,
+            )
+            self._refresh_navigation_data()
+            self._refresh_navigation()
+            if self.current_id in question_ids:
+                self._load_question(self.current_id)
+        except (QBankError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _pending_topic_created(self, slug: str) -> None:
+        matches = self.controller.possible_tag_synonyms(slug)
+        alternatives = [item.slug for item in matches if item.slug != slug]
+        if alternatives:
+            self.statusBar().showMessage(
+                f"新标签 {slug} 将标记为待整理；疑似同义：{', '.join(alternatives)}",
+                8000,
+            )
+        else:
+            self.statusBar().showMessage(f"新标签 {slug} 将标记为待整理", 5000)
+
+    def _show_tag_manager(self) -> None:
+        dialog = TagManagerDialog(self.controller, self.theme_name, self)
+        dialog.changed.connect(self._tag_metadata_changed)
+        dialog.exec()
+
+    def _show_tag_overview(self) -> None:
+        dialog = TagOverviewDialog(self.controller, self.theme_name, self)
+        dialog.filter_requested.connect(self._apply_overview_filter)
+        dialog.exec()
+
+    def _tag_metadata_changed(self) -> None:
+        self._refresh_navigation_data()
+        self._refresh_navigation()
+        if self.current_id is not None:
+            self._load_question(self.current_id)
+
+    def _apply_overview_filter(self, filters: object) -> None:
+        if not isinstance(filters, QueryFilters):
+            return
+        self.navigation.select_view("all")
+        self.navigation.set_transient_filters(filters)
+        self.raise_()
+        self.activateWindow()
 
     def _select_question(self, question_id: str) -> None:
         if self._switching or question_id == self.current_id:
@@ -418,6 +573,7 @@ class DesktopMainWindow(QMainWindow):
             return False
         current = self.current_id
         self._load_question(current)
+        self._refresh_navigation_data()
         self._refresh_navigation()
         self.statusBar().showMessage("题目已保存、校验并更新索引", 5000)
         return True
@@ -595,7 +751,7 @@ class DesktopMainWindow(QMainWindow):
         buffer = QBuffer()
         buffer.open(QIODevice.OpenModeFlag.WriteOnly)
         # PySide 6.11 accepts the Qt format name as str at runtime despite its stub.
-        image.save(buffer, "PNG")  # pyright: ignore[reportCallIssue, reportArgumentType]
+        image.save(buffer, cast(bytes, "PNG"))
         encoded = base64.b64encode(buffer.data().data()).decode("ascii")
         self.controller.replace_asset(
             question_id,

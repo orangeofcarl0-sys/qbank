@@ -9,6 +9,9 @@ menus, and dialogs derive their visual constants from
 
 - Native Windows title bar and platform window behavior.
 - Compact, stable Zotero-like saved views and question list at the left.
+- A collapsible, high-density tag facet sits below the question list; include/exclude
+  state, counts, AND/OR mode, saved views, and field facets remain navigation controls,
+  never a dashboard home page.
 - Source and preview are the visual center; metadata remains a collapsible drawer.
 - Paper-like light surfaces and graphite dark surfaces use one restrained blue
   accent. Success, warning, and error colors appear only for status.

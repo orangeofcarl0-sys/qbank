@@ -16,12 +16,14 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCompleter,
     QDockWidget,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLayoutItem,
     QLineEdit,
     QListWidget,
@@ -42,10 +44,15 @@ from qbank.models import (
     AssetCapabilities,
     AssetManifest,
     DesktopAssetItem,
+    DesktopNavigationData,
     DesktopQuestionDocument,
     DesktopQuestionSummary,
+    QueryFilters,
     QuestionStatus,
     QuestionType,
+    SavedView,
+    TagUsage,
+    normalize_tag_slug,
 )
 from qbank.presentation.studio.design.controls import ModernComboBox, ModernSpinBox
 from qbank.presentation.studio.design.icons import icon
@@ -104,6 +111,328 @@ _TOPIC_SUGGESTIONS = (
 )
 
 
+class FilterChipBar(QWidget):
+    """Compact removable chips describing the active navigation query."""
+
+    remove_requested = Signal(str, str)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("filterChipBar")
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(METRICS.space_1)
+
+    def set_chips(self, chips: list[tuple[str, str, str]]) -> None:
+        """Replace chips as key, value, and user-facing label tuples."""
+        _clear_layout(self._layout)
+        for key, value, label in chips:
+            button = QToolButton()
+            button.setObjectName("filterChip")
+            button.setText(f"{label}  ×")
+            button.setToolTip(f"移除筛选：{label}")
+            button.setAccessibleName(f"移除筛选 {label}")
+            button.clicked.connect(
+                lambda checked=False, item_key=key, item_value=value: self.remove_requested.emit(
+                    item_key, item_value
+                )
+            )
+            self._layout.addWidget(button)
+        self._layout.addStretch()
+        self.setVisible(bool(chips))
+
+
+class FacetFilterPanel(QFrame):
+    """Small OpenRefine-style field facets kept secondary to the question list."""
+
+    changed = Signal()
+
+    def __init__(self, theme: ThemeName) -> None:
+        super().__init__()
+        self.setObjectName("facetFilterPanel")
+        self.status = ModernComboBox(theme)
+        self.question_type = ModernComboBox(theme)
+        self.chapter = ModernComboBox(theme)
+        self.year = ModernComboBox(theme)
+        self.difficulty_min = ModernComboBox(theme)
+        self.difficulty_max = ModernComboBox(theme)
+        layout = QGridLayout(self)
+        layout.setContentsMargins(
+            METRICS.space_2, METRICS.space_2, METRICS.space_2, METRICS.space_2
+        )
+        layout.setHorizontalSpacing(METRICS.space_1)
+        layout.setVerticalSpacing(METRICS.space_1)
+        controls = (
+            ("状态", self.status),
+            ("题型", self.question_type),
+            ("章节", self.chapter),
+            ("年份", self.year),
+            ("难度从", self.difficulty_min),
+            ("难度至", self.difficulty_max),
+        )
+        for index, (label, control) in enumerate(controls):
+            row, column = divmod(index, 2)
+            box = QVBoxLayout()
+            box.setSpacing(0)
+            box.addWidget(_field_label(label))
+            box.addWidget(control)
+            layout.addLayout(box, row, column)
+            control.currentIndexChanged.connect(self._emit_changed)
+        self.setVisible(False)
+
+    def set_data(self, data: DesktopNavigationData) -> None:
+        """Populate deterministic facet choices while retaining selections."""
+        _set_combo_choices(self.status, data.statuses)
+        _set_combo_choices(self.question_type, data.question_types)
+        _set_combo_choices(self.chapter, data.chapters)
+        _set_combo_choices(self.year, [str(year) for year in data.years])
+        _set_combo_choices(self.difficulty_min, [str(value) for value in range(1, 6)])
+        _set_combo_choices(self.difficulty_max, [str(value) for value in range(1, 6)])
+
+    def filters(self, text: str, topics: TagSelector) -> QueryFilters:
+        """Build one validated query from all transient UI facets."""
+        status = _combo_optional(self.status)
+        question_type = _combo_optional(self.question_type)
+        return QueryFilters(
+            text=text or None,
+            topics=topics.included(),
+            excluded_topics=topics.excluded(),
+            topic_mode=topics.topic_mode(),
+            status=QuestionStatus(status) if status else None,
+            question_type=QuestionType(question_type) if question_type else None,
+            chapter=_combo_optional(self.chapter),
+            year=_combo_optional_int(self.year),
+            difficulty_min=_combo_optional_int(self.difficulty_min),
+            difficulty_max=_combo_optional_int(self.difficulty_max),
+            limit=100_000,
+        )
+
+    def set_filters(self, filters: QueryFilters) -> None:
+        """Restore a saved view into the facet controls."""
+        for control, value in (
+            (self.status, filters.status.value if filters.status else None),
+            (self.question_type, filters.question_type.value if filters.question_type else None),
+            (self.chapter, filters.chapter),
+            (self.year, str(filters.year) if filters.year else None),
+            (
+                self.difficulty_min,
+                str(filters.difficulty_min) if filters.difficulty_min else None,
+            ),
+            (
+                self.difficulty_max,
+                str(filters.difficulty_max) if filters.difficulty_max else None,
+            ),
+        ):
+            _select_combo_data(control, value)
+
+    def clear(self) -> None:
+        """Reset all field facets."""
+        for control in (
+            self.status,
+            self.question_type,
+            self.chapter,
+            self.year,
+            self.difficulty_min,
+            self.difficulty_max,
+        ):
+            control.setCurrentIndex(0)
+
+    def set_theme(self, theme: ThemeName) -> None:
+        for control in (
+            self.status,
+            self.question_type,
+            self.chapter,
+            self.year,
+            self.difficulty_min,
+            self.difficulty_max,
+        ):
+            control.set_theme(theme)
+
+    def _emit_changed(self, _index: int) -> None:
+        self.changed.emit()
+
+
+class TagSelector(QFrame):
+    """Collapsible three-state tag facet scoped to the current result set."""
+
+    changed = Signal()
+    manage_requested = Signal()
+    overview_requested = Signal()
+
+    def __init__(self, theme: ThemeName) -> None:
+        super().__init__()
+        self.theme_name = theme
+        self.setObjectName("tagSelector")
+        self._rows: list[TagUsage] = []
+        self._included: set[str] = set()
+        self._excluded: set[str] = set()
+        self._create_controls(theme)
+        self._build_layout()
+        self._connect_signals()
+
+    def _create_controls(self, theme: ThemeName) -> None:
+        self.toggle = QToolButton()
+        self.toggle.setObjectName("tagSelectorToggle")
+        self.toggle.setText("标签")
+        self.toggle.setCheckable(True)
+        self.toggle.setChecked(True)
+        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow)
+        self.manage = QToolButton()
+        self.manage.setText("管理")
+        self.manage.setToolTip("打开标签管理器")
+        self.overview = QToolButton()
+        self.overview.setText("概览")
+        self.overview.setToolTip("打开标签频次、共现与覆盖图")
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("搜索标签")
+        self.search.setAccessibleName("搜索标签")
+        self.sort = ModernComboBox(theme)
+        self.sort.addItem("按数量", "count")
+        self.sort.addItem("按名称", "name")
+        self.mode = ModernComboBox(theme)
+        self.mode.addItem("AND", "and")
+        self.mode.addItem("OR", "or")
+        self.list = QListWidget()
+        self.list.setObjectName("tagFacetList")
+        self.list.setAccessibleName("标签包含与排除筛选")
+        self.list.setMaximumHeight(METRICS.control_height * 6)
+        self.body = QWidget()
+
+    def _build_layout(self) -> None:
+        body_layout = QVBoxLayout(self.body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(METRICS.space_1)
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.addWidget(self.search, 1)
+        search_row.addWidget(self.sort)
+        search_row.addWidget(self.mode)
+        body_layout.addLayout(search_row)
+        body_layout.addWidget(self.list)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, METRICS.space_1, 0, 0)
+        layout.setSpacing(METRICS.space_1)
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addWidget(self.toggle, 1)
+        header.addWidget(self.manage)
+        header.addWidget(self.overview)
+        layout.addLayout(header)
+        layout.addWidget(self.body)
+
+    def _connect_signals(self) -> None:
+        self.toggle.toggled.connect(self._toggle_body)
+        self.search.textChanged.connect(self._refresh)
+        self.sort.currentIndexChanged.connect(self._refresh)
+        self.mode.currentIndexChanged.connect(self._mode_changed)
+        self.list.itemClicked.connect(self._cycle_item)
+        self.manage.clicked.connect(self.manage_requested.emit)
+        self.overview.clicked.connect(self.overview_requested.emit)
+
+    def set_rows(self, rows: list[TagUsage]) -> None:
+        """Replace counts using only tags present in the current result set."""
+        self._rows = rows
+        self._refresh()
+
+    def set_filters(
+        self, included: list[str], excluded: list[str], topic_mode: str = "and"
+    ) -> None:
+        """Restore include, exclude, and AND/OR state from a saved query."""
+        self._included = set(included)
+        self._excluded = set(excluded)
+        _select_combo_data(self.mode, topic_mode)
+        self._refresh()
+
+    def included(self) -> list[str]:
+        return sorted(self._included)
+
+    def excluded(self) -> list[str]:
+        return sorted(self._excluded)
+
+    def topic_mode(self) -> Literal["and", "or"]:
+        return cast(Literal["and", "or"], str(self.mode.currentData()))
+
+    def clear(self) -> None:
+        self._included.clear()
+        self._excluded.clear()
+        self.search.clear()
+        self.mode.setCurrentIndex(0)
+        self._refresh()
+
+    def remove(self, slug: str) -> None:
+        self._included.discard(slug)
+        self._excluded.discard(slug)
+        self._refresh()
+
+    def set_theme(self, theme: ThemeName) -> None:
+        self.theme_name = theme
+        self.sort.set_theme(theme)
+        self.mode.set_theme(theme)
+        self._refresh()
+
+    def _toggle_body(self, expanded: bool) -> None:
+        self.body.setVisible(expanded)
+        self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+
+    def _mode_changed(self, _index: int) -> None:
+        self.changed.emit()
+
+    def _refresh(self, *_: object) -> None:
+        query = self.search.text().strip().casefold()
+        rows = [
+            row
+            for row in self._rows
+            if not query
+            or query in row.slug.casefold()
+            or (
+                row.metadata is not None
+                and any(query in term for term in row.metadata.search_terms())
+            )
+        ]
+        if self.sort.currentData() == "count":
+            rows.sort(key=lambda row: (-row.count, row.slug))
+        else:
+            rows.sort(key=lambda row: row.slug)
+        self.list.clear()
+        for row in rows:
+            state = "+" if row.slug in self._included else "−" if row.slug in self._excluded else ""
+            label = row.metadata.name_zh if row.metadata and row.metadata.name_zh else row.slug
+            item = QListWidgetItem(f"{state:<1} {label}    {row.count}")
+            item.setData(Qt.ItemDataRole.UserRole, row.slug)
+            item.setToolTip(self._tooltip(row))
+            if row.metadata is not None and row.metadata.color is not None:
+                pixmap = QPixmap(8, 8)
+                pixmap.fill(QColor(row.metadata.color))
+                item.setIcon(QIcon(pixmap))
+            self.list.addItem(item)
+        active = len(self._included) + len(self._excluded)
+        suffix = f" · {active} 项筛选" if active else ""
+        self.toggle.setText(f"标签 · {len(rows)}{suffix}")
+
+    def _cycle_item(self, item: QListWidgetItem | None) -> None:
+        if item is None:
+            return
+        slug = str(item.data(Qt.ItemDataRole.UserRole))
+        if slug in self._included:
+            self._included.remove(slug)
+            self._excluded.add(slug)
+        elif slug in self._excluded:
+            self._excluded.remove(slug)
+        else:
+            self._included.add(slug)
+        self._refresh()
+        self.changed.emit()
+
+    @staticmethod
+    def _tooltip(row: TagUsage) -> str:
+        if row.metadata is None:
+            return f"{row.slug} · {row.count} 道题 · 未注册，待整理"
+        aliases = "、".join(row.metadata.aliases)
+        detail = f" · 别名：{aliases}" if aliases else ""
+        return f"{row.slug} · {row.count} 道题 · {row.metadata.status.value}{detail}"
+
+
 class NavigationPane(QWidget):
     """Zotero-style saved views and question navigation."""
 
@@ -112,13 +441,32 @@ class NavigationPane(QWidget):
     view_changed = Signal(str)
     question_selected = Signal(str)
     search_changed = Signal(str)
+    filters_changed = Signal()
+    save_view_requested = Signal()
+    rename_view_requested = Signal(str)
+    delete_view_requested = Signal(str)
+    bulk_add_requested = Signal()
+    bulk_remove_requested = Signal()
+    manage_tags_requested = Signal()
+    tag_overview_requested = Signal()
 
     def __init__(self, theme: ThemeName = "light") -> None:
         super().__init__()
         self.theme_name = theme
+        self._syncing = False
+        self._result_total: int | None = None
+        self._view_definitions: dict[str, SavedView] = {}
         self.setObjectName("navigationPane")
         self.setMinimumWidth(METRICS.nav_width)
         self.setMaximumWidth(METRICS.nav_width + METRICS.space_8)
+        self._create_controls(theme)
+        self._build_layout()
+        self.set_navigation_data(self._initial_navigation_data())
+        self.views.setCurrentRow(0)
+        self._update_active_filter()
+        self._connect_signals()
+
+    def _create_controls(self, theme: ThemeName) -> None:
         self.search = QLineEdit()
         self.search.setPlaceholderText("搜索题目、主题或公式")
         self.search.setAccessibleName("搜索题目")
@@ -129,13 +477,37 @@ class NavigationPane(QWidget):
         self.clear_filter.setAccessibleName("清除搜索和筛选")
         self.active_filter = QLabel()
         self.active_filter.setObjectName("activeFilter")
+        self.filter_chips = FilterChipBar()
         self.views = QListWidget()
         self.views.setAccessibleName("保存的筛选视图")
         self.views.setMaximumHeight(METRICS.control_height * 6)
+        self.save_view = QToolButton()
+        self.save_view.setText("保存当前视图")
+        self.save_view.setIcon(icon("save", theme))
+        self.save_view.setToolTip("将当前组合筛选保存为视图")
+        self.view_actions = QToolButton()
+        self.view_actions.setText("⋯")
+        self.view_actions.setToolTip("重命名或删除当前视图")
+        self.filters_toggle = QToolButton()
+        self.filters_toggle.setText("字段分面")
+        self.filters_toggle.setCheckable(True)
+        self.filters_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self.filters_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.facets = FacetFilterPanel(theme)
         self.questions = QListWidget()
         self.questions.setAccessibleName("题目列表")
         self.questions.setAlternatingRowColors(True)
+        self.questions.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.bulk_add = QToolButton()
+        self.bulk_add.setText("+ 标签")
+        self.bulk_add.setToolTip("为选中的题目批量添加标签")
+        self.bulk_remove = QToolButton()
+        self.bulk_remove.setText("− 标签")
+        self.bulk_remove.setToolTip("从选中的题目批量移除标签")
+        self.tags = TagSelector(theme)
         self.empty_hint = _empty_hint()
+
+    def _build_layout(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 8, 10)
         search_row = QHBoxLayout()
@@ -144,25 +516,77 @@ class NavigationPane(QWidget):
         search_row.addWidget(self.clear_filter)
         layout.addLayout(search_row)
         layout.addWidget(self.active_filter)
+        layout.addWidget(self.filter_chips)
         layout.addWidget(self.views)
-        layout.addWidget(QLabel("题目"))
+        view_actions = QHBoxLayout()
+        view_actions.setContentsMargins(0, 0, 0, 0)
+        view_actions.addWidget(self.save_view)
+        view_actions.addWidget(self.view_actions)
+        layout.addLayout(view_actions)
+        layout.addWidget(self.filters_toggle)
+        layout.addWidget(self.facets)
+        question_header = QHBoxLayout()
+        question_header.setContentsMargins(0, 0, 0, 0)
+        question_header.addWidget(QLabel("题目"))
+        question_header.addStretch()
+        question_header.addWidget(self.bulk_add)
+        question_header.addWidget(self.bulk_remove)
+        layout.addLayout(question_header)
         layout.addWidget(self.empty_hint)
         layout.addWidget(self.questions, 1)
-        self._populate_views()
-        self.views.setCurrentRow(0)
-        self._update_active_filter()
-        self._connect_signals()
+        layout.addWidget(self.tags)
 
-    def _populate_views(self) -> None:
-        for label, value in (
-            ("全部题目", "all"),
-            ("draft", "draft"),
-            ("图形待重绘", "needs_redraw"),
-            ("当前试卷", "paper"),
-        ):
-            item = QListWidgetItem(label)
-            item.setData(Qt.ItemDataRole.UserRole, value)
+    @staticmethod
+    def _initial_navigation_data() -> DesktopNavigationData:
+        return DesktopNavigationData(
+            views=[
+                SavedView(name="all", protected=True),
+                SavedView(
+                    name="draft",
+                    filters=QueryFilters(status=QuestionStatus.DRAFT),
+                    protected=True,
+                ),
+                SavedView(name="needs_redraw", protected=True),
+                SavedView(name="current_paper", protected=True),
+            ],
+            tags=[],
+            statuses=[],
+            question_types=[],
+            chapters=[],
+            years=[],
+        )
+
+    def set_navigation_data(self, data: DesktopNavigationData) -> None:
+        """Load saved views and available field facets without losing selection."""
+        current = self.current_view() if self.views.count() else "all"
+        self._view_definitions = {view.name: view for view in data.views}
+        self.views.blockSignals(True)
+        self.views.clear()
+        selected_row = 0
+        labels = {
+            "all": "全部题目",
+            "draft": "草稿",
+            "needs_redraw": "图形待重绘",
+            "current_paper": "当前试卷",
+        }
+        for index, view in enumerate(data.views):
+            item = QListWidgetItem(labels.get(view.name, view.name))
+            item.setData(Qt.ItemDataRole.UserRole, view.name)
+            item.setData(Qt.ItemDataRole.UserRole + 1, view.protected)
             self.views.addItem(item)
+            if view.name == current:
+                selected_row = index
+        self.views.setCurrentRow(selected_row)
+        self.views.blockSignals(False)
+        self.facets.set_data(data)
+        self.tags.set_rows(data.tags)
+        self._update_active_filter()
+
+    def set_tag_rows(self, rows: list[TagUsage], total: int) -> None:
+        """Update current-result tag counts and result summary together."""
+        self.tags.set_rows(rows)
+        self._result_total = total
+        self._update_active_filter()
 
     def _connect_signals(self) -> None:
         self.views.currentItemChanged.connect(self._emit_view)
@@ -170,6 +594,16 @@ class NavigationPane(QWidget):
         self.search.textChanged.connect(self.search_changed.emit)
         self.search.textChanged.connect(self._update_active_filter)
         self.clear_filter.clicked.connect(self.clear_filters)
+        self.filter_chips.remove_requested.connect(self._remove_chip)
+        self.facets.changed.connect(self._filters_changed)
+        self.tags.changed.connect(self._filters_changed)
+        self.filters_toggle.toggled.connect(self._toggle_facets)
+        self.save_view.clicked.connect(self.save_view_requested.emit)
+        self.view_actions.clicked.connect(self._show_view_actions)
+        self.bulk_add.clicked.connect(self.bulk_add_requested.emit)
+        self.bulk_remove.clicked.connect(self.bulk_remove_requested.emit)
+        self.tags.manage_requested.connect(self.manage_tags_requested.emit)
+        self.tags.overview_requested.connect(self.tag_overview_requested.emit)
 
     def set_rows(self, rows: list[DesktopQuestionSummary], selected: str | None) -> None:
         """Replace question rows while retaining the current logical ID."""
@@ -199,12 +633,36 @@ class NavigationPane(QWidget):
 
     def current_view(self) -> str:
         """Return the selected saved-view identifier."""
-        item = self.views.currentItem()
-        return str(item.data(Qt.ItemDataRole.UserRole))
+        item = cast(QListWidgetItem | None, self.views.currentItem())
+        return str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else "all"
+
+    def current_filters(self) -> QueryFilters:
+        """Return one validated filter model spanning text, facets, and tags."""
+        return self.facets.filters(self.search.text().strip(), self.tags)
+
+    def selected_question_ids(self) -> list[str]:
+        """Return all selected question IDs in visual order."""
+        return [str(item.data(Qt.ItemDataRole.UserRole)) for item in self.questions.selectedItems()]
+
+    def select_view(self, name: str) -> None:
+        """Select a named view after a save or rename operation."""
+        for index in range(self.views.count()):
+            item = self.views.item(index)
+            if item.data(Qt.ItemDataRole.UserRole) == name:
+                self.views.setCurrentRow(index)
+                return
+
+    def set_transient_filters(self, filters: QueryFilters) -> None:
+        """Apply chart-driven or programmatic filters to the real controls."""
+        self._restore_filters(filters)
+        self._update_active_filter()
+        self.filters_changed.emit()
 
     def clear_filters(self) -> None:
         """Restore the stable all-questions view and clear free-text search."""
         self.search.clear()
+        self.facets.clear()
+        self.tags.clear()
         self.views.setCurrentRow(0)
         self._update_active_filter()
 
@@ -212,20 +670,109 @@ class NavigationPane(QWidget):
         """Refresh theme-dependent icons without rebuilding navigation."""
         self.theme_name = theme
         self.clear_filter.setIcon(icon("clear", theme))
+        self.save_view.setIcon(icon("save", theme))
+        self.facets.set_theme(theme)
+        self.tags.set_theme(theme)
 
     def _update_active_filter(self, *_: object) -> None:
-        item = self.views.currentItem()
-        label = item.text()
-        query = self.search.text().strip()
-        suffix = f" · 搜索“{query}”" if query else ""
-        self.active_filter.setText(f"当前筛选：{label}{suffix}")
-        self.clear_filter.setEnabled(bool(query) or self.current_view() != "all")
+        try:
+            filters = self.current_filters()
+        except ValueError:
+            return
+        chips = self._chips(filters)
+        self.filter_chips.set_chips(chips)
+        current_item = cast(QListWidgetItem | None, self.views.currentItem())
+        label = current_item.text() if current_item is not None else "全部题目"
+        query = f" · 搜索“{filters.text}”" if filters.text else ""
+        count = f"{self._result_total} 道题 · " if self._result_total is not None else ""
+        self.active_filter.setText(f"{count}当前筛选：{label}{query}")
+        has_transient = bool(chips)
+        self.clear_filter.setEnabled(has_transient or self.current_view() != "all")
+        current = self._view_definitions.get(self.current_view())
+        self.view_actions.setEnabled(current is not None and not current.protected)
 
     def _emit_view(self, current: QListWidgetItem | None, previous: QListWidgetItem | None) -> None:
         del previous
         if current is not None:
+            definition = self._view_definitions.get(str(current.data(Qt.ItemDataRole.UserRole)))
+            if definition is not None:
+                self._restore_filters(definition.filters)
             self._update_active_filter()
             self.view_changed.emit(str(current.data(Qt.ItemDataRole.UserRole)))
+
+    def _restore_filters(self, filters: QueryFilters) -> None:
+        self._syncing = True
+        self.search.setText(filters.text or "")
+        self.facets.set_filters(filters)
+        self.tags.set_filters(filters.topics, filters.excluded_topics, filters.topic_mode)
+        self._syncing = False
+
+    def _filters_changed(self, *_: object) -> None:
+        if self._syncing:
+            return
+        self._update_active_filter()
+        self.filters_changed.emit()
+
+    def _toggle_facets(self, expanded: bool) -> None:
+        self.facets.setVisible(expanded)
+        self.filters_toggle.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        )
+
+    def _show_view_actions(self) -> None:
+        view = self._view_definitions.get(self.current_view())
+        if view is None or view.protected:
+            return
+        menu = QMenu(self)
+        rename = menu.addAction("重命名视图")
+        delete = menu.addAction("删除视图")
+        chosen = menu.exec(self.view_actions.mapToGlobal(self.view_actions.rect().bottomLeft()))
+        if chosen == rename:
+            self.rename_view_requested.emit(view.name)
+        elif chosen == delete:
+            self.delete_view_requested.emit(view.name)
+
+    def _remove_chip(self, key: str, value: str) -> None:
+        if key == "text":
+            self.search.clear()
+        elif key in {"topic", "excluded_topic"}:
+            self.tags.remove(value)
+        else:
+            control = {
+                "status": self.facets.status,
+                "question_type": self.facets.question_type,
+                "chapter": self.facets.chapter,
+                "year": self.facets.year,
+                "difficulty_min": self.facets.difficulty_min,
+                "difficulty_max": self.facets.difficulty_max,
+            }[key]
+            control.setCurrentIndex(0)
+        self._filters_changed()
+
+    @staticmethod
+    def _chips(filters: QueryFilters) -> list[tuple[str, str, str]]:
+        chips: list[tuple[str, str, str]] = []
+        if filters.text:
+            chips.append(("text", filters.text, f"搜索：{filters.text}"))
+        chips.extend(("topic", topic, f"包含：{topic}") for topic in filters.topics)
+        chips.extend(
+            ("excluded_topic", topic, f"排除：{topic}") for topic in filters.excluded_topics
+        )
+        for key, value, label in (
+            ("status", filters.status.value if filters.status else None, "状态"),
+            (
+                "question_type",
+                filters.question_type.value if filters.question_type else None,
+                "题型",
+            ),
+            ("chapter", filters.chapter, "章节"),
+            ("year", filters.year, "年份"),
+            ("difficulty_min", filters.difficulty_min, "最低难度"),
+            ("difficulty_max", filters.difficulty_max, "最高难度"),
+        ):
+            if value is not None:
+                chips.append((key, str(value), f"{label}：{value}"))
+        return chips
 
     def _emit_question(
         self,
@@ -275,12 +822,16 @@ class TopicTagEditor(QWidget):
     """Small removable-topic editor with keyboard completion."""
 
     topics_changed = Signal()
+    pending_topic_created = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("topicTagEditor")
         self._topics: list[str] = []
         self._suggestions: set[str] = set(_TOPIC_SUGGESTIONS)
+        self._registry: dict[str, TagUsage] = {}
+        self._identity_to_slug: dict[str, str] = {}
+        self._completion_to_slug: dict[str, str] = {}
         self.tags = QWidget()
         self.tags_layout = QHBoxLayout(self.tags)
         self.tags_layout.setContentsMargins(0, 0, 0, 0)
@@ -289,9 +840,11 @@ class TopicTagEditor(QWidget):
         self.input.setPlaceholderText("输入主题后按 Enter")
         self.input.setAccessibleName("添加主题")
         self._completion_model = QStringListModel(sorted(self._suggestions), self)
-        completer = QCompleter(self._completion_model, self)
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self.input.setCompleter(completer)
+        self.completer = QCompleter(self._completion_model, self)
+        self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.input.setCompleter(self.completer)
+        self.completer.activated.connect(self._completion_activated)
         self.input.textEdited.connect(self.topics_changed.emit)
         self.input.returnPressed.connect(self._accept_input)
         layout = QVBoxLayout(self)
@@ -307,8 +860,35 @@ class TopicTagEditor(QWidget):
         self._completion_model.setStringList(sorted(self._suggestions))
         self._rebuild_tags()
 
+    def set_registry(self, rows: list[TagUsage]) -> None:
+        """Use canonical taxonomy identities and counts for completion."""
+        self._registry = {row.slug: row for row in rows}
+        self._identity_to_slug = {}
+        self._completion_to_slug = {}
+        completions: list[str] = []
+        for row in sorted(rows, key=lambda item: (-item.count, item.slug)):
+            metadata = row.metadata
+            display = metadata.name_zh if metadata and metadata.name_zh else row.slug
+            aliases = metadata.aliases if metadata is not None else []
+            alias_text = f" · {' / '.join(aliases)}" if aliases else ""
+            completion = f"{display} · {row.slug} · {row.count}{alias_text}"
+            completions.append(completion)
+            self._completion_to_slug[completion] = row.slug
+            identities = [row.slug]
+            if metadata is not None:
+                identities.extend(
+                    value
+                    for value in (metadata.name_zh, metadata.name_en, *metadata.aliases)
+                    if value
+                )
+            for identity in identities:
+                self._identity_to_slug[identity.casefold()] = row.slug
+        self._suggestions.update(self._registry)
+        self._completion_model.setStringList(completions)
+        self._rebuild_tags()
+
     def topics(self) -> list[str]:
-        pending = [value.strip() for value in self.input.text().split(",")]
+        pending = [self._canonical_topic(value) for value in self.input.text().split(",")]
         return [
             *self._topics,
             *(topic for topic in pending if topic and topic not in self._topics),
@@ -318,10 +898,13 @@ class TopicTagEditor(QWidget):
         additions = [value.strip() for value in self.input.text().split(",")]
         changed = False
         for topic in additions:
-            if topic and topic not in self._topics:
-                self._topics.append(topic)
-                self._suggestions.add(topic)
+            canonical = self._canonical_topic(topic)
+            if canonical and canonical not in self._topics:
+                self._topics.append(canonical)
+                self._suggestions.add(canonical)
                 changed = True
+                if canonical not in self._registry:
+                    self.pending_topic_created.emit(canonical)
         self.input.clear()
         if changed:
             self._completion_model.setStringList(sorted(self._suggestions))
@@ -332,6 +915,24 @@ class TopicTagEditor(QWidget):
         self._topics.remove(topic)
         self._rebuild_tags()
         self.topics_changed.emit()
+
+    def _completion_activated(self, value: str) -> None:
+        slug = self._completion_to_slug.get(value)
+        if slug is not None:
+            self.input.setText(slug)
+            self._accept_input()
+
+    def _canonical_topic(self, value: str) -> str | None:
+        normalized = value.strip()
+        if not normalized:
+            return None
+        resolved = self._identity_to_slug.get(normalized.casefold())
+        if resolved is not None:
+            return resolved
+        try:
+            return normalize_tag_slug(normalized)
+        except ValueError:
+            return None
 
     def _rebuild_tags(self) -> None:
         while self.tags_layout.count():
@@ -344,7 +945,12 @@ class TopicTagEditor(QWidget):
         for topic in self._topics:
             tag = QToolButton()
             tag.setObjectName("topicTag")
-            tag.setText(f"{topic}  ×")
+            usage = self._registry.get(topic)
+            pending = usage is None or (
+                usage.metadata is not None and usage.metadata.status.value == "pending"
+            )
+            suffix = " · 待整理" if pending else ""
+            tag.setText(f"{topic}{suffix}  ×")
             tag.setToolTip(f"移除主题 {topic}")
             tag.setAccessibleName(f"移除主题 {topic}")
             tag.clicked.connect(lambda checked=False, value=topic: self._remove_topic(value))
@@ -424,6 +1030,10 @@ class MetadataPanel(QWidget):
         self.question_type.set_theme(theme)
         self.status.set_theme(theme)
         self.difficulty.set_theme(theme)
+
+    def set_taxonomy(self, rows: list[TagUsage]) -> None:
+        """Refresh canonical topic autocomplete and pending-state labels."""
+        self.topics.set_registry(rows)
 
     def load_document(self, document: DesktopQuestionDocument) -> None:
         question = document.question
@@ -1158,9 +1768,37 @@ def _friendly_combo(
     return combo
 
 
-def _select_combo_data(combo: ModernComboBox, value: str) -> None:
+def _select_combo_data(combo: ModernComboBox, value: str | None) -> None:
     index = combo.findData(value)
     combo.setCurrentIndex(max(0, index))
+
+
+def _set_combo_choices(combo: ModernComboBox, choices: list[str]) -> None:
+    current = combo.currentData()
+    combo.blockSignals(True)
+    combo.clear()
+    combo.addItem("不限", None)
+    for value in choices:
+        combo.addItem(value, value)
+    index = combo.findData(current)
+    combo.setCurrentIndex(max(0, index))
+    combo.blockSignals(False)
+
+
+def _combo_optional(combo: ModernComboBox) -> str | None:
+    value = combo.currentData()
+    return str(value) if value is not None else None
+
+
+def _combo_optional_int(combo: ModernComboBox) -> int | None:
+    value = _combo_optional(combo)
+    return int(value) if value is not None else None
+
+
+def _field_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setObjectName("fieldLabel")
+    return label
 
 
 def _section_label(text: str) -> QLabel:
@@ -1365,7 +2003,7 @@ def _parse_timestamp(value: str) -> datetime | None:
     return parsed if parsed.tzinfo is not None else None
 
 
-def _clear_layout(layout: QVBoxLayout) -> None:
+def _clear_layout(layout: QLayout) -> None:
     while layout.count():
         item = cast(QLayoutItem | None, layout.takeAt(0))
         if item is None:

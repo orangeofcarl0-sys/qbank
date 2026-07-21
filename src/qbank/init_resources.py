@@ -58,6 +58,14 @@ STATIC_INIT_RESOURCES = (
         PurePosixPath("init/qbank.yaml"),
     ),
     ManagedResource(
+        PurePosixPath("taxonomy.yaml"),
+        PurePosixPath("init/taxonomy.yaml"),
+    ),
+    ManagedResource(
+        PurePosixPath("views.yaml"),
+        PurePosixPath("init/views.yaml"),
+    ),
+    ManagedResource(
         PurePosixPath("templates/paper.md.j2"),
         PurePosixPath("init/templates/paper.md.j2"),
     ),

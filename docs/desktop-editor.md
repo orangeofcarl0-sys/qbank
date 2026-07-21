@@ -24,7 +24,8 @@ bundled Qt DLLs can conflict with PySide6.
 
 The window has a two-and-a-half-column layout:
 
-- views, search, and question list on the left;
+- saved query views, removable filter chips, question list, field facets, and a
+  collapsible include/exclude tag selector on the left;
 - Markdown/TeX source and live preview in the center;
 - a collapsible basic/assets/source/history drawer on the right.
 

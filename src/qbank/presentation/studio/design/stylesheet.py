@@ -63,6 +63,14 @@ def build_stylesheet(theme: ThemeName) -> str:
     QMenu::item:selected {{ color: {p.text_primary}; background: {p.selection}; }}
     QMessageBox {{ background: {p.surface_elevated}; }}
     QLabel#sectionLabel, QLabel#activeFilter {{ color: {p.text_secondary}; }}
+    #navigationPane QLineEdit, #navigationPane QComboBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}
+    QFrame#facetFilterPanel {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_medium}px; }}
+    QFrame#tagSelector {{ background: transparent; border-top: {m.border_width}px solid {p.border_subtle}; }}
+    QToolButton#tagSelectorToggle {{ color: {p.text_primary}; font-weight: 600; text-align: left; }}
+    QListWidget#tagFacetList {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; }}
+    QListWidget#tagFacetList::item {{ min-height: 20px; padding: 2px {m.space_2}px; }}
+    QToolButton#filterChip {{ min-height: 22px; max-height: 22px; color: {p.accent}; background: {p.selection}; border: {m.border_width}px solid {p.border_subtle}; border-radius: 11px; padding: 0 {m.space_2}px; }}
+    QToolButton#filterChip:hover {{ border-color: {p.focus}; }}
     #detailDrawer {{ background: {p.surface}; }}
     #detailDrawer QScrollArea, #detailDrawer QScrollArea > QWidget > QWidget {{ background: {p.surface}; }}
     #detailDrawer QLineEdit, #detailDrawer QComboBox, #detailDrawer QSpinBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}

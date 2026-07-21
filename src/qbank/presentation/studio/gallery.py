@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -24,8 +23,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from qbank.desktop.widgets import InspectorSummary, MetadataPanel, WebWorkspace
-from qbank.models import DesktopQuestionDocument, Question
+from qbank.desktop.widgets import (
+    InspectorSummary,
+    MetadataPanel,
+    NavigationPane,
+    WebWorkspace,
+)
+from qbank.models import (
+    DesktopNavigationData,
+    DesktopQuestionDocument,
+    DesktopQuestionSummary,
+    QueryFilters,
+    Question,
+    SavedView,
+    TagStatus,
+    TagUsage,
+    TaxonomyTag,
+)
 from qbank.presentation.studio.design.controls import ModernComboBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.palette import ThemeName
@@ -133,24 +147,77 @@ class StudioGallery(QMainWindow):
 
     def _navigation(self) -> QFrame:
         panel, layout = _section("导航与题目列表")
-        filter_label = QLabel("当前筛选：全部题目")
-        filter_label.setObjectName("activeFilter")
-        layout.addWidget(filter_label)
-        views = QListWidget()
-        views.addItems(["全部题目  24", "草稿  6", "图形待重绘  3", "当前试卷  8"])
-        views.setCurrentRow(0)
-        views.setMaximumHeight(126)
-        layout.addWidget(views)
-        questions = QListWidget()
-        questions.addItems(
-            [
-                "Michelson 干涉仪光程差变化\nOPT-INT-0001 · reviewed",
-                "单缝衍射中央主极大\nOPT-DIF-0001 · draft",
-                "干涉条纹示意图观察\nOPT-IMG-0001 · final",
-            ]
+        navigation = NavigationPane(self.theme_name)
+        navigation.set_navigation_data(
+            DesktopNavigationData(
+                views=[
+                    SavedView(name="all", protected=True),
+                    SavedView(name="draft", protected=True),
+                    SavedView(name="图形覆盖待审", filters=QueryFilters(topics=["diffraction"])),
+                ],
+                tags=[
+                    TagUsage(
+                        slug="interference",
+                        count=12,
+                        registered=True,
+                        metadata=TaxonomyTag(
+                            slug="interference",
+                            name_zh="干涉",
+                            aliases=["相干叠加"],
+                            color="#527da6",
+                        ),
+                    ),
+                    TagUsage(
+                        slug="diffraction",
+                        count=7,
+                        registered=True,
+                        metadata=TaxonomyTag(
+                            slug="diffraction",
+                            name_zh="衍射",
+                            color="#7a6aa6",
+                        ),
+                    ),
+                    TagUsage(
+                        slug="needs-review",
+                        count=3,
+                        registered=True,
+                        metadata=TaxonomyTag(
+                            slug="needs-review",
+                            name_zh="待整理",
+                            status=TagStatus.PENDING,
+                        ),
+                    ),
+                ],
+                statuses=["draft", "reviewed"],
+                question_types=["calculation", "short_answer"],
+                chapters=["interferometry", "diffraction"],
+                years=[2025, 2026],
+            )
         )
-        questions.setCurrentRow(0)
-        layout.addWidget(questions)
+        navigation.set_rows(
+            [
+                DesktopQuestionSummary(
+                    id="OPT-INT-0001",
+                    title="Michelson 干涉仪光程差变化",
+                    subject="optics",
+                    status="reviewed",
+                    question_type="calculation",
+                    difficulty=2,
+                    needs_redraw=False,
+                ),
+                DesktopQuestionSummary(
+                    id="OPT-DIF-0001",
+                    title="单缝衍射中央主极大",
+                    subject="optics",
+                    status="draft",
+                    question_type="short_answer",
+                    difficulty=3,
+                    needs_redraw=True,
+                ),
+            ],
+            "OPT-INT-0001",
+        )
+        layout.addWidget(navigation)
         return panel
 
     def _documents(self) -> QFrame:

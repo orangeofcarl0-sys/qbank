@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
+from qbank.application.service import question_matches
 from qbank.asset_references import AssetKind, classify_resource_uri, extract_image_resources
 from qbank.assets import (
     AssetService,
@@ -29,21 +31,29 @@ from qbank.models import (
     AssetRenderResult,
     AssetStatus,
     DesktopAssetItem,
+    DesktopNavigationData,
     DesktopPreviewResult,
     DesktopQuestionDocument,
+    DesktopQuestionListResult,
     DesktopQuestionSummary,
     Diagnostic,
     DiagnosticCode,
     PatchQuestionResult,
+    QueryFilters,
     Question,
     QuestionPatch,
+    SavedViewMutationResult,
+    TagMutationResult,
+    TagOverviewResult,
+    TagUsage,
+    TaxonomyTag,
 )
 from qbank.papers import load_paper
 from qbank.presentation.studio.design.palette import ThemeName
 from qbank.presentation.studio.design.web_theme import css_variables
 from qbank.question_layout import QUESTION_SECTIONS
 
-DesktopView = Literal["all", "draft", "needs_redraw", "paper"]
+DesktopView = str
 _DESKTOP_METADATA_FIELDS = frozenset(
     {"title", "type", "subject", "chapter", "topics", "difficulty", "status", "language"}
 )
@@ -111,18 +121,156 @@ class DesktopController:
         *,
         view: DesktopView = "all",
         search: str = "",
+        filters: QueryFilters | None = None,
     ) -> list[DesktopQuestionSummary]:
-        """Return navigation rows for the selected lightweight view."""
-        questions = self.services.questions.query_questions()
-        redraw_ids = self._redraw_question_ids()
-        normalized_search = search.strip().casefold()
-        rows = [
-            self._summary(question, redraw_ids)
-            for question in questions
-            if self._matches_view(question, view, redraw_ids)
-            and _matches_search(question, normalized_search)
+        """Return rows after one named view and the current transient facets."""
+        questions, redraw_ids = self._filtered_questions(view, search, filters)
+        return [self._summary(question, redraw_ids) for question in questions]
+
+    def navigation_result(
+        self,
+        *,
+        view: DesktopView = "all",
+        search: str = "",
+        filters: QueryFilters | None = None,
+    ) -> DesktopQuestionListResult:
+        """Return question rows and tag counts from the exact same result set."""
+        questions, redraw_ids = self._filtered_questions(view, search, filters)
+        counts = Counter(topic for question in questions for topic in set(question.topics))
+        metadata = self.services.tags.registry().by_slug()
+        tags = [
+            TagUsage(
+                slug=slug,
+                count=count,
+                registered=slug in metadata,
+                metadata=metadata.get(slug),
+            )
+            for slug, count in sorted(counts.items())
         ]
-        return rows
+        return DesktopQuestionListResult(
+            rows=[self._summary(question, redraw_ids) for question in questions],
+            tags=tags,
+            total=len(questions),
+        )
+
+    def _filtered_questions(
+        self,
+        view: DesktopView,
+        search: str,
+        filters: QueryFilters | None,
+    ) -> tuple[list[Question], set[str]]:
+        questions = self.services.questions.query_questions(QueryFilters(limit=100_000))
+        redraw_ids = self._redraw_question_ids()
+        view_name = "current_paper" if view == "paper" else view
+        definition = self.services.views.resolve(view_name)
+        visible_ids: set[str] | None = None
+        if definition.kind.value == "needs_redraw":
+            visible_ids = redraw_ids
+        elif definition.kind.value == "current_paper":
+            visible_ids = set(self.current_paper_ids)
+        active = filters or QueryFilters(text=search or None, limit=100_000)
+        matches = [
+            question
+            for question in questions
+            if question_matches(question, definition.filters)
+            and (visible_ids is None or question.id in visible_ids)
+            and question_matches(question, active)
+        ]
+        return matches, redraw_ids
+
+    def navigation_data(self) -> DesktopNavigationData:
+        """Return current saved views and deterministic facet choices."""
+        questions = self.services.questions.query_questions(QueryFilters(limit=100_000))
+        years = sorted(
+            {
+                int(question.created_at[:4])
+                for question in questions
+                if question.created_at is not None
+            }
+        )
+        return DesktopNavigationData(
+            views=self.services.views.list_views(),
+            tags=self.services.tags.list_tags(),
+            statuses=sorted({question.status.value for question in questions}),
+            question_types=sorted({question.type.value for question in questions}),
+            chapters=sorted(
+                {question.chapter for question in questions if question.chapter is not None}
+            ),
+            years=years,
+        )
+
+    def tag_suggestions(self, text: str = "", *, limit: int = 20) -> list[TagUsage]:
+        """Return registry-aware topic suggestions for the Inspector."""
+        return self.services.tags.suggestions(text, limit=limit)
+
+    def list_tags(self) -> list[TagUsage]:
+        """Return all tag registry rows with authoritative counts."""
+        return self.services.tags.list_tags()
+
+    def possible_tag_synonyms(self, value: str, *, limit: int = 5) -> list[TagUsage]:
+        """Return close registry matches before Studio creates a pending tag."""
+        return self.services.tags.possible_synonyms(value, limit=limit)
+
+    def tag_overview(self, *, top_n: int = 12) -> TagOverviewResult:
+        """Return lightweight charts derived from authoritative question topics."""
+        return self.services.tags.overview(top_n=top_n)
+
+    def save_view(
+        self, name: str, filters: QueryFilters, *, dry_run: bool = False
+    ) -> SavedViewMutationResult:
+        """Persist the current transient filters as a reusable query view."""
+        return self.services.views.save(name, filters, dry_run=dry_run)
+
+    def rename_view(self, old: str, new: str, *, dry_run: bool = False) -> SavedViewMutationResult:
+        """Rename one user view through the application service."""
+        return self.services.views.rename(old, new, dry_run=dry_run)
+
+    def delete_view(self, name: str, *, dry_run: bool = False) -> SavedViewMutationResult:
+        """Delete one user view through the application service."""
+        return self.services.views.delete(name, dry_run=dry_run)
+
+    def bulk_edit_topics(
+        self,
+        question_ids: list[str],
+        *,
+        add: list[str] | None = None,
+        remove: list[str] | None = None,
+        dry_run: bool = False,
+    ) -> TagMutationResult:
+        """Apply a multi-selection topic edit through one atomic use case."""
+        return self.services.tags.bulk_edit(
+            question_ids,
+            add=add or [],
+            remove=remove or [],
+            dry_run=dry_run,
+            command="qbank desktop bulk tags",
+        )
+
+    def rename_tag(self, old: str, new: str, *, dry_run: bool = False) -> TagMutationResult:
+        """Plan or commit a global tag rename."""
+        return self.services.tags.rename(
+            old, new, dry_run=dry_run, command="qbank desktop tag rename"
+        )
+
+    def merge_tag(self, source: str, target: str, *, dry_run: bool = False) -> TagMutationResult:
+        """Plan or commit a global tag merge."""
+        return self.services.tags.merge(
+            source, target, dry_run=dry_run, command="qbank desktop tag merge"
+        )
+
+    def delete_tag(self, slug: str, *, dry_run: bool = False) -> TagMutationResult:
+        """Plan or commit a global tag deletion."""
+        return self.services.tags.delete(slug, dry_run=dry_run, command="qbank desktop tag delete")
+
+    def update_tag(self, tag: TaxonomyTag, *, dry_run: bool = False) -> TagMutationResult:
+        """Plan or commit tag display metadata changes."""
+        return self.services.tags.update_tag(
+            tag, dry_run=dry_run, command="qbank desktop tag update"
+        )
+
+    def undo_tag(self, token: str, *, dry_run: bool = False) -> TagMutationResult:
+        """Plan or commit a safe inverse tag history event."""
+        return self.services.tags.undo(token, dry_run=dry_run, command="qbank desktop tag undo")
 
     def load_question(self, question_id: str) -> DesktopQuestionDocument:
         """Load one editable body plus assets and asset history."""
@@ -337,12 +485,21 @@ class DesktopController:
         )
         if not planned.ok:
             return planned
-        return self.services.questions.patch_question(
+        committed = self.services.questions.patch_question(
             question_id,
             patch,
             dry_run=False,
             command="qbank desktop save",
         )
+        if committed.ok:
+            question = self.services.questions.get_question(question_id)
+            pending = self.services.tags.register_pending(
+                question.topics,
+                dry_run=False,
+                command="qbank desktop register pending tags",
+            )
+            committed.warnings.extend(pending.warnings)
+        return committed
 
     def preview_source(
         self,
@@ -799,21 +956,6 @@ def _invalid_asset_item(
         asset_id=asset_id,
         diagnostic=Diagnostic(code=code, message=message),
     )
-
-
-def _matches_search(question: Question, search: str) -> bool:
-    if not search:
-        return True
-    haystack = " ".join(
-        (
-            question.id,
-            question.title,
-            question.subject,
-            question.stem_md,
-            " ".join(question.topics),
-        )
-    ).casefold()
-    return search in haystack
 
 
 def _normalized_metadata(metadata: Mapping[str, object] | None) -> dict[str, object]:

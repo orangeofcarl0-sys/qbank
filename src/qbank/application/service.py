@@ -108,6 +108,7 @@ def question_matches(question: Question, filters: QueryFilters) -> bool:
         and (filters.difficulty_min is None or question.difficulty >= filters.difficulty_min)
         and (filters.difficulty_max is None or question.difficulty <= filters.difficulty_max)
         and (filters.language is None or question.language == filters.language)
+        and filters.matches_year(question.created_at)
     )
     desired = set(filters.topics)
     available = set(question.topics)
@@ -116,4 +117,22 @@ def question_matches(question: Question, filters: QueryFilters) -> bool:
         or (filters.topic_mode == "and" and desired <= available)
         or (filters.topic_mode == "or" and bool(desired & available))
     )
-    return metadata_matches and topics_match
+    excluded_match = not (set(filters.excluded_topics) & available)
+    text = filters.text.casefold() if filters.text else None
+    text_match = (
+        text is None
+        or text
+        in "\n".join(
+            (
+                question.id,
+                question.title,
+                question.subject,
+                question.chapter or "",
+                " ".join(question.topics),
+                question.stem_md,
+                question.answer_md,
+                question.solution_md,
+            )
+        ).casefold()
+    )
+    return metadata_matches and topics_match and excluded_match and text_match

@@ -2,6 +2,17 @@
 
 ## 0.1.0 - 2026-07-18
 
+- Added project-level `taxonomy.yaml` metadata while keeping question Markdown
+  `topics` as the sole tag-relation authority, plus persistent `views.yaml` query views.
+- Added atomic `qbank tag` rename, merge, delete, normalize, statistics, and
+  co-occurrence commands, durable history/undo data, and `qbank view` lifecycle commands.
+- Added Studio tag facets with include/exclude and AND/OR composition, field facets,
+  removable filter chips, saved-view editing, multi-question topic changes, and
+  registry-aware Inspector autocomplete with pending/synonym guidance.
+- Added a native tag manager with impact previews and a lightweight tag overview with
+  frequency bars, Top-N co-occurrence, year coverage, and chapter coverage; chart clicks
+  now produce real main-window filters without adding a dashboard or graph database.
+
 - Modernized Studio with centralized light/dark design tokens shared by Qt,
   CodeMirror, and Markdown/MathJax, plus a maintained component gallery and
   repository-scoped `$qbank-ui-design` workflow.

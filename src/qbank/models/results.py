@@ -10,6 +10,7 @@ from pydantic import Field
 from qbank.models.asset import AssetManifest
 from qbank.models.common import ResultModel
 from qbank.models.question import Question
+from qbank.models.taxonomy import SavedView, TaxonomyTag
 
 Severity = Literal["error", "warning", "info"]
 
@@ -499,6 +500,91 @@ class SearchHit(ResultModel):
     topics: str
     snippet: str
     rank: float
+
+
+class TagUsage(ResultModel):
+    """One tag and its current authoritative question count."""
+
+    slug: str
+    count: int
+    registered: bool
+    metadata: TaxonomyTag | None = None
+
+
+class DesktopNavigationData(ResultModel):
+    """Facet values, query views, and tag counts used by Studio navigation."""
+
+    views: list[SavedView]
+    tags: list[TagUsage]
+    statuses: list[str]
+    question_types: list[str]
+    chapters: list[str]
+    years: list[int]
+
+
+class DesktopQuestionListResult(ResultModel):
+    """Filtered Studio rows and tag counts scoped to those same rows."""
+
+    rows: list[DesktopQuestionSummary]
+    tags: list[TagUsage]
+    total: int
+
+
+class TagCooccurrence(ResultModel):
+    """A deterministic unordered tag-pair count."""
+
+    left: str
+    right: str
+    count: int
+
+
+class TagCoverageCell(ResultModel):
+    """One axis-by-tag coverage count for a compact heat map."""
+
+    axis: str
+    tag: str
+    count: int
+
+
+class TagOverviewResult(ResultModel):
+    """Shared data contract for Studio's lightweight tag charts."""
+
+    frequencies: list[TagUsage]
+    cooccurrences: list[TagCooccurrence]
+    year_coverage: list[TagCoverageCell]
+    chapter_coverage: list[TagCoverageCell]
+
+
+class TagQuestionChange(ResultModel):
+    """One question's topic-level change in a bulk tag operation."""
+
+    id: str
+    before: list[str]
+    after: list[str]
+
+
+class TagMutationResult(ResultModel):
+    """Dry-run plan or committed atomic tag mutation."""
+
+    ok: bool
+    dry_run: bool
+    operation: str
+    affected_questions: int
+    changes: list[TagQuestionChange]
+    taxonomy_before: list[TaxonomyTag]
+    taxonomy_after: list[TaxonomyTag]
+    history_token: str | None = None
+    warnings: list[Diagnostic] = Field(default_factory=_diagnostic_list)
+    index_updated: bool
+
+
+class SavedViewMutationResult(ResultModel):
+    """Saved-view metadata mutation result."""
+
+    ok: bool
+    dry_run: bool
+    action: Literal["save", "rename", "delete"]
+    view: SavedView
 
 
 class IndexHealth(ResultModel):

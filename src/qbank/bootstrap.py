@@ -2,7 +2,12 @@
 
 from dataclasses import dataclass
 
-from qbank.application import AssetApplicationService, QuestionService
+from qbank.application import (
+    AssetApplicationService,
+    QuestionService,
+    SavedViewService,
+    TagApplicationService,
+)
 from qbank.application.ports import MutableQuestionRepositoryPort, RenderingPort
 from qbank.context import ProjectContext
 from qbank.diagnostics import DiagnosticServices
@@ -19,6 +24,9 @@ from qbank.operations import MutationServices, apply_patch_in_context
 from qbank.rendering import RenderService
 from qbank.repository import MarkdownQuestionRepository
 from qbank.search_index import SQLiteSearchIndex
+from qbank.tagging import AtomicTagMutationExecutor
+from qbank.taxonomy_store import YamlSavedViewStore, YamlTaxonomyStore
+from qbank.view_support import ProjectSpecialViews
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +39,8 @@ class ProjectServices:
     diagnostics: DiagnosticServices
     renderer: RenderingPort
     assets: AssetApplicationService
+    tags: TagApplicationService
+    views: SavedViewService
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +80,7 @@ def create_project_services(context: ProjectContext) -> ProjectServices:
         index=index,
         history=JsonHistoryStore(context),
     )
+    taxonomy = YamlTaxonomyStore(context)
     return ProjectServices(
         repository=repository,
         questions=QuestionService(
@@ -90,6 +101,16 @@ def create_project_services(context: ProjectContext) -> ProjectServices:
             inputs=AssetInputAdapter(context),
             renderer=IpeRenderAdapter(context),
             launcher=SafeAssetLauncher(context),
+        ),
+        tags=TagApplicationService(
+            repository=repository,
+            taxonomy=taxonomy,
+            mutations=AtomicTagMutationExecutor(context, mutations),
+        ),
+        views=SavedViewService(
+            repository=repository,
+            store=YamlSavedViewStore(context),
+            special=ProjectSpecialViews(context),
         ),
     )
 
