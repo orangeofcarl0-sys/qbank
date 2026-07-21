@@ -53,6 +53,12 @@ def build_stylesheet(theme: ThemeName) -> str:
     QListWidget::item:hover {{ background: {p.surface_hover}; }}
     QListWidget::item:selected {{ color: {p.text_primary}; background: {p.selection}; }}
     QListWidget::item:disabled {{ color: {p.text_disabled}; }}
+    QTableWidget {{ color: {p.text_primary}; background: {p.surface_elevated}; alternate-background-color: {p.background}; border: {m.border_width}px solid {p.border_subtle}; gridline-color: {p.border_subtle}; selection-background-color: {p.selection}; selection-color: {p.text_primary}; }}
+    QTableWidget::item:hover {{ background: {p.surface_hover}; }}
+    QTableWidget::item:selected {{ color: {p.text_primary}; background: {p.selection}; }}
+    QHeaderView::section {{ color: {p.text_primary}; background: {p.surface}; border: 0; border-right: {m.border_width}px solid {p.border_subtle}; border-bottom: {m.border_width}px solid {p.border_strong}; padding: {m.space_1}px {m.space_2}px; font-weight: 600; }}
+    QProgressBar {{ color: {p.text_primary}; background: {p.background}; border: 0; border-radius: {m.radius_small}px; text-align: right; }}
+    QProgressBar::chunk {{ background: {p.accent}; border-radius: {m.radius_small}px; }}
     QTabWidget::pane {{ border: 0; border-top: {m.border_width}px solid {p.border_subtle}; }}
     QTabBar::tab {{ padding: {m.space_2}px {m.space_3}px; color: {p.text_secondary}; border-bottom: 2px solid transparent; }}
     QTabBar::tab:selected {{ color: {p.text_primary}; border-bottom-color: {p.accent}; }}

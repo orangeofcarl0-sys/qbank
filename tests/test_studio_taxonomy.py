@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QInputDialog,
     QMessageBox,
+    QPushButton,
     QTableWidget,
     QToolButton,
 )
@@ -84,6 +85,18 @@ def test_navigation_tag_states_and_field_facets_form_one_query(
     pane.set_rows(result.rows, None)
     pane.set_tag_rows(result.tags, result.total)
 
+    assert pane.tags.list.item(0).data(Qt.ItemDataRole.UserRole) == "waves"
+    pane.tags.sort.setCurrentIndex(1)
+    assert [
+        pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole)
+        for index in range(pane.tags.list.count())
+    ] == ["diffraction", "interference", "waves"]
+    pane.tags.search.setText("干涉")
+    assert pane.tags.list.count() == 1
+    assert pane.tags.list.item(0).data(Qt.ItemDataRole.UserRole) == "interference"
+    pane.tags.search.clear()
+    pane.tags.sort.setCurrentIndex(0)
+
     waves = next(
         pane.tags.list.item(index)
         for index in range(pane.tags.list.count())
@@ -95,6 +108,18 @@ def test_navigation_tag_states_and_field_facets_form_one_query(
         row.id
         for row in controller.navigation_result(view="all", filters=pane.current_filters()).rows
     } == {"OPT-TAG-0001", "OPT-TAG-0002"}
+
+    interference = next(
+        pane.tags.list.item(index)
+        for index in range(pane.tags.list.count())
+        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == "interference"
+    )
+    pane.tags.list.itemClicked.emit(interference)
+    assert pane.current_filters().topics == ["interference", "waves"]
+    assert controller.navigation_result(view="all", filters=pane.current_filters()).total == 1
+    pane.tags.mode.setCurrentIndex(1)
+    assert pane.current_filters().topic_mode == "or"
+    assert controller.navigation_result(view="all", filters=pane.current_filters()).total == 2
 
     waves = next(
         pane.tags.list.item(index)
@@ -152,6 +177,7 @@ def test_tag_manager_and_overview_emit_real_query_filters(
         "interference",
         "waves",
     }
+    assert "关闭" in {button.text() for button in manager.findChildren(QPushButton)}
 
     overview = TagOverviewDialog(controller, "light")
     qtbot.addWidget(overview)
@@ -241,6 +267,8 @@ def test_overview_matrix_and_heatmap_clicks_emit_combined_filters(
     overview.filter_requested.connect(lambda value: emitted.append(cast(QueryFilters, value)))
 
     matrix = cast(QTableWidget, overview.tabs.widget(1))
+    assert matrix.horizontalHeaderItem(0).text() == "1"
+    assert matrix.horizontalHeaderItem(0).toolTip()
     overview._matrix_clicked(matrix, 0, 1)
     assert len(emitted[-1].topics) == 2
     assert emitted[-1].topic_mode == "and"
@@ -255,7 +283,10 @@ def test_overview_matrix_and_heatmap_clicks_emit_combined_filters(
     overview._coverage_clicked(
         years,
         [years.verticalHeaderItem(row).text() for row in range(years.rowCount())],
-        [years.horizontalHeaderItem(column).text() for column in range(years.columnCount())],
+        [
+            str(years.horizontalHeaderItem(column).data(Qt.ItemDataRole.UserRole))
+            for column in range(years.columnCount())
+        ],
         "year",
         *year_cell,
     )
@@ -271,7 +302,10 @@ def test_overview_matrix_and_heatmap_clicks_emit_combined_filters(
     overview._coverage_clicked(
         chapters,
         [chapters.verticalHeaderItem(row).text() for row in range(chapters.rowCount())],
-        [chapters.horizontalHeaderItem(column).text() for column in range(chapters.columnCount())],
+        [
+            str(chapters.horizontalHeaderItem(column).data(Qt.ItemDataRole.UserRole))
+            for column in range(chapters.columnCount())
+        ],
         "chapter",
         *chapter_cell,
     )

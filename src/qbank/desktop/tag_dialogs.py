@@ -108,9 +108,7 @@ class TagManagerDialog(QDialog):
             actions.addWidget(button)
         actions.addStretch()
         layout.addLayout(actions)
-        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close.rejected.connect(self.reject)
-        layout.addWidget(close)
+        layout.addWidget(_close_button_box(self))
 
     def refresh(self) -> None:
         """Reload counts and metadata after every committed operation."""
@@ -245,9 +243,10 @@ class TagOverviewDialog(QDialog):
         super().__init__(parent)
         self.controller = controller
         self.theme_name = theme
-        self.data = controller.tag_overview(top_n=12)
+        self.data = controller.tag_overview(top_n=10)
         self.setWindowTitle("标签概览")
-        self.setMinimumSize(820, 560)
+        self.setMinimumSize(900, 560)
+        self.resize(1180, 720)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._frequency_table(), "频次")
         self.tabs.addTab(self._cooccurrence_table(), "共现")
@@ -258,9 +257,7 @@ class TagOverviewDialog(QDialog):
         hint.setObjectName("fieldHint")
         layout.addWidget(hint)
         layout.addWidget(self.tabs, 1)
-        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close.rejected.connect(self.reject)
-        layout.addWidget(close)
+        layout.addWidget(_close_button_box(self))
 
     def _frequency_table(self) -> QTableWidget:
         table = QTableWidget(len(self.data.frequencies), 2)
@@ -292,8 +289,8 @@ class TagOverviewDialog(QDialog):
         counts = {(item.left, item.right): item.count for item in self.data.cooccurrences}
         frequencies = {usage.slug: usage.count for usage in self.data.frequencies}
         table = QTableWidget(len(tags), len(tags))
-        table.setVerticalHeaderLabels(tags)
-        table.setHorizontalHeaderLabels(tags)
+        table.setVerticalHeaderLabels([f"{index + 1}  {tag}" for index, tag in enumerate(tags)])
+        _set_tag_headers(table, tags, numbered=True)
         maximum = max([*counts.values(), *frequencies.values()], default=1)
         for row, left in enumerate(tags):
             for column, right in enumerate(tags):
@@ -325,7 +322,7 @@ class TagOverviewDialog(QDialog):
         maximum = max(counts.values(), default=1)
         table = QTableWidget(len(axes), len(tags))
         table.setVerticalHeaderLabels(axes)
-        table.setHorizontalHeaderLabels(tags)
+        _set_tag_headers(table, tags, numbered=False)
         for row, axis in enumerate(axes):
             for column, tag in enumerate(tags):
                 count = counts.get((axis, tag), 0)
@@ -368,6 +365,28 @@ def _finish_chart_table(table: QTableWidget) -> None:
     table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+
+def _close_button_box(dialog: QDialog) -> QDialogButtonBox:
+    box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    button = box.button(QDialogButtonBox.StandardButton.Close)
+    button.setText("关闭")
+    button.setAccessibleName("关闭窗口")
+    box.rejected.connect(dialog.reject)
+    return box
+
+
+def _set_tag_headers(table: QTableWidget, tags: list[str], *, numbered: bool) -> None:
+    for column, tag in enumerate(tags):
+        label = str(column + 1) if numbered else _compact_tag(tag)
+        item = QTableWidgetItem(label)
+        item.setToolTip(tag)
+        item.setData(Qt.ItemDataRole.UserRole, tag)
+        table.setHorizontalHeaderItem(column, item)
+
+
+def _compact_tag(tag: str) -> str:
+    return tag if len(tag) <= 11 else f"{tag[:10]}…"
 
 
 def _heat_color(theme: ThemeName, count: int, maximum: int) -> QColor:

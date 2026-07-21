@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from qbank.context import ProjectContext
 from qbank.models import QuestionPatch
 from qbank.operations import (
     add_question,
@@ -16,7 +17,7 @@ from qbank.operations import (
     ingest_questions,
     query_questions,
 )
-from qbank.search_index import index_path, rebuild_index, search
+from qbank.search_index import SQLiteSearchIndex, index_path, rebuild_index, search
 from qbank.storage import locate_question
 
 
@@ -202,3 +203,35 @@ def test_delete_removes_fts_row(project: tuple[Path, Any], question: Any) -> Non
     add_question(root, config, question)
     delete_question(root, config, question.id)
     assert search(root, config, "Michelson") == []
+
+
+def test_tag_count_and_cooccurrence_projections_follow_mutations(
+    project: tuple[Path, Any], make_question: Any
+) -> None:
+    root, config = project
+    first = make_question(id="OPT-TAGS-0001", topics=["alpha", "beta"])
+    second = make_question(id="OPT-TAGS-0002", topics=["alpha", "gamma"])
+    ingest_questions(root, config, [first, second])
+    index = SQLiteSearchIndex(ProjectContext.from_config(root, config))
+
+    assert index.tag_projection() == (
+        {"alpha": 2, "beta": 1, "gamma": 1},
+        {("alpha", "beta"): 1, ("alpha", "gamma"): 1},
+    )
+
+    apply_patch(
+        root,
+        config,
+        first.id,
+        QuestionPatch(remove_topics=["beta"], add_topics=["gamma"]),
+    )
+    assert index.tag_projection() == (
+        {"alpha": 2, "gamma": 2},
+        {("alpha", "gamma"): 2},
+    )
+
+    delete_question(root, config, second.id)
+    assert index.tag_projection() == (
+        {"alpha": 1, "gamma": 1},
+        {("alpha", "gamma"): 1},
+    )

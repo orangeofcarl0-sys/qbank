@@ -98,7 +98,9 @@ class InMemoryMutationIndex:
         *,
         questions: tuple[Question, ...] = (),
         deleted_ids: tuple[str, ...] = (),
+        topics_by_question: Mapping[str, tuple[str, ...]] | None = None,
     ) -> None:
+        del topics_by_question
         self.questions = questions
         self.deleted_ids = deleted_ids
 

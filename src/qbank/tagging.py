@@ -109,7 +109,10 @@ class AtomicTagMutationExecutor:
         transaction.commit()
         result.history_token = history_path.stem
         if prepared:
-            result.index_updated, result.warnings = self._sync_index(prepared)
+            result.index_updated, result.warnings = self._sync_index(
+                prepared,
+                plan.snapshot,
+            )
         return result
 
     def undo(self, token: str, *, dry_run: bool, command: str) -> TagMutationResult:
@@ -198,11 +201,24 @@ class AtomicTagMutationExecutor:
             prepared.append(question)
         return prepared
 
-    def _sync_index(self, questions: Sequence[Question]) -> tuple[bool, list[Diagnostic]]:
+    def _sync_index(
+        self,
+        questions: Sequence[Question],
+        snapshot: RepositorySnapshot,
+    ) -> tuple[bool, list[Diagnostic]]:
         if not self.context.config.index.enabled:
             return False, []
         try:
-            self.services.index.apply(questions=tuple(questions))
+            topics_by_question = {
+                record.question.id: tuple(record.question.topics) for record in snapshot.records
+            }
+            topics_by_question.update(
+                {question.id: tuple(question.topics) for question in questions}
+            )
+            self.services.index.apply(
+                questions=tuple(questions),
+                topics_by_question=topics_by_question,
+            )
         except Exception as exc:
             message = f"authoritative tag changes committed, but index update failed: {exc}"
             try:

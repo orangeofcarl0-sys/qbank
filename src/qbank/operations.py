@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -146,6 +146,7 @@ def _sync_index(
     config: ProjectConfig,
     index: MutationIndexPort,
     *,
+    snapshot: RepositorySnapshot,
     questions: Sequence[Question] = (),
     deleted_ids: Sequence[str] = (),
 ) -> tuple[bool, list[Diagnostic]]:
@@ -155,6 +156,11 @@ def _sync_index(
         index.apply(
             questions=tuple(questions),
             deleted_ids=tuple(deleted_ids),
+            topics_by_question=_topics_after(
+                snapshot,
+                questions=questions,
+                deleted_ids=deleted_ids,
+            ),
         )
     except Exception as exc:
         message = f"authoritative files committed, but the index update failed: {exc}"
@@ -170,6 +176,23 @@ def _sync_index(
             )
         ]
     return True, []
+
+
+def _topics_after(
+    snapshot: RepositorySnapshot,
+    *,
+    questions: Sequence[Question] = (),
+    deleted_ids: Sequence[str] = (),
+) -> Mapping[str, tuple[str, ...]]:
+    """Project post-commit topic relations from the already scanned snapshot."""
+    deleted = set(deleted_ids)
+    topics = {
+        record.question.id: tuple(record.question.topics)
+        for record in snapshot.records
+        if record.question.id not in deleted
+    }
+    topics.update({question.id: tuple(question.topics) for question in questions})
+    return topics
 
 
 def _history_write(
@@ -264,6 +287,7 @@ def add_question_in_context(
     index_updated, index_warnings = _sync_index(
         config,
         services.index,
+        snapshot=snapshot,
         questions=[prepared],
     )
     result.index_updated = index_updated
@@ -511,6 +535,7 @@ def _commit_ingest(
         index_updated, index_warnings = _sync_index(
             planning.context.config,
             planning.services.index,
+            snapshot=planning.snapshot,
             questions=prepared_questions,
         )
         result.index_updated = index_updated
@@ -622,6 +647,7 @@ def apply_patch_in_context(
     index_updated, index_warnings = _sync_index(
         config,
         services.index,
+        snapshot=snapshot,
         questions=[prepared],
     )
     result.index_updated = index_updated
@@ -704,6 +730,7 @@ def delete_question_in_context(
     index_updated, index_warnings = _sync_index(
         config,
         services.index,
+        snapshot=snapshot,
         deleted_ids=[question_id],
     )
     result.index_updated = index_updated

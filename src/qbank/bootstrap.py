@@ -111,6 +111,7 @@ def create_project_services(context: ProjectContext) -> ProjectServices:
             repository=repository,
             store=YamlSavedViewStore(context),
             special=ProjectSpecialViews(context),
+            taxonomy=taxonomy,
         ),
     )
 

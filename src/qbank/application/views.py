@@ -16,6 +16,7 @@ from qbank.models import (
     SavedViewKind,
     SavedViewMutationResult,
     SavedViewRegistry,
+    Taxonomy,
 )
 
 
@@ -31,6 +32,12 @@ class SpecialViewPort(Protocol):
     """Resolve project-derived built-in view membership."""
 
     def question_ids(self, kind: SavedViewKind) -> frozenset[str]: ...
+
+
+class ViewTaxonomyPort(Protocol):
+    """Resolve historical aliases used by persisted view filters."""
+
+    def load(self) -> Taxonomy: ...
 
 
 BUILTIN_VIEWS = (
@@ -52,10 +59,14 @@ class SavedViewService:
     repository: QuestionRepositoryPort
     store: SavedViewStorePort
     special: SpecialViewPort
+    taxonomy: ViewTaxonomyPort
 
     def list_views(self) -> list[SavedView]:
         """Return fixed built-ins followed by user views."""
-        return [*BUILTIN_VIEWS, *self.store.load().views]
+        return [
+            *BUILTIN_VIEWS,
+            *(self._canonical_view(view) for view in self.store.load().views),
+        ]
 
     def resolve(self, name: str) -> SavedView:
         """Resolve a view by its case-insensitive stable name."""
@@ -92,7 +103,7 @@ class SavedViewService:
         if any(view.name.casefold() == name.strip().casefold() for view in BUILTIN_VIEWS):
             raise ConflictError(f"built-in view cannot be replaced: {name}")
         registry = self.store.load()
-        view = SavedView(name=name, filters=filters)
+        view = SavedView(name=name, filters=self._canonical_filters(filters))
         views = [item for item in registry.views if item.name.casefold() != view.name.casefold()]
         views.append(view)
         if not dry_run:
@@ -125,3 +136,18 @@ class SavedViewService:
         if not dry_run:
             self.store.save(SavedViewRegistry(views=views))
         return SavedViewMutationResult(ok=True, dry_run=dry_run, action="delete", view=current)
+
+    def _canonical_view(self, view: SavedView) -> SavedView:
+        filters = self._canonical_filters(view.filters)
+        return view if filters == view.filters else view.model_copy(update={"filters": filters})
+
+    def _canonical_filters(self, filters: QueryFilters) -> QueryFilters:
+        registry = self.taxonomy.load()
+        values = filters.model_dump()
+        values["topics"] = list(
+            dict.fromkeys(registry.resolve(topic) or topic for topic in filters.topics)
+        )
+        values["excluded_topics"] = list(
+            dict.fromkeys(registry.resolve(topic) or topic for topic in filters.excluded_topics)
+        )
+        return QueryFilters.model_validate(values)

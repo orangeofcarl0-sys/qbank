@@ -386,8 +386,20 @@ class DesktopMainWindow(QMainWindow):
         matches = self.controller.possible_tag_synonyms(slug)
         alternatives = [item.slug for item in matches if item.slug != slug]
         if alternatives:
+            listed = "、".join(alternatives)
+            answer = QMessageBox.question(
+                self,
+                "确认新建标签",
+                f"“{slug}”与现有标签可能同义：{listed}\n\n仍将它作为待整理标签添加吗？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self.drawer.metadata.topics.discard_topic(slug)
+                self.statusBar().showMessage(f"已取消新建标签 {slug}", 4000)
+                return
             self.statusBar().showMessage(
-                f"新标签 {slug} 将标记为待整理；疑似同义：{', '.join(alternatives)}",
+                f"新标签 {slug} 将标记为待整理；疑似同义：{listed}",
                 8000,
             )
         else:

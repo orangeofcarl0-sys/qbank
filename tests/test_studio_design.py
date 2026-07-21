@@ -88,6 +88,8 @@ def test_design_tokens_cover_both_qt_and_web_surfaces() -> None:
         css = css_variables(theme)
         assert "QToolBar" in qss
         assert "QComboBox QAbstractItemView" in qss
+        assert "QHeaderView::section" in qss
+        assert "QProgressBar::chunk" in qss
         assert "QSpinBox { padding-right" in qss
         assert "QComboBox::down-arrow" not in qss
         assert "--qbank-surface-elevated" in css

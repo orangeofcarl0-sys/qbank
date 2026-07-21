@@ -12,6 +12,8 @@
 - Added a native tag manager with impact previews and a lightweight tag overview with
   frequency bars, Top-N co-occurrence, year coverage, and chapter coverage; chart clicks
   now produce real main-window filters without adding a dashboard or graph database.
+- Added rebuildable SQLite tag-count/co-occurrence projections, alias-safe saved views,
+  native synonym confirmation, and themed readable Top-N table headers.
 
 - Modernized Studio with centralized light/dark design tokens shared by Qt,
   CodeMirror, and Markdown/MathJax, plus a maintained component gallery and

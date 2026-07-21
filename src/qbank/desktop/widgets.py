@@ -894,6 +894,11 @@ class TopicTagEditor(QWidget):
             *(topic for topic in pending if topic and topic not in self._topics),
         ]
 
+    def discard_topic(self, topic: str) -> None:
+        """Remove a just-proposed topic after synonym confirmation is rejected."""
+        if topic in self._topics:
+            self._remove_topic(topic)
+
     def _accept_input(self) -> None:
         additions = [value.strip() for value in self.input.text().split(",")]
         changed = False

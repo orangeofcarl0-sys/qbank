@@ -59,6 +59,7 @@ class MutationIndexPort(Protocol):
         *,
         questions: tuple[Question, ...] = (),
         deleted_ids: tuple[str, ...] = (),
+        topics_by_question: Mapping[str, tuple[str, ...]] | None = None,
     ) -> None: ...
 
     def mark_dirty(self, reason: str) -> None: ...

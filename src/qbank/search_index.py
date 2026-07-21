@@ -6,6 +6,8 @@ import json
 import os
 import sqlite3
 import tempfile
+from collections import Counter
+from collections.abc import Mapping
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,6 +73,17 @@ CREATE TABLE IF NOT EXISTS metadata (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tag_counts (
+  tag TEXT PRIMARY KEY,
+  count INTEGER NOT NULL CHECK (count >= 0)
+);
+CREATE TABLE IF NOT EXISTS tag_cooccurrence (
+  left_tag TEXT NOT NULL,
+  right_tag TEXT NOT NULL,
+  count INTEGER NOT NULL CHECK (count >= 0),
+  PRIMARY KEY (left_tag, right_tag),
+  CHECK (left_tag < right_tag)
+);
 """
 INSERT_SQL = f"INSERT INTO question_fts({COLUMN_SQL}) VALUES ({PLACEHOLDERS})"
 
@@ -122,6 +135,8 @@ class SQLiteSearchIndex:
             connection.row_factory = sqlite3.Row
             connection.execute(f"SELECT {COLUMN_SQL} FROM question_fts LIMIT 0")
             connection.execute("SELECT key, value FROM metadata LIMIT 0")
+            connection.execute("SELECT tag, count FROM tag_counts LIMIT 0")
+            connection.execute("SELECT left_tag, right_tag, count FROM tag_cooccurrence LIMIT 0")
             return connection
         except sqlite3.DatabaseError as exc:
             if connection is not None:
@@ -141,6 +156,8 @@ class SQLiteSearchIndex:
             connection.row_factory = sqlite3.Row
             connection.execute(f"SELECT {COLUMN_SQL} FROM question_fts LIMIT 0")
             connection.execute("SELECT key, value FROM metadata LIMIT 0")
+            connection.execute("SELECT tag, count FROM tag_counts LIMIT 0")
+            connection.execute("SELECT left_tag, right_tag, count FROM tag_cooccurrence LIMIT 0")
             return connection
         except sqlite3.DatabaseError:
             if connection is not None:
@@ -152,6 +169,7 @@ class SQLiteSearchIndex:
         *,
         questions: tuple[Question, ...] = (),
         deleted_ids: tuple[str, ...] = (),
+        topics_by_question: Mapping[str, tuple[str, ...]] | None = None,
     ) -> None:
         """Apply all incremental changes in one SQLite transaction."""
         if not self.context.config.index.enabled:
@@ -164,6 +182,10 @@ class SQLiteSearchIndex:
                 INSERT_SQL,
                 [IndexDocument.from_question(question).values() for question in questions],
             )
+            projection_source = (
+                self._authoritative_topics() if topics_by_question is None else topics_by_question
+            )
+            self._replace_tag_projection(connection, projection_source)
             connection.execute(
                 "INSERT OR REPLACE INTO metadata(key, value) VALUES ('updated_at', ?)",
                 (utc_now(),),
@@ -189,6 +211,13 @@ class SQLiteSearchIndex:
                         IndexDocument.from_question(record.question).values()
                         for record in snapshot.records
                     ],
+                )
+                self._replace_tag_projection(
+                    connection,
+                    {
+                        record.question.id: tuple(record.question.topics)
+                        for record in snapshot.records
+                    },
                 )
                 connection.execute(
                     "INSERT OR REPLACE INTO metadata(key, value) VALUES ('updated_at', ?)",
@@ -242,6 +271,26 @@ class SQLiteSearchIndex:
             str(row["id"]): tuple(str(row[column]) for column in INDEX_COLUMNS[1:]) for row in rows
         }
 
+    def tag_projection(
+        self,
+    ) -> tuple[dict[str, int], dict[tuple[str, str], int]]:
+        """Read the rebuildable tag-count and co-occurrence projections."""
+        with closing(self.open_readonly()) as connection:
+            count_rows = connection.execute(
+                "SELECT tag, count FROM tag_counts ORDER BY tag"
+            ).fetchall()
+            pair_rows = connection.execute(
+                """
+                SELECT left_tag, right_tag, count
+                FROM tag_cooccurrence
+                ORDER BY left_tag, right_tag
+                """
+            ).fetchall()
+        return (
+            {str(row["tag"]): int(row["count"]) for row in count_rows},
+            {(str(row["left_tag"]), str(row["right_tag"])): int(row["count"]) for row in pair_rows},
+        )
+
     def last_updated(self) -> str | None:
         """Return the index timestamp without creating or repairing it."""
         try:
@@ -291,7 +340,19 @@ class SQLiteSearchIndex:
                 record.question.id: IndexDocument.from_question(record.question).comparable()
                 for record in snapshot.records
             }
-            if snapshot.duplicate_ids or documents != source_documents:
+            expected_tags = _tag_projection(
+                {record.question.id: tuple(record.question.topics) for record in snapshot.records}
+            )
+            indexed_tags: tuple[dict[str, int], dict[tuple[str, str], int]]
+            try:
+                indexed_tags = self.tag_projection()
+            except DataValidationError:
+                indexed_tags = ({}, {})
+            if (
+                snapshot.duplicate_ids
+                or documents != source_documents
+                or indexed_tags != expected_tags
+            ):
                 return IndexHealth(
                     state="stale",
                     updated_at=updated_at,
@@ -303,6 +364,32 @@ class SQLiteSearchIndex:
             updated_at=updated_at,
             documents=documents,
             message="index is current",
+        )
+
+    def _authoritative_topics(self) -> dict[str, tuple[str, ...]]:
+        """Compatibility fallback for direct index-adapter callers."""
+        snapshot = MarkdownQuestionRepository(self.context).scan()
+        snapshot.require_consistent()
+        return {record.question.id: tuple(record.question.topics) for record in snapshot.records}
+
+    @staticmethod
+    def _replace_tag_projection(
+        connection: sqlite3.Connection,
+        topics_by_question: Mapping[str, tuple[str, ...]],
+    ) -> None:
+        counts, pairs = _tag_projection(topics_by_question)
+        connection.execute("DELETE FROM tag_counts")
+        connection.execute("DELETE FROM tag_cooccurrence")
+        connection.executemany(
+            "INSERT INTO tag_counts(tag, count) VALUES (?, ?)",
+            sorted(counts.items()),
+        )
+        connection.executemany(
+            """
+            INSERT INTO tag_cooccurrence(left_tag, right_tag, count)
+            VALUES (?, ?, ?)
+            """,
+            [(*pair, count) for pair, count in sorted(pairs.items())],
         )
 
     @staticmethod
@@ -393,12 +480,24 @@ def update_question(
     question: Question,
 ) -> None:
     """Compatibility adapter replacing one indexed question."""
-    SQLiteSearchIndex(_context(root, config)).apply(questions=(question,))
+    context = _context(root, config)
+    topics = _topics_from_repository(context)
+    topics[question.id] = tuple(question.topics)
+    SQLiteSearchIndex(context).apply(
+        questions=(question,),
+        topics_by_question=topics,
+    )
 
 
 def remove_question(root: Path, config: ProjectConfig, question_id: str) -> None:
     """Compatibility adapter removing one indexed question."""
-    SQLiteSearchIndex(_context(root, config)).apply(deleted_ids=(question_id,))
+    context = _context(root, config)
+    topics = _topics_from_repository(context)
+    topics.pop(question_id, None)
+    SQLiteSearchIndex(context).apply(
+        deleted_ids=(question_id,),
+        topics_by_question=topics,
+    )
 
 
 def apply_index_changes(
@@ -409,9 +508,15 @@ def apply_index_changes(
     deleted_ids: tuple[str, ...] = (),
 ) -> None:
     """Apply a batch of changes in one SQLite transaction."""
-    SQLiteSearchIndex(_context(root, config)).apply(
+    context = _context(root, config)
+    topics = _topics_from_repository(context)
+    for question_id in deleted_ids:
+        topics.pop(question_id, None)
+    topics.update({question.id: tuple(question.topics) for question in questions})
+    SQLiteSearchIndex(context).apply(
         questions=questions,
         deleted_ids=deleted_ids,
+        topics_by_question=topics,
     )
 
 
@@ -465,3 +570,24 @@ def _fts_query(text: str) -> str:
     if not terms:
         return '""'
     return " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
+
+
+def _topics_from_repository(context: ProjectContext) -> dict[str, tuple[str, ...]]:
+    snapshot = MarkdownQuestionRepository(context).scan()
+    snapshot.require_consistent()
+    return {record.question.id: tuple(record.question.topics) for record in snapshot.records}
+
+
+def _tag_projection(
+    topics_by_question: Mapping[str, tuple[str, ...]],
+) -> tuple[dict[str, int], dict[tuple[str, str], int]]:
+    """Build deterministic tag projections without storing question relations."""
+    counts: Counter[str] = Counter()
+    pairs: Counter[tuple[str, str]] = Counter()
+    for topics in topics_by_question.values():
+        unique = sorted(set(topics))
+        counts.update(unique)
+        for index, left in enumerate(unique):
+            for right in unique[index + 1 :]:
+                pairs[(left, right)] += 1
+    return dict(counts), dict(pairs)

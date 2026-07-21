@@ -228,7 +228,9 @@ def test_saved_view_combines_text_topics_exclusion_and_persists(
         chapter="waves",
     )
     context = ProjectContext.from_root(root)
-    views = create_project_services(context).views
+    services = create_project_services(context)
+    services.tags.normalize(dry_run=False, command="test normalize")
+    views = services.views
     filters = QueryFilters(
         text="Michelson",
         chapter="waves",
@@ -243,6 +245,11 @@ def test_saved_view_combines_text_topics_exclusion_and_persists(
 
     reloaded = create_project_services(ProjectContext.from_root(root)).views
     assert [question.id for question in reloaded.apply("clean-interference")] == ["OPT-TAG-0001"]
+    services.tags.rename("alpha", "wave-alpha", dry_run=False, command="test rename")
+    reloaded = create_project_services(ProjectContext.from_root(root)).views
+    assert [question.id for question in reloaded.apply("clean-interference")] == ["OPT-TAG-0001"]
+    persisted = reloaded.resolve("clean-interference")
+    assert persisted.filters.topics == ["wave-alpha", "beta"]
     renamed = reloaded.rename("clean-interference", "clean", dry_run=False)
     assert renamed.view.name == "clean"
     reloaded.delete("clean", dry_run=False)

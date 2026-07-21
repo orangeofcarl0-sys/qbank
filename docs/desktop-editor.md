@@ -29,6 +29,10 @@ The window has a two-and-a-half-column layout:
 - Markdown/TeX source and live preview in the center;
 - a collapsible basic/assets/source/history drawer on the right.
 
+Unknown Inspector topics are normalized to pending slugs. If registered names or
+aliases look similar, Studio asks for confirmation before retaining the new chip.
+Saved views resolve retained taxonomy aliases after a global rename or merge.
+
 Save, undo, redo, validate, source/preview/split, and Markdown/TeX controls stay
 close to the editor. CodeMirror 6 is bundled in the wheel and does not need a
 network connection. MathJax continues to use the existing CDN policy.

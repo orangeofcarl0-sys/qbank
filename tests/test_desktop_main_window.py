@@ -435,7 +435,24 @@ def test_real_main_window_saved_views_bulk_tags_and_chart_filter(
     window._bulk_topics(True)
     assert "bulk-topic" in controller.load_question(question.id).question.topics
 
+    window.drawer.metadata.topics.input.setText("novel-studio-topic")
+    window.drawer.metadata.topics.input.returnPressed.emit()
+    assert window.dirty
+    assert window.save_current()
+    pending = controller.services.tags.show_tag("novel-studio-topic")
+    assert pending.registered and pending.metadata is not None
+    assert pending.metadata.status.value == "pending"
+
     window._pending_topic_created("interference")
+    proposed = "interferometr"
+    window.drawer.metadata.topics.set_topics([proposed])
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+    )
+    window._pending_topic_created(proposed)
+    assert proposed not in window.drawer.metadata.topics.topics()
     window._apply_overview_filter(QueryFilters(topics=["bulk-topic"]))
     assert window.navigation.current_filters().topics == ["bulk-topic"]
     window._tag_metadata_changed()

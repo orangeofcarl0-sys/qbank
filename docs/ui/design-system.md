@@ -12,6 +12,8 @@ menus, and dialogs derive their visual constants from
 - A collapsible, high-density tag facet sits below the question list; include/exclude
   state, counts, AND/OR mode, saved views, and field facets remain navigation controls,
   never a dashboard home page.
+- Tag tables use semantic table/header tokens in both themes. Top-N matrices use
+  numbered columns and heat-map headers use deliberate ellipsis plus full tooltips.
 - Source and preview are the visual center; metadata remains a collapsible drawer.
 - Paper-like light surfaces and graphite dark surfaces use one restrained blue
   accent. Success, warning, and error colors appear only for status.
@@ -59,6 +61,6 @@ never overlays review notes or clips when the preview pane narrows.
 ## Review and maintenance
 
 Run `python -m qbank.studio_gallery` for production component states. Use
-`.agents/skills/qbank-ui-design/scripts/capture-ui.py` with an isolated real qbank
+`scripts/capture-ui.py` with an isolated real qbank
 copy for screenshots. Review both themes at Windows 100% and 125% scaling; screenshots
 are human/auditor evidence rather than a pixel-perfect test gate.
