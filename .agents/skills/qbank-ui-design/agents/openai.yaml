@@ -1,0 +1,4 @@
+interface:
+  display_name: "qbank UI Design"
+  short_description: "Design and review qbank Studio desktop UI"
+  default_prompt: "Use $qbank-ui-design to modernize or review the qbank Studio interface."

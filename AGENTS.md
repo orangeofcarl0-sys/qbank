@@ -16,3 +16,6 @@
 - If a question, answer, or source cannot be confirmed, keep it `draft`; do not invent facts.
 
 Use the repository-scoped `$qbank` Skill for detailed workflows and command guidance.
+
+For every Studio visual, theme, component-state, screenshot, or interaction change,
+read and follow the repository-scoped `$qbank-ui-design` Skill before editing UI code.

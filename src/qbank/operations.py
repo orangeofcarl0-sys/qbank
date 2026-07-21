@@ -7,7 +7,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from pydantic import ValidationError
 
@@ -221,7 +221,7 @@ def add_question_in_context(
     prepared = prepare_question_for_write(question, previous=previous)
     destination = repository.destination(prepared)
     rendered = render_question(prepared)
-    action = "update" if previous else "create"
+    action: Literal["create", "update"] = "update" if previous else "create"
     changes = (
         [
             change.model_dump(mode="json", exclude_none=True)

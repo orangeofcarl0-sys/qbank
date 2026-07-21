@@ -326,9 +326,12 @@ def test_cli_questions_has_no_direct_storage_or_sqlite_imports() -> None:
 
 
 def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> None:
-    desktop_root = Path(__file__).parents[1] / "src/qbank/desktop"
+    package_root = Path(__file__).parents[1] / "src/qbank"
+    presentation_roots = [package_root / "desktop", package_root / "presentation"]
     source = "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(desktop_root.glob("*.py"))
+        path.read_text(encoding="utf-8")
+        for root in presentation_roots
+        for path in sorted(root.rglob("*.py"))
     )
     for forbidden in (
         "qbank.infrastructure",

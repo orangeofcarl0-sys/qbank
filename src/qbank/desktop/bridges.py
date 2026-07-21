@@ -27,11 +27,17 @@ class PreviewBridge(QObject):
 
     action_requested = Signal(str, str)
     asset_dropped = Signal(str, str, str)
+    context_menu_requested = Signal(str, int, int)
 
     @Slot(str, str)
     def requestAction(self, asset_id: str, action: str) -> None:
         """Forward a menu action; dispatch validates the closed action name."""
         self.action_requested.emit(asset_id, action)
+
+    @Slot(str, int, int)
+    def requestContextMenu(self, asset_id: str, x: int, y: int) -> None:
+        """Request a native Qt context menu at preview viewport coordinates."""
+        self.context_menu_requested.emit(asset_id, x, y)
 
     @Slot(str, str, str)
     def assetDropped(self, asset_id: str, name: str, data_uri: str) -> None:

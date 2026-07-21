@@ -250,8 +250,12 @@ def test_desktop_controller_live_preview_save_reopen_drop_replace_and_restore(
 
 def test_desktop_resources_embed_codemirror_and_closed_asset_actions() -> None:
     root = Path(__file__).parents[1] / "src/qbank/resources/desktop"
+    main_window = (Path(__file__).parents[1] / "src/qbank/desktop/main_window.py").read_text(
+        encoding="utf-8"
+    )
     bundle = (root / "codemirror.bundle.js").read_text(encoding="utf-8")
     editor = (root / "editor.html").read_text(encoding="utf-8")
+    editor_entry = (root / "editor-entry.js").read_text(encoding="utf-8")
     preview = (root / "preview.html.j2").read_text(encoding="utf-8")
 
     assert len(bundle) > 100_000
@@ -267,9 +271,20 @@ def test_desktop_resources_embed_codemirror_and_closed_asset_actions() -> None:
         "在资源管理器中显示",
         "恢复上一版本",
     ):
-        assert label in preview
+        assert label in main_window
+    assert "requestContextMenu" in preview
+    assert 'id="asset-menu"' not in preview
     assert "assetDropped" in preview
-    assert "qbank-asset:" in (root / "editor-entry.js").read_text(encoding="utf-8")
+    assert "qbank-asset:" in editor_entry
+    assert "view.setState(editorState(value))" in editor_entry
+    assert "bridge.sourceChanged(update.state.doc.toString())" in editor_entry
+    assert "window.qbankAssetActionsEnabled = false" in preview
+    assert "image.tabIndex = 0" in preview
+    assert "event.key === 'ContextMenu'" in preview
+    assert ".drop-hint { box-sizing: border-box; display: flex" in preview
+    assert "@media (max-width: 520px)" in preview
+    assert 'class="drop-hint" role="note"' in preview
+    assert "position: fixed" not in preview
 
 
 def test_legacy_path_preview_gets_stable_id_and_normalizes_on_first_action(

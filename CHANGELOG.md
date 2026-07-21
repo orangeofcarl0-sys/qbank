@@ -2,6 +2,16 @@
 
 ## 0.1.0 - 2026-07-18
 
+- Modernized Studio with centralized light/dark design tokens shared by Qt,
+  CodeMirror, and Markdown/MathJax, plus a maintained component gallery and
+  repository-scoped `$qbank-ui-design` workflow.
+- Refined the question-detail drawer into a stacked, accessible property
+  inspector with custom single-surface combo boxes and borderless spin controls,
+  and made the preview image-drop guidance responsive without overlaying document
+  content.
+- Fixed saved-snapshot dirty tracking, stable all-questions navigation, stale
+  preview replacement, native image-menu dismissal, and accessible native
+  confirmation dialogs; added QtAwesome as the sole UI icon dependency.
 - Added the optional PySide6 desktop editor with Zotero-style navigation,
   embedded CodeMirror 6 Markdown/TeX editing, live MathJax preview, and a
   collapsible metadata/assets/source/history drawer.

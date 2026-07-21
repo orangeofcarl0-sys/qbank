@@ -33,6 +33,8 @@ from qbank.models import (
     QuestionPatch,
 )
 from qbank.papers import load_paper
+from qbank.presentation.studio.design.palette import ThemeName
+from qbank.presentation.studio.design.web_theme import css_variables
 from qbank.question_layout import QUESTION_SECTIONS
 
 DesktopView = Literal["all", "draft", "needs_redraw", "paper"]
@@ -170,6 +172,8 @@ class DesktopController:
         question_id: str,
         source: str,
         metadata: Mapping[str, object] | None = None,
+        *,
+        theme: ThemeName = "light",
     ) -> DesktopPreviewResult:
         """Render an unsaved editor buffer with interactive logical images."""
         candidate = self._candidate(question_id, source, metadata)
@@ -191,6 +195,8 @@ class DesktopController:
                 for section in QUESTION_SECTIONS
             ],
             "assets": self.services.assets.list_assets(question_id).assets,
+            "theme": theme,
+            "theme_css": css_variables(theme),
         }
         return DesktopPreviewResult(
             html=self.renderer.internal_template("desktop/preview.html.j2", values),

@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
   <style>
-    html, body, #editor { height: 100%; margin: 0; overflow: hidden; background: #fff; }
+    html, body, #editor { height: 100%; margin: 0; overflow: hidden; background: var(--qbank-surface-elevated); }
+    body { color: var(--qbank-text-primary); }
+    .cm-editor { height: 100%; color: var(--qbank-text-primary) !important; background: var(--qbank-surface-elevated) !important; }
+    .cm-scroller { font-family: var(--qbank-mono-font) !important; }
+    .cm-gutters { color: var(--qbank-text-secondary) !important; background: var(--qbank-surface) !important; border-right-color: var(--qbank-border-subtle) !important; }
+    .cm-activeLine, .cm-activeLineGutter { background: var(--qbank-surface-hover) !important; }
+    .cm-selectionBackground { background: var(--qbank-selection) !important; }
+    .cm-focused { outline: 1px solid var(--qbank-focus) !important; outline-offset: -1px; }
   </style>
 </head>
 <body>

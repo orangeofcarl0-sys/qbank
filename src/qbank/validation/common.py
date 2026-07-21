@@ -41,6 +41,9 @@ def issue(
     field: str | None = None,
 ) -> ValidationIssue:
     """Build one normalized diagnostic."""
+    root: Path
+    path: Path | None
+    question_id: str | None
     if context is not None:
         root = context.root
         path = context.path

@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
+from typing import Any, cast
 from urllib.parse import unquote, urlsplit
 
 from markdown_it import MarkdownIt
@@ -95,7 +96,7 @@ def classify_resource_uri(uri: str) -> AssetReference:
 def extract_image_resources(question: Question) -> dict[str, set[str]]:
     """Extract image destinations from Markdown tokens for every body field."""
     parser = MarkdownIt("commonmark", {"html": False})
-    parser.validateLink = _allow_link
+    cast(Any, parser).validateLink = _allow_link
     resources: dict[str, set[str]] = {}
     for field in QUESTION_CONTENT_FIELDS:
         value = getattr(question, field)
@@ -109,7 +110,7 @@ def extract_image_resources(question: Question) -> dict[str, set[str]]:
 def extract_markdown_image_resources(markdown: str) -> set[str]:
     """Extract image destinations from one already-rendered Markdown document."""
     parser = MarkdownIt("commonmark", {"html": False})
-    parser.validateLink = _allow_link
+    cast(Any, parser).validateLink = _allow_link
     resources = set(_image_sources(parser.parse(markdown)))
     resources.update(f"qbank-asset:{asset_id}" for asset_id in extract_tex_asset_ids(markdown))
     return resources

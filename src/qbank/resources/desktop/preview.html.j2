@@ -12,30 +12,42 @@
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
-    :root { color-scheme: light; font: 15px/1.65 system-ui, "Microsoft YaHei", sans-serif; }
-    body { margin: 0; padding: 28px 34px 80px; color: #25282c; background: #fff; }
+    {{ theme_css | safe }}
+    :root { color-scheme: {{ theme }}; font: 15px/1.65 var(--qbank-document-font); }
+    body { margin: 0; padding: 28px 34px 80px; color: var(--qbank-text-primary); background: var(--qbank-surface-elevated); }
     h1 { margin: 0 0 4px; font-size: 22px; }
-    .meta { color: #68717d; margin-bottom: 24px; }
+    .meta { color: var(--qbank-text-secondary); margin-bottom: 24px; }
     section { margin: 24px 0; }
-    section > h2 { color: #66717d; font-size: 13px; letter-spacing: .08em; }
+    section > h2 { color: var(--qbank-text-secondary); font-size: 13px; letter-spacing: .08em; }
     img[data-asset-id] {
       max-width: 100%; min-width: 48px; border: 2px solid transparent;
       border-radius: 5px; cursor: context-menu;
     }
-    img[data-asset-id]:hover, img.asset-target { border-color: #4c8bf5; }
-    .asset-state { margin-top: 32px; border-top: 1px solid #e8eaed; padding-top: 10px; }
+    img[data-asset-id]:hover, img.asset-target { border-color: var(--qbank-focus); }
+    img[data-asset-id]:focus { border-color: var(--qbank-focus); outline: none; }
+    .asset-object { position: relative; display: inline-block; max-width: 100%; }
+    .asset-tip { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px;
+      border-radius: var(--qbank-radius-small); color: var(--qbank-text-primary);
+      background: color-mix(in srgb, var(--qbank-surface-elevated) 92%, transparent);
+      border: 1px solid var(--qbank-border-subtle); font-size: 12px; opacity: 0;
+      pointer-events: none; transition: opacity 80ms linear; }
+    .asset-object:hover .asset-tip, .asset-object:focus-within .asset-tip { opacity: 1; }
+    .asset-state { margin-top: 32px; border-top: 1px solid var(--qbank-border-subtle); padding-top: 10px; }
     .asset-state span { display: inline-block; margin: 4px; padding: 2px 7px;
-      border-radius: 10px; background: #eef1f5; font-size: 12px; }
-    .asset-state .stale { color: #9a4d00; background: #fff1dc; }
-    #asset-menu {
-      position: fixed; z-index: 1000; display: none; min-width: 190px;
-      padding: 5px; border: 1px solid #cfd4dc; border-radius: 7px;
-      background: #fff; box-shadow: 0 8px 28px #0002;
+      border-radius: 10px; background: var(--qbank-surface-hover); font-size: 12px; }
+    .asset-state .stale { color: var(--qbank-warning); background: color-mix(in srgb, var(--qbank-warning) 13%, transparent); }
+    .drop-hint { box-sizing: border-box; display: flex; align-items: center;
+      justify-content: center; gap: 4px 10px; flex-wrap: wrap; width: 100%;
+      margin-top: 20px; padding: 9px 12px; color: var(--qbank-text-secondary);
+      background: var(--qbank-surface); border-top: 1px solid var(--qbank-border-subtle);
+      font-size: 12px; line-height: 1.45; text-align: center; }
+    .drop-hint strong { color: var(--qbank-text-primary); font-weight: 600; white-space: nowrap; }
+    .drop-hint span { min-width: 0; }
+    @media (max-width: 520px) {
+      body { padding-right: 20px; padding-left: 20px; }
+      .drop-hint { align-items: flex-start; justify-content: flex-start; text-align: left; }
+      .drop-hint span { flex-basis: 100%; }
     }
-    #asset-menu button { display: block; width: 100%; border: 0; padding: 7px 10px;
-      text-align: left; background: transparent; border-radius: 4px; }
-    #asset-menu button:hover { background: #edf3ff; }
-    .drop-hint { position: fixed; right: 14px; bottom: 12px; color: #7a838f; font-size: 12px; }
   </style>
 </head>
 <body data-question-id="{{ question.id }}">
@@ -57,43 +69,58 @@
     </span>
     {% endfor %}
   </div>
-  <div class="drop-hint">拖入图片：落在题图上替换，落在空白处新建资产</div>
-  <div id="asset-menu">
-    <button data-action="edit">用 Ipe 编辑</button>
-    <button data-action="replace-file">替换为本地文件</button>
-    <button data-action="replace-clipboard">从剪贴板替换</button>
-    <button data-action="open-original">打开原始参考图</button>
-    <button data-action="render">重新渲染</button>
-    <button data-action="set-render">设为首选表示</button>
-    <button data-action="show-directory">在资源管理器中显示</button>
-    <button data-action="restore">恢复上一版本</button>
+  <div class="drop-hint" role="note">
+    <strong>拖入图片</strong><span>落在题图上替换 · 落在空白处新建资产</span>
   </div>
   <script>
     let bridge = null;
-    let menuAsset = null;
-    const menu = document.getElementById('asset-menu');
+    window.qbankAssetActionsEnabled = false;
     new QWebChannel(qt.webChannelTransport, channel => { bridge = channel.objects.previewBridge; });
 
     function assetImage(node) {
-      return node && node.closest ? node.closest('img[data-asset-id]') : null;
+      if (!node || !node.closest) return null;
+      return node.closest('img[data-asset-id]')
+        || node.closest('.asset-object')?.querySelector('img[data-asset-id]')
+        || null;
     }
+    document.querySelectorAll('img[data-asset-id]').forEach(image => {
+      image.tabIndex = 0;
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-label', `${image.alt || '图片'}；Enter 编辑，Shift+F10 打开操作菜单`);
+      const wrapper = document.createElement('span');
+      wrapper.className = 'asset-object';
+      image.before(wrapper);
+      wrapper.append(image);
+      const tip = document.createElement('span');
+      tip.className = 'asset-tip';
+      tip.textContent = '右键或 Shift+F10 操作';
+      wrapper.append(tip);
+    });
     document.addEventListener('contextmenu', event => {
       const image = assetImage(event.target);
-      if (!image) return;
+      if (!image || !window.qbankAssetActionsEnabled) return;
       event.preventDefault();
-      menuAsset = image.dataset.assetId;
-      menu.style.left = `${Math.min(event.clientX, innerWidth - 210)}px`;
-      menu.style.top = `${Math.min(event.clientY, innerHeight - 280)}px`;
-      menu.style.display = 'block';
-    });
-    document.addEventListener('click', event => {
-      const action = event.target.closest('#asset-menu button')?.dataset.action;
-      if (action && menuAsset && bridge) bridge.requestAction(menuAsset, action);
-      menu.style.display = 'none';
+      if (bridge) bridge.requestContextMenu(image.dataset.assetId, event.clientX, event.clientY);
     });
     document.addEventListener('dblclick', event => {
       const image = assetImage(event.target);
-      if (image && bridge) bridge.requestAction(image.dataset.assetId, 'edit');
+      if (image && bridge && window.qbankAssetActionsEnabled) bridge.requestAction(image.dataset.assetId, 'edit');
+    });
+    document.addEventListener('keydown', event => {
+      const image = assetImage(event.target);
+      if (!image || !bridge || !window.qbankAssetActionsEnabled) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        bridge.requestAction(image.dataset.assetId, 'edit');
+      } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+        event.preventDefault();
+        const rect = image.getBoundingClientRect();
+        bridge.requestContextMenu(
+          image.dataset.assetId,
+          Math.round(rect.left),
+          Math.round(rect.bottom),
+        );
+      }
     });
     document.addEventListener('dragover', event => {
       event.preventDefault();
@@ -109,7 +136,7 @@
       event.preventDefault();
       document.querySelectorAll('.asset-target').forEach(node => node.classList.remove('asset-target'));
       const file = event.dataTransfer.files[0];
-      if (!file || !bridge) return;
+      if (!file || !bridge || !window.qbankAssetActionsEnabled) return;
       const image = assetImage(event.target);
       const reader = new FileReader();
       reader.onload = () => bridge.assetDropped(image?.dataset.assetId || '', file.name, reader.result);

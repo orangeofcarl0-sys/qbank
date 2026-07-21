@@ -60,11 +60,11 @@ class MarkdownQuestionRepository:
                 )
             )
         counts = Counter(record.question.id for record in records)
-        duplicates = frozenset(question_id for question_id, count in counts.items() if count > 1)
+        duplicate_ids = frozenset(question_id for question_id, count in counts.items() if count > 1)
         return RepositorySnapshot(
             records=tuple(records),
             invalid_sources=tuple(invalid_sources),
-            duplicate_ids=duplicates,
+            duplicate_ids=duplicate_ids,
         )
 
     def destination(self, question: Question) -> Path:

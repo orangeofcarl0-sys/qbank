@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic import BaseModel
+
 from qbank.models import AssetManifest, AssetPackage, Paper, Question, QuestionPatch
 
 SchemaKind = Literal["question", "paper", "patch", "asset", "asset-package"]
@@ -19,7 +21,7 @@ SCHEMA_FILENAMES: dict[SchemaKind, str] = {
 
 def schema_for(kind: SchemaKind) -> dict[str, Any]:
     """Generate the requested public JSON Schema from its Pydantic model."""
-    models = {
+    models: dict[SchemaKind, type[BaseModel]] = {
         "question": Question,
         "paper": Paper,
         "patch": QuestionPatch,
