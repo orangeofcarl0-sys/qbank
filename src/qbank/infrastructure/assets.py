@@ -7,6 +7,7 @@ import binascii
 import hashlib
 import json
 import re
+import shutil
 import time
 import urllib.request
 import uuid
@@ -174,6 +175,26 @@ class FileAssetRepository:
         transaction = MutationTransaction()
         transaction.write(path, text)
         transaction.commit()
+
+    def discard_new(self, question_id: str, asset_id: str) -> None:
+        """Remove a just-created asset and only its matching history entries."""
+        location = self.location(question_id, asset_id)
+        if location.directory.is_dir():
+            shutil.rmtree(location.directory)
+        parent = location.directory.parent
+        if parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+        history_root = self.context.paths.state / "asset-history"
+        if not history_root.is_dir():
+            return
+        for path in history_root.glob("*.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                event = AssetHistoryEntry.model_validate(value)
+            except (OSError, UnicodeError, json.JSONDecodeError, ValidationError):
+                continue
+            if event.question_id == question_id and event.asset_id == asset_id:
+                path.unlink()
 
     def history(
         self,

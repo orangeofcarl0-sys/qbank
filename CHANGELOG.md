@@ -8,6 +8,15 @@
 - Fixed repeated live theme switching so CodeMirror backgrounds, gutters,
   selections, cursors, search surfaces, and native web-view color schemes follow
   the Qt shell in both directions.
+- Rebuilt the Studio question-detail drawer as a compact, resizable Inspector with
+  localized properties, topic tags, fixed dirty actions, asset cards, structured
+  provenance, history timelines, actionable empty states, and legacy-image
+  normalization controls.
+- Hardened Studio asset operations with typed capabilities, containment-safe previews,
+  native save/discard/cancel gating, compensating rollback for failed declarations,
+  explicit external/invalid states, and deterministic provenance/history display.
+- Normalized native Studio typography to scalable Qt point sizes, eliminating invalid
+  `QFont` point-size warnings while preserving the existing Windows visual density.
 - Refined the question-detail drawer into a stacked, accessible property
   inspector with custom single-surface combo boxes and borderless spin controls,
   and made the preview image-drop guidance responsive without overlaying document

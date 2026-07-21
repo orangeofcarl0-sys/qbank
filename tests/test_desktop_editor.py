@@ -23,7 +23,9 @@ from qbank.models import (
     AssetPackage,
     AssetPackageRepresentation,
     AssetStatus,
+    PatchQuestionResult,
     Question,
+    QuestionPatch,
 )
 from qbank.operations import add_question
 from qbank.rendering import RenderService
@@ -68,6 +70,28 @@ class _Launcher:
         execute: bool,
     ) -> tuple[str, ...]:
         return ("ipe", str(path), format_.value, str(execute))
+
+
+class _FailingMutation:
+    def __init__(self, delegate: Any) -> None:
+        self.delegate = delegate
+
+    def apply_patch(
+        self,
+        question_id: str,
+        patch: QuestionPatch,
+        *,
+        dry_run: bool,
+        command: str,
+    ) -> PatchQuestionResult:
+        if not dry_run:
+            raise RuntimeError("question commit failed")
+        return self.delegate.apply_patch(
+            question_id,
+            patch,
+            dry_run=True,
+            command=command,
+        )
 
 
 def _context(project: tuple[Path, Any]) -> ProjectContext:
@@ -215,6 +239,12 @@ def test_desktop_controller_live_preview_save_reopen_drop_replace_and_restore(
     controller = DesktopController(context, services, RenderService(context))
 
     document = controller.load_question(question.id)
+    item = next(item for item in document.asset_items if item.asset_id == "diagram")
+    assert item.kind == "logical"
+    assert item.capabilities.edit
+    assert item.capabilities.render
+    assert not item.capabilities.set_render
+    assert item.capabilities.open_original
     edited = document.source.replace("$x=1$", "$x=2$")
     preview = controller.preview_source(question.id, edited)
     assert 'data-asset-id="diagram"' in preview.html
@@ -246,6 +276,140 @@ def test_desktop_controller_live_preview_save_reopen_drop_replace_and_restore(
         if item.asset_id == created.asset_id
     )
     assert restored.preferred_render == "desktop-source"
+
+
+def test_desktop_asset_items_classify_and_contain_every_reference(
+    project: tuple[Path, Any],
+    question: Question,
+    tmp_path: Path,
+) -> None:
+    context = _context(project)
+    local = context.paths.assets / "images" / "local.png"
+    local.parent.mkdir(parents=True, exist_ok=True)
+    local.write_bytes(b"png")
+    with_assets = question.model_copy(
+        update={
+            "assets": ["assets/images/local.png"],
+            "stem_md": (
+                "![local](assets/images/local.png)\n\n![remote](HTTPS://example.com/figure.png)"
+            ),
+        }
+    )
+    add_question(context.root, context.config, with_assets)
+    controller = DesktopController(
+        context,
+        create_project_services(context),
+        RenderService(context),
+    )
+
+    items = controller.load_question(question.id).asset_items
+    local_item = next(item for item in items if item.kind == "local")
+    external_item = next(item for item in items if item.kind == "external")
+    assert local_item.preview_path == str(local.resolve())
+    assert local_item.capabilities.open_reference
+    assert external_item.reference.startswith("HTTPS://")
+    assert external_item.capabilities.convert
+    assert external_item.diagnostic is not None
+
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"outside")
+    escaped = controller._desktop_reference_item(
+        question.id,
+        "../outside.png",
+        True,
+        {},
+        set(),
+    )
+    absolute = controller._desktop_reference_item(
+        question.id,
+        str(outside),
+        True,
+        {},
+        set(),
+    )
+    assert escaped.kind == absolute.kind == "invalid"
+    assert escaped.preview_path is None and absolute.preview_path is None
+    assert not escaped.capabilities.open_reference
+
+    link = context.paths.assets / "images" / "escape.png"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        pass
+    else:
+        symlinked = controller._desktop_reference_item(
+            question.id,
+            "assets/images/escape.png",
+            True,
+            {},
+            set(),
+        )
+        assert symlinked.kind == "invalid"
+        assert symlinked.preview_path is None
+
+
+def test_new_asset_rolls_back_when_question_declaration_fails(
+    project: tuple[Path, Any],
+    question: Question,
+) -> None:
+    context = _context(project)
+    add_question(context.root, context.config, question)
+    services = create_project_services(context)
+    assert services.questions.mutations is not None
+    questions = replace(
+        services.questions,
+        mutations=_FailingMutation(services.questions.mutations),
+    )
+    controller = DesktopController(
+        context,
+        replace(services, questions=questions),
+        RenderService(context),
+    )
+
+    with pytest.raises(RuntimeError, match="question commit failed"):
+        controller.create_asset(
+            question.id,
+            "data:image/png;base64," + base64.b64encode(b"rollback").decode(),
+            name="rollback.png",
+        )
+
+    assert not (context.paths.assets / question.id / "rollback").exists()
+    assert controller.services.questions.get_question(question.id).assets == []
+    assert not controller.services.assets.history(question.id, "rollback").events
+
+
+def test_asset_rollback_failure_preserves_original_exception(
+    project: tuple[Path, Any],
+    question: Question,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _context(project)
+    add_question(context.root, context.config, question)
+    services = create_project_services(context)
+    assert services.questions.mutations is not None
+    questions = replace(
+        services.questions,
+        mutations=_FailingMutation(services.questions.mutations),
+    )
+
+    def fail_rollback(_question_id: str, _asset_id: str) -> None:
+        raise OSError("rollback unavailable")
+
+    monkeypatch.setattr(services.assets, "discard_new_asset", fail_rollback)
+    controller = DesktopController(
+        context,
+        replace(services, questions=questions),
+        RenderService(context),
+    )
+
+    with pytest.raises(RuntimeError, match="question commit failed") as caught:
+        controller.create_asset(
+            question.id,
+            "data:image/png;base64," + base64.b64encode(b"rollback").decode(),
+            name="rollback.png",
+        )
+
+    assert caught.value.__notes__ == ["asset rollback failed: rollback unavailable"]
 
 
 def test_desktop_resources_embed_codemirror_and_closed_asset_actions() -> None:
@@ -342,6 +506,7 @@ def test_desktop_navigation_paper_and_asset_actions_use_application_services(
     assert controller.reconcile_asset(question.id, "diagram").ok
     rendered = controller.render_asset(question.id, "diagram")
     assert len(rendered.generated) == 3
+    assert controller.load_question(question.id).asset_items[0].capabilities.set_render
     controller.open_original(question.id, "diagram")
     controller.show_asset_directory(question.id, "diagram")
     selected = controller.set_preferred_render(

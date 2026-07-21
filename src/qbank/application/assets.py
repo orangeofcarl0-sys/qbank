@@ -93,6 +93,10 @@ class AssetApplicationService:
             events=list(self.repository.history(question_id, asset_id)),
         )
 
+    def discard_new_asset(self, question_id: str, asset_id: str) -> None:
+        """Compensate a failed question declaration for a newly created asset."""
+        self.repository.discard_new(question_id, asset_id)
+
     def ingest_package(
         self,
         package: AssetPackage,

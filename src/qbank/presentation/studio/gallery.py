@@ -24,7 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from qbank.desktop.widgets import MetadataPanel, WebWorkspace
+from qbank.desktop.widgets import InspectorSummary, MetadataPanel, WebWorkspace
+from qbank.models import DesktopQuestionDocument, Question
 from qbank.presentation.studio.design.controls import ModernComboBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.palette import ThemeName
@@ -120,15 +121,13 @@ class StudioGallery(QMainWindow):
 
     def _inspector(self) -> QFrame:
         panel, layout = _section("题目详情属性检查器")
+        document = _gallery_document()
+        summary = InspectorSummary(self.theme_name)
+        summary.load_document(document)
+        summary.set_warning(["2 项修改尚未保存", "图形待重绘"])
+        layout.addWidget(summary)
         inspector = MetadataPanel(self.theme_name)
-        inspector.title.setText("理想运算放大器基本性质")
-        inspector.subject.setText("electronics")
-        inspector.chapter.setText("amplifiers")
-        inspector.topics.setText("op-amp, ideal-model")
-        inspector.question_type.setCurrentText("multiple_choice")
-        inspector.status.setCurrentText("reviewed")
-        inspector.difficulty.setValue(1)
-        inspector.language.setText("zh-CN")
+        inspector.load_document(document)
         layout.addWidget(inspector)
         return panel
 
@@ -244,3 +243,24 @@ def _gallery_preview_html(theme: ThemeName) -> str:
     <p>若反射镜沿光轴移动 <em>d</em>，求两束光重新叠加时的光程差变化。</p>
     <p>答案：$\\Delta L = 2d\\cos\\theta$</p>
     <div class='asset'>图像对象 · interferometer-layout · 右键可操作</div></body></html>"""
+
+
+def _gallery_document() -> DesktopQuestionDocument:
+    question = Question.model_validate(
+        {
+            "schema_version": "1.0",
+            "id": "ELEC-AMP-0001",
+            "title": "理想运算放大器基本性质",
+            "type": "multiple_choice",
+            "subject": "electronics",
+            "chapter": "amplifiers",
+            "topics": ["op-amp", "ideal-model"],
+            "difficulty": 1,
+            "status": "reviewed",
+            "language": "zh-CN",
+            "source": {"type": "manual", "reference": "实验讲义 2025 第 3 题"},
+            "assets": [],
+            "stem_md": "理想运算放大器有哪些基本性质？",
+        }
+    )
+    return DesktopQuestionDocument(question=question, source="## 题目", assets=[], history=[])

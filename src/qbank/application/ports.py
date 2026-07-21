@@ -169,6 +169,8 @@ class AssetRepositoryPort(Protocol):
 
     def record(self, event: AssetHistoryEvent) -> None: ...
 
+    def discard_new(self, question_id: str, asset_id: str) -> None: ...
+
     def history(
         self,
         question_id: str,

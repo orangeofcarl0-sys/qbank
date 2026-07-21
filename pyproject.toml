@@ -52,12 +52,6 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 source = ["qbank"]
-omit = [
-  "src/qbank/desktop/bridges.py",
-  "src/qbank/desktop/main_window.py",
-  "src/qbank/desktop/qt.py",
-  "src/qbank/desktop/widgets.py",
-]
 
 [tool.coverage.report]
 fail_under = 90
@@ -104,6 +98,11 @@ include = ["src/qbank"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportUnnecessaryTypeIgnoreComment = "error"
+
+[[tool.mypy.overrides]]
+# Qt for Python does not publish a PEP 561 marker; keep this exception scoped to Qt.
+module = ["PySide6", "PySide6.*"]
+ignore_missing_imports = true
 
 [tool.deptry]
 known_first_party = ["qbank"]

@@ -16,8 +16,9 @@ from PySide6.QtCore import (
     QSize,
     Qt,
     QTimer,
+    QUrl,
 )
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
@@ -32,10 +33,11 @@ from PySide6.QtWidgets import (
     QToolBar,
 )
 
+from qbank.assets import stable_legacy_asset_id
 from qbank.desktop.controller import DesktopController, DesktopView
 from qbank.desktop.widgets import DetailDrawer, NavigationPane, WebWorkspace, WorkspaceMode
 from qbank.errors import QBankError
-from qbank.models import AssetManifest, PatchQuestionResult
+from qbank.models import AssetManifest, DesktopAssetItem, PatchQuestionResult
 from qbank.presentation.studio.design.controls import ModernComboBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.metrics import METRICS
@@ -54,6 +56,7 @@ _ASSET_ACTIONS = frozenset(
         "restore",
     }
 )
+_MUTATING_ASSET_ACTIONS = _ASSET_ACTIONS - {"open-original", "show-directory"}
 
 _ASSET_MENU_ITEMS = (
     ("edit", "用 Ipe 编辑"),
@@ -90,7 +93,11 @@ class DesktopMainWindow(QMainWindow):
         self._editing_targets: dict[str, tuple[str, str]] = {}
         self.navigation = NavigationPane(theme)
         self.workspace = WebWorkspace(theme)
-        self.drawer = DetailDrawer(theme)
+        self.drawer = DetailDrawer(
+            theme,
+            project_root=controller.context.root,
+            assets_root=controller.context.paths.assets,
+        )
         self.language_mode = ModernComboBox(theme)
         self.file_watcher = QFileSystemWatcher(self)
         self.preview_timer = QTimer(self)
@@ -107,8 +114,17 @@ class DesktopMainWindow(QMainWindow):
         self.setCentralWidget(shell)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, _navigation_dock(self.navigation))
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.drawer)
+        QTimer.singleShot(0, self._apply_drawer_width)
         self.addToolBar(self._toolbar())
         self.statusBar().showMessage("就绪")
+
+    def _apply_drawer_width(self) -> None:
+        self.resizeDocks(
+            [self.drawer],
+            [self.drawer.preferred_width()],
+            Qt.Orientation.Horizontal,
+        )
+        self.drawer.enable_width_persistence()
 
     def _toolbar(self) -> QToolBar:
         toolbar = QToolBar("编辑")
@@ -205,23 +221,17 @@ class DesktopMainWindow(QMainWindow):
         self.workspace.context_menu_requested.connect(self._show_asset_context_menu)
         self.workspace.mode_changed.connect(self._workspace_mode_changed)
         self.drawer.asset_activated.connect(self._drawer_asset_activated)
+        self.drawer.asset_action_requested.connect(self._asset_action)
+        self.drawer.legacy_asset_action_requested.connect(self._legacy_asset_action)
+        self.drawer.add_asset_requested.connect(self._add_asset_from_file)
+        self.drawer.save_requested.connect(self.save_current)
+        self.drawer.restore_requested.connect(self._restore_current)
         self.preview_timer.timeout.connect(self._render_scheduled_preview)
         self.file_watcher.fileChanged.connect(self._editor_file_changed)
         self._wire_metadata_changes()
 
     def _wire_metadata_changes(self) -> None:
-        panel = self.drawer.metadata
-        for widget in (
-            panel.title,
-            panel.subject,
-            panel.chapter,
-            panel.topics,
-            panel.language,
-        ):
-            widget.textEdited.connect(self._metadata_changed)
-        panel.question_type.currentTextChanged.connect(self._metadata_changed)
-        panel.status.currentTextChanged.connect(self._metadata_changed)
-        panel.difficulty.valueChanged.connect(self._metadata_changed)
+        self.drawer.metadata.metadata_changed.connect(self._metadata_changed)
 
     def _language_mode_changed(self, language: ModernComboBox, index: int) -> None:
         self.workspace.set_language_mode(str(language.itemData(index)))
@@ -280,9 +290,10 @@ class DesktopMainWindow(QMainWindow):
         self.drawer.load_document(document)
         self.workspace.set_source(document.source)
         self._saved_source = document.source
-        self._saved_metadata = self.drawer.metadata.values()
+        self._saved_metadata = self.drawer.values()
         self.dirty = False
         self._switching = False
+        self.drawer.set_dirty_state(0, preview_pending=True)
         self._update_title()
         QTimer.singleShot(0, partial(self._render_preview, generation, question_id))
 
@@ -321,7 +332,7 @@ class DesktopMainWindow(QMainWindow):
             result = self.controller.preview_source(
                 question_id,
                 self.current_source,
-                self.drawer.metadata.values(),
+                self.drawer.values(),
                 theme=self.theme_name,
             )
         except (QBankError, ValueError) as exc:
@@ -331,6 +342,7 @@ class DesktopMainWindow(QMainWindow):
                 return
             self._preview_loading = False
             self.workspace.show_error(str(exc))
+            self._sync_dirty()
             self.statusBar().showMessage(f"预览暂不可用：{exc}", 6000)
             return
         if not preview_result_is_current(
@@ -339,6 +351,15 @@ class DesktopMainWindow(QMainWindow):
             return
         self._preview_loading = False
         self.workspace.set_preview(result.html, self.controller.context.root, question_id)
+        self.drawer.set_dirty_state(
+            changed_fields_count(
+                self.current_source,
+                self.drawer.values(),
+                self._saved_source,
+                self._saved_metadata,
+            ),
+            preview_pending=False,
+        )
         warning = f" · {len(result.warnings)} 个资产提示" if result.warnings else ""
         self.statusBar().showMessage(f"预览已刷新{warning}", 3000)
 
@@ -349,9 +370,18 @@ class DesktopMainWindow(QMainWindow):
     def _sync_dirty(self) -> None:
         self.dirty = snapshot_is_dirty(
             self.current_source,
-            self.drawer.metadata.values(),
+            self.drawer.values(),
             self._saved_source,
             self._saved_metadata,
+        )
+        self.drawer.set_dirty_state(
+            changed_fields_count(
+                self.current_source,
+                self.drawer.values(),
+                self._saved_source,
+                self._saved_metadata,
+            ),
+            preview_pending=self.preview_timer.isActive() or self._preview_loading,
         )
         self._update_title()
 
@@ -362,11 +392,12 @@ class DesktopMainWindow(QMainWindow):
             result = self.controller.validate_source(
                 self.current_id,
                 self.current_source,
-                self.drawer.metadata.values(),
+                self.drawer.values(),
             )
         except (QBankError, ValueError) as exc:
             self._show_error(exc)
             return
+        self.drawer.set_validation(result.ok, len(result.validation_errors))
         self._show_validation(result)
 
     def save_current(self) -> bool:
@@ -376,12 +407,13 @@ class DesktopMainWindow(QMainWindow):
             result = self.controller.save_source(
                 self.current_id,
                 self.current_source,
-                self.drawer.metadata.values(),
+                self.drawer.values(),
             )
         except (QBankError, ValueError) as exc:
             self._show_error(exc)
             return False
         if not result.ok:
+            self.drawer.set_validation(False, len(result.validation_errors))
             self._show_validation(result)
             return False
         current = self.current_id
@@ -408,10 +440,85 @@ class DesktopMainWindow(QMainWindow):
         if self.current_id is None or action not in _ASSET_ACTIONS or self._preview_loading:
             return
         try:
+            document = self.controller.load_question(self.current_id)
+            already_managed = any(item.asset_id == asset_id for item in document.assets)
+            if (action in _MUTATING_ASSET_ACTIONS or not already_managed) and not (
+                self._prepare_asset_mutation()
+            ):
+                return
             asset_id = self.controller.ensure_logical_asset(self.current_id, asset_id)
             self._dispatch_asset_action(self.current_id, asset_id, action)
+            if not already_managed:
+                self._reload_after_question_asset_change()
         except (QBankError, OSError, ValueError) as exc:
             self._show_error(exc)
+
+    def _legacy_asset_action(self, reference: str, action: str) -> None:
+        if self.current_id is None:
+            return
+        try:
+            document = self.controller.load_question(self.current_id)
+            item = next(
+                (
+                    candidate
+                    for candidate in document.asset_items
+                    if candidate.reference == reference
+                ),
+                None,
+            )
+            if item is None:
+                raise ValueError(f"资源引用不存在：{reference}")
+            if action == "convert":
+                self._convert_reference_asset(reference, item.capabilities.convert)
+                return
+            if action != "open":
+                raise ValueError(f"不支持的资源操作：{action}")
+            self._open_reference_asset(item)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _convert_reference_asset(self, reference: str, allowed: bool) -> None:
+        if self.current_id is None or not allowed:
+            raise ValueError(f"资源引用无效，无法转换：{reference}")
+        if not self._prepare_asset_mutation():
+            return
+        asset_id = stable_legacy_asset_id(reference)
+        self.controller.ensure_logical_asset(self.current_id, asset_id)
+        self._reload_after_question_asset_change()
+
+    @staticmethod
+    def _open_reference_asset(item: DesktopAssetItem) -> None:
+        if not item.capabilities.open_reference:
+            raise ValueError(f"资源引用不可打开：{item.reference}")
+        if item.kind == "external":
+            QDesktopServices.openUrl(QUrl(item.reference))
+            return
+        if item.kind != "local" or item.preview_path is None:
+            raise ValueError(f"图片文件不存在或不在 assets 目录内：{item.reference}")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(item.preview_path))
+
+    def _add_asset_from_file(self) -> None:
+        if self.current_id is None:
+            return
+        if not self._prepare_asset_mutation():
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "添加图形资产",
+            str(self.controller.context.root),
+            "图像和图形 (*.png *.jpg *.jpeg *.svg *.pdf *.ipe *.tex *.webp *.gif *.bmp);;所有文件 (*)",
+        )
+        if not path:
+            return
+        try:
+            self.controller.create_asset(self.current_id, path, name=Path(path).name)
+            self._reload_after_question_asset_change()
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _restore_current(self) -> None:
+        if self.current_id is not None:
+            self._load_question(self.current_id)
 
     def _show_asset_context_menu(self, asset_id: str, x: int, y: int) -> None:
         if self._preview_loading or not self.workspace.asset_actions_enabled:
@@ -423,6 +530,7 @@ class DesktopMainWindow(QMainWindow):
         for action_name, label in _ASSET_MENU_ITEMS:
             action = menu.addAction(icon(action_name, self.theme_name), label)
             action.setData((asset_id, action_name))
+            action.setEnabled(self._asset_action_available(asset_id, action_name))
             action.triggered.connect(
                 lambda checked=False, aid=asset_id, name=action_name: self._asset_action(aid, name)
             )
@@ -486,7 +594,8 @@ class DesktopMainWindow(QMainWindow):
             raise ValueError("剪贴板中没有图片")
         buffer = QBuffer()
         buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-        image.save(buffer, b"PNG")
+        # PySide 6.11 accepts the Qt format name as str at runtime despite its stub.
+        image.save(buffer, "PNG")  # pyright: ignore[reportCallIssue, reportArgumentType]
         encoded = base64.b64encode(buffer.data().data()).decode("ascii")
         self.controller.replace_asset(
             question_id,
@@ -523,8 +632,15 @@ class DesktopMainWindow(QMainWindow):
     def _asset_dropped(self, asset_id: str, name: str, data_uri: str) -> None:
         if self.current_id is None:
             return
+        if not self._prepare_asset_mutation():
+            return
         try:
+            already_managed = False
             if asset_id:
+                already_managed = any(
+                    item.asset_id == asset_id
+                    for item in self.controller.load_question(self.current_id).assets
+                )
                 asset_id = self.controller.ensure_logical_asset(self.current_id, asset_id)
                 self.controller.replace_asset(
                     self.current_id,
@@ -539,7 +655,10 @@ class DesktopMainWindow(QMainWindow):
                     name=name,
                 )
                 self.workspace.insert_asset(result.asset_id)
-            self._refresh_after_asset_change()
+            if asset_id and not already_managed:
+                self._reload_after_question_asset_change()
+            else:
+                self._refresh_after_asset_change()
         except (QBankError, OSError, ValueError) as exc:
             self._show_error(exc)
 
@@ -569,13 +688,63 @@ class DesktopMainWindow(QMainWindow):
             return
         document = self.controller.load_question(self.current_id)
         self._switching = True
-        self.drawer.load_document(document)
+        self.drawer.refresh_asset_state(document)
         self._switching = False
         generation = self._next_preview_generation()
         self._preview_loading = True
         self.workspace.show_loading(self.current_id)
         QTimer.singleShot(0, partial(self._render_preview, generation, self.current_id))
         self._refresh_navigation()
+        self._sync_dirty()
+
+    def _reload_after_question_asset_change(self) -> None:
+        if self.current_id is None:
+            return
+        current = self.current_id
+        self._load_question(current)
+        self._refresh_navigation()
+
+    def _prepare_asset_mutation(self) -> bool:
+        self._sync_dirty()
+        if not self.dirty:
+            return True
+        choice = self._message_box(
+            "先保存题目",
+            "当前题目有未保存修改。可先保存、放弃修改或取消资产操作。",
+            QMessageBox.Icon.Question,
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if choice == QMessageBox.StandardButton.Save:
+            return self.save_current()
+        if choice == QMessageBox.StandardButton.Discard and self.current_id is not None:
+            self._load_question(self.current_id)
+            return True
+        return False
+
+    def _asset_action_available(self, asset_id: str, action: str) -> bool:
+        if self.current_id is None:
+            return False
+        document = self.controller.load_question(self.current_id)
+        item = next(
+            (candidate for candidate in document.asset_items if candidate.asset_id == asset_id),
+            None,
+        )
+        if item is None:
+            return False
+        capability = {
+            "edit": "edit",
+            "replace-file": "replace",
+            "replace-clipboard": "replace",
+            "open-original": "open_original",
+            "render": "render",
+            "set-render": "set_render",
+            "show-directory": "show_directory",
+            "restore": "restore",
+        }.get(action)
+        return bool(capability and getattr(item.capabilities, capability))
 
     def _manifest(self, asset_id: str) -> AssetManifest:
         if self.current_id is None:
@@ -683,6 +852,18 @@ def snapshot_is_dirty(
 ) -> bool:
     """Compare the live editor state with its last authoritative snapshot."""
     return source != saved_source or metadata != saved_metadata
+
+
+def changed_fields_count(
+    source: str,
+    metadata: dict[str, object],
+    saved_source: str,
+    saved_metadata: dict[str, object],
+) -> int:
+    """Count edited source plus independently changed Inspector fields."""
+    count = int(source != saved_source)
+    fields = set(metadata) | set(saved_metadata)
+    return count + sum(metadata.get(field) != saved_metadata.get(field) for field in fields)
 
 
 def preview_result_is_current(

@@ -12,12 +12,21 @@ class StudioProxyStyle(QProxyStyle):
     """Small native-style adapter; geometry remains platform-owned."""
 
 
+def _point_size(pixel_size: int) -> float:
+    """Convert a 96-DPI design pixel size to a valid scalable Qt point size."""
+    return pixel_size * 72.0 / 96.0
+
+
+def _point_css(pixel_size: int) -> str:
+    return f"{_point_size(pixel_size):g}pt"
+
+
 def build_stylesheet(theme: ThemeName) -> str:
     """Generate the complete Qt Widgets stylesheet from semantic tokens."""
     t = tokens_for(theme)
     p, m = t.palette, t.metrics
     return f"""
-    QWidget {{ color: {p.text_primary}; font-family: "{t.typography.qt_family}"; font-size: {t.typography.ui_size}px; }}
+    QWidget {{ color: {p.text_primary}; }}
     QMainWindow, QDialog {{ background: {p.background}; }}
     QScrollArea, QScrollArea > QWidget > QWidget {{ background: {p.background}; border: 0; }}
     QDockWidget {{ color: {p.text_primary}; titlebar-close-icon: none; titlebar-normal-icon: none; }}
@@ -54,12 +63,42 @@ def build_stylesheet(theme: ThemeName) -> str:
     QMenu::item:selected {{ color: {p.text_primary}; background: {p.selection}; }}
     QMessageBox {{ background: {p.surface_elevated}; }}
     QLabel#sectionLabel, QLabel#activeFilter {{ color: {p.text_secondary}; }}
-    #metadataPanel QLabel#fieldLabel {{ color: {p.text_secondary}; font-size: {t.typography.small_size}px; font-weight: 500; }}
+    #detailDrawer {{ background: {p.surface}; }}
+    #detailDrawer QScrollArea, #detailDrawer QScrollArea > QWidget > QWidget {{ background: {p.surface}; }}
+    #detailDrawer QLineEdit, #detailDrawer QComboBox, #detailDrawer QSpinBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}
+    #metadataPanel QLabel#fieldLabel, QLabel#fieldLabel {{ color: {p.text_secondary}; font-size: {_point_css(t.typography.small_size)}; font-weight: 500; }}
+    QLabel#inspectorSectionLabel {{ color: {p.text_primary}; font-weight: 600; padding-top: {m.space_2}px; border-bottom: {m.border_width}px solid {p.border_subtle}; }}
+    QLabel#inspectorTitle {{ color: {p.text_primary}; font-size: {_point_css(16)}; font-weight: 600; }}
+    QLabel#inspectorId {{ color: {p.text_secondary}; font-family: {t.typography.mono_family}; }}
+    QLabel#summaryBadge {{ color: {p.text_secondary}; background: {p.background}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; padding: 2px {m.space_2}px; }}
+    QLabel#summaryBadge[state="success"] {{ color: {p.success}; border-color: {p.success}; }}
+    QLabel#summaryBadge[state="error"] {{ color: {p.error}; border-color: {p.error}; }}
+    QLabel#summaryWarning {{ color: {p.warning}; background: {p.background}; border-left: 2px solid {p.warning}; padding: {m.space_1}px {m.space_2}px; }}
+    QLabel#fieldHint {{ color: {p.text_secondary}; font-size: {_point_css(t.typography.small_size)}; }}
+    QLabel#sourceValue {{ color: {p.text_primary}; background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; padding: {m.space_2}px; }}
+    QLabel#sourceValue[missing="true"] {{ color: {p.text_disabled}; }}
+    QLabel#assetName, QLabel#timelineTitle, QLabel#emptyStateTitle {{ color: {p.text_primary}; font-weight: 600; }}
+    QLabel#assetThumbnail {{ background: {p.background}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; }}
+    QLabel#timelineBullet {{ color: {p.accent}; padding-top: 2px; }}
+    QWidget#timelineRow {{ border-bottom: {m.border_width}px solid {p.border_subtle}; }}
+    QFrame#assetCard {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_medium}px; }}
+    QFrame#inspectorEmptyState {{ background: transparent; border: {m.border_width}px dashed {p.border_strong}; border-radius: {m.radius_medium}px; }}
+    QFrame#inspectorActionBar {{ background: {p.surface_elevated}; border-top: {m.border_width}px solid {p.border_strong}; }}
+    QPushButton {{ min-height: 28px; padding: 0 {m.space_3}px; background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_strong}; border-radius: {m.radius_small}px; }}
+    QPushButton:hover {{ border-color: {p.focus}; background: {p.surface_hover}; }}
+    QPushButton:focus {{ border-color: {p.focus}; }}
+    QPushButton#saveChanges {{ color: {p.background}; background: {p.accent}; border-color: {p.accent}; font-weight: 600; }}
+    QPushButton#saveChanges:hover {{ background: {p.accent_hover}; border-color: {p.accent_hover}; }}
+    QPushButton#compactButton {{ min-height: 26px; padding: 0 {m.space_2}px; font-size: {_point_css(t.typography.small_size)}; }}
+    QToolButton#compactIconButton {{ min-width: 26px; min-height: 26px; max-width: 26px; max-height: 26px; }}
+    QToolButton#compactIconButton::menu-indicator {{ image: none; }}
+    QToolButton#topicTag {{ min-height: 24px; padding: 0 {m.space_2}px; color: {p.accent}; background: {p.selection}; border: {m.border_width}px solid {p.border_subtle}; border-radius: 12px; }}
+    QToolButton#representationToggle {{ min-height: 24px; padding: 0; color: {p.text_secondary}; text-align: left; }}
     QLabel#emptyState {{ color: {p.text_secondary}; padding: {m.space_3}px {m.space_2}px; }}
     QLabel#statusSuccess {{ color: {p.success}; }}
     QLabel#statusWarning {{ color: {p.warning}; }}
     QLabel#statusError {{ color: {p.error}; }}
-    QLabel#documentTitle {{ font-size: {t.typography.title_size}px; font-weight: 600; }}
+    QLabel#documentTitle {{ font-size: {_point_css(t.typography.title_size)}; font-weight: 600; }}
     QFrame[frameShape="6"] {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_medium}px; }}
     """
 
@@ -68,5 +107,10 @@ def apply_theme(application: QApplication, theme: ThemeName) -> None:
     """Apply one Studio theme without changing the native window frame."""
     if not isinstance(application.style(), StudioProxyStyle):
         application.setStyle(StudioProxyStyle(application.style()))
+    typography = tokens_for(theme).typography
+    application_font = application.font()
+    application_font.setFamily(typography.qt_family)
+    application_font.setPointSizeF(_point_size(typography.ui_size))
+    application.setFont(application_font)
     application.setProperty("qbankTheme", theme)
     application.setStyleSheet(build_stylesheet(theme))

@@ -359,6 +359,39 @@ class DesktopQuestionSummary(ResultModel):
     needs_redraw: bool
 
 
+class AssetCapabilities(ResultModel):
+    """Actions that the desktop may safely offer for one asset item."""
+
+    edit: bool = False
+    replace: bool = False
+    render: bool = False
+    set_render: bool = False
+    open_original: bool = False
+    show_directory: bool = False
+    restore: bool = False
+    convert: bool = False
+    open_reference: bool = False
+
+
+class DesktopAssetItem(ResultModel):
+    """Containment-checked asset state prepared for the desktop Inspector."""
+
+    kind: Literal["logical", "local", "external", "invalid"]
+    reference: str
+    display_name: str
+    asset_id: str | None = None
+    manifest: AssetManifest | None = None
+    preview_path: str | None = None
+    exists: bool = False
+    declared: bool = True
+    diagnostic: Diagnostic | None = None
+    capabilities: AssetCapabilities = Field(default_factory=AssetCapabilities)
+
+
+def _desktop_asset_items() -> list[DesktopAssetItem]:
+    return []
+
+
 class DesktopQuestionDocument(ResultModel):
     """One editable question and its current logical-asset state."""
 
@@ -366,6 +399,7 @@ class DesktopQuestionDocument(ResultModel):
     source: str
     assets: list[AssetManifest]
     history: list[AssetHistoryEntry]
+    asset_items: list[DesktopAssetItem] = Field(default_factory=_desktop_asset_items)
 
 
 class DesktopPreviewResult(ResultModel):
