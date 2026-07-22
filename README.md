@@ -43,7 +43,7 @@ qbank doctor --format json
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install -U pip
+python -m pip install -U pip setuptools wheel
 pip install .
 qbank --help
 ```
@@ -68,7 +68,7 @@ pip install .\qbank-0.1.0-py3-none-any.whl
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install -U pip
+python -m pip install -U pip setuptools wheel
 pip install -e ".[dev,studio-dev]"
 qbank --help
 ```
