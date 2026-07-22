@@ -1,547 +1,236 @@
 # qbank
 
-`qbank` 是一个本地优先、对人类和 AI 都友好的题库命令行工具。每道题以一个带
-YAML front matter 的 Markdown 文件保存；JSON/JSONL 用于 AI 交换；SQLite FTS5
-只是随时可删除重建的搜索索引；`paper.yaml` 是可审查的组卷结果。
-
-它不提供在线考试、用户账号、学习记录、自动判题、OCR、内置 AI 或网络服务。
+`qbank` 是一个本地优先、面向人机协作的结构化题库工具。题目以带 YAML front matter
+的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
+`paper.yaml` 用于描述可审查、可复现的试卷结构。
 
 > **版本状态：** `0.1.0` 是当前冻结的私有基线，要求 Python 3.11 或更高版本。
-> 题目 Markdown 是唯一权威数据；SQLite、预览和导出物均可重建。
+> Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
-| 使用入口 | 适合场景 | 启动方式 |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
+  <img src="docs/assets/readme/studio-main-light.png" alt="qbank Studio 主界面：左侧题库导航，中部 Markdown 编辑与实时预览，右侧题目详情" width="1680">
+</picture>
+
+<p align="center"><sub>Studio 使用公开合成题目展示题库导航、源码编辑、实时预览和结构化属性。</sub></p>
+
+| 使用入口 | 适用场景 | 启动方式 |
 | --- | --- | --- |
-| Studio | 日常浏览、编辑、标签整理和组卷 | `qbank desktop` |
-| CLI | 批处理、校验、导入导出和自动化 | `qbank --help` |
-| Codex Skill | 让 Codex 按同一数据边界协作 | `qbank codex check --format json` |
+| Studio | 日常浏览、编辑、标签整理、资源管理和组卷 | `qbank desktop` |
+| CLI | 批量导入、校验、查询、导出和自动化 | `qbank --help` |
+| Codex Skill | 让 Codex 在相同数据边界内协作 | `qbank codex check --format json` |
 
-## 定位与功能
+## 项目定位
 
-qbank 面向希望将题目长期保存在普通文件、同时让人类与自动化工具共享同一套数据边界的
-个人和小型团队。核心功能包括结构化题目录入与修订、确定性校验、标签与保存视图、全文
-检索、静态预览、Studio 桌面编辑、试卷构建，以及 Markdown、HTML、JSON/JSONL、纯文本
-和 DOCX 导出。Markdown 始终是权威数据，索引与导出物都可重建。
+qbank 面向希望将题目长期保存在普通文件中，同时让桌面编辑、命令行自动化和 AI 工具共享
+同一套数据边界的个人与小型团队。它不提供在线考试、用户账号、学习记录、自动判题、OCR
+或内置模型服务。
+
+核心能力包括：
+
+- 使用结构化 Markdown 保存题目、答案、解析、评分要点和来源信息；
+- 对单题、批量导入和结构化修订执行确定性校验；
+- 通过字段、标签、保存视图和 SQLite FTS5 检索题目；
+- 管理本地图片、外部引用和带多种表示的逻辑资产；
+- 构建学生版、答案版和解析版试卷；
+- 导出 Markdown、HTML、JSON、JSONL、纯文本和 DOCX；
+- 通过 Studio、CLI 与 Codex Skill 复用同一应用服务和事务边界。
+
+## Studio 桌面编辑器
+
+Studio 是可选的本地 Qt 桌面界面，不依赖 Web 后端，也不维护第二份题库数据。界面采用紧凑的
+两栏半布局：左侧用于题库导航与筛选，中部用于 Markdown/TeX 源码和实时预览，右侧用于
+题目属性、资源、来源和历史记录。
+
+图片按文档对象处理。可用操作由资源类型和实际表示决定；本地文件必须通过题库边界校验，
+外部资源保持只读并显示警告。Studio 保存仍执行与 CLI 相同的 dry-run、提交、校验和索引同步。
+
+![Studio 深色模式下的资源与题目详情](docs/assets/readme/studio-assets-dark.png)
+
+<p align="center"><sub>深色模式保持编辑器、预览和详情面板的一致语义，并显示资源能力与状态。</sub></p>
+
+安装并启动 Studio：
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -U pip setuptools wheel
+pip install -e ".[desktop]"
+qbank desktop
+```
+
+Windows 上建议使用标准 CPython 环境，以避免其他 Python 发行版附带的 Qt DLL 与 PySide6
+冲突。完整交互说明见 [Studio 用户文档](docs/desktop-editor.md)，视觉规范见
+[Studio 设计系统](docs/ui/design-system.md)。
 
 ## 快速开始
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e .
-qbank init demo-bank
-Set-Location demo-bank
-qbank doctor --format json
-```
-
-仓库中的 `examples/public-demo/` 是完全自制的最小公开示例，包含一道题和一幅 SVG；它不
-来自真实考试或用户题库。
-
-## 安装与开发
-
-需要 Python 3.11 或更高版本。只使用核心 CLI：
+安装核心 CLI 并创建题库：
 
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -U pip setuptools wheel
 pip install .
-qbank --help
+
+qbank init demo-bank
+Set-Location demo-bank
+qbank doctor --format json
 ```
 
-安装 Studio 桌面端：
-
-```powershell
-pip install ".[desktop]"
-qbank desktop
-```
-
-从私有 GitHub Release 下载 wheel 后，可先核对同一 Release 中 `checksums.txt` 的
-SHA-256，再安装：
+仓库中的 `examples/public-demo/` 是完全自制的最小公开示例，不包含真实考试或用户题库内容。
+从 Release 下载 wheel 时，应先使用同一 Release 中的 `checksums.txt` 核对 SHA-256：
 
 ```powershell
 Get-FileHash .\qbank-0.1.0-py3-none-any.whl -Algorithm SHA256
 pip install .\qbank-0.1.0-py3-none-any.whl
 ```
 
-参与开发时安装完整检查工具和 Studio 测试依赖：
+参与开发时安装完整质量检查和 Studio 测试依赖：
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -U pip setuptools wheel
 pip install -e ".[dev,studio-dev]"
-qbank --help
 ```
 
-只开发和测试核心 CLI 时可安装 `.[dev]`；`.[studio-dev]` 单独提供 Qt 与
-pytest-qt，使未安装或无法加载 Qt 的环境仍能运行核心测试。
+## 安全操作流程
 
-Release 附件中的 wheel 提供核心 CLI；需要 Studio 时还应从受信任的软件源安装
-`PySide6>=6.8,<7` 与 `QtAwesome>=1.4,<2`，或直接从源码使用上面的 `.[desktop]` extra。
+![qbank 安全写入流程：检查项目、读取 Schema、dry-run、提交、校验和索引恢复](docs/assets/readme/safe-workflow.svg)
 
-Windows PowerShell 5.x 把文本传给原生命令前，请先将管道设为 UTF-8；读取 JSON 时也
-显式指定 UTF-8，避免中文被系统代码页改写：
+所有权威写入均遵循同一过程：先读取 Schema 或现有记录，执行 dry-run 并检查差异，再正式
+提交，最后运行完整校验。索引同步发生在 Markdown 与历史提交之后；索引失败不会撤销权威
+内容，而是留下 dirty 标记并要求显式重建。
+
+以批量导入为例：
 
 ```powershell
-$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+qbank schema --format json
+qbank ingest ..\examples\questions.jsonl --dry-run --format json
+qbank ingest ..\examples\questions.jsonl --format json
+qbank validate --format json
 ```
 
-也可用 `pip install -r requirements-dev.lock` 复现已验收的开发依赖版本，再执行
-`pip install -e . --no-deps --no-build-isolation` 安装本项目。锁文件覆盖运行、开发和
-构建依赖；更新依赖后，在干净虚拟环境中安装 `.[dev]`，再用
-`python -m pip freeze --exclude-editable > requirements-dev.lock` 重建。也可使用
-`python -m qbank`。开发检查：
+结构化修订同样先预演：
 
 ```powershell
-ruff format .
-ruff check .
-pyright
-lint-imports
-deptry .
-pytest --cov=qbank --cov-branch --cov-fail-under=0 --cov-report=json:build/audit/coverage.json
-python scripts/check_branch_coverage.py build/audit/coverage.json
-pip check
-pip-audit
-python -m pip wheel . --no-deps --no-build-isolation
+qbank patch OPT-INT-0001 --file build\ai\OPT-INT-0001.patch.json `
+  --dry-run --format json
+qbank patch OPT-INT-0001 --file build\ai\OPT-INT-0001.patch.json --format json
+qbank validate --format json
 ```
 
-## 初始化
+不得默认直接编辑 `questions/**/*.md`，也不得手工修改 `.qbank/index.sqlite`。损坏的 Markdown
+不会被普通写入或 `--upsert` 静默覆盖。
 
-`qbank init` 初始化当前目录，`qbank init demo-bank` 初始化指定子目录。命令会创建
-`questions/`、`assets/`、`papers/`、`templates/`、`exports/`、`build/`、
-`schemas/`、`taxonomy.yaml`、`views.yaml`、`AGENTS.md`、`.agents/skills/qbank/`
-和 `.qbank/history/`，并建立空的
-FTS5 索引。程序从当前目录向上查找
-`qbank.yaml`，所以可以在任意子目录运行命令。
+## 数据边界与架构
 
-初始化采用冲突即失败：任何将由 qbank 管理的同名文件已存在时，命令以退出码 5
-结束且不会写入任何文件。只有显式 `--force` 才会覆盖这些受管文件。
+![qbank 数据架构：Markdown 和逻辑资产是权威数据，SQLite、预览、试卷和导出是可重建投影](docs/assets/readme/data-architecture.svg)
+
+- `questions/` 保存权威题目 Markdown；文件名与 front matter ID 必须一致。
+- `assets/` 保存受管本地资源和逻辑资产 manifest；本地路径不得逃逸题库边界。
+- `.qbank/history/` 与 Markdown 写入构成同一权威提交单元。
+- `.qbank/index.sqlite` 是只读命令使用的可重建搜索投影。
+- `papers/` 保存试卷定义，`exports/` 保存最终产物，`build/` 保存临时输出。
+- JSON Schema 由 Pydantic 模型生成，不维护手写副本。
+
+HTTP、HTTPS 和 `//host` 图片允许引用，但校验与构建会产生 `external_asset` warning；绝对路径、
+`file:`、`data:` 和越界路径会被拒绝。Jinja 模板在沙箱环境中执行，但自定义模板仍属于用户
+需要审查的可信代码边界。
+
+内部依赖关系、事务语义和扩展边界见 [架构文档](docs/architecture.md) 与
+[架构决策记录](docs/adr/)。
+
+## 常用工作流
+
+### 查询与检索
+
+优先使用结构化查询缩小范围，再对候选题目执行全文检索或读取完整正文：
 
 ```powershell
-qbank init demo-bank
-Set-Location demo-bank
-qbank doctor --format json
+qbank query --subject optics --status reviewed `
+  --fields id,title,subject,chapter,topics,type,difficulty,status `
+  --format json
+qbank search "光程差" --format json
+qbank get OPT-INT-0001 --format json
 ```
 
-初始化会写入一个自制 SVG 示例资源和可用的 `papers/demo-paper.yaml`，但不会把示例
-题自动导入。仓库中的 `examples/questions.jsonl` 提供 8 道覆盖主要题型的示例。
+索引缺失、损坏、过期或存在 dirty marker 时，`search` 会以退出码 3 明确失败。运行
+`qbank index rebuild --format json` 可恢复索引。
 
-常规初始化内容的权威来源位于安装包的 `qbank.resources` 中，包括默认配置、两个
-试卷模板、示例试卷、SVG 和预览内部模板。仓库根部的 `templates/` 与
-`papers/demo-paper.yaml` 只是便于阅读的逐字节镜像；修改默认内容时应先修改包内资源，
-再同步镜像并运行测试。仓库级 `.agents/skills/qbank/` 是 Codex Skill 的规范来源，
-并逐字节同步到初始化包资源。JSON Schema 始终直接由 Pydantic 模型生成，不维护手写
-副本。
-
-## 数据格式
-
-题目源文件必须位于 `questions/<subject>/<ID>.md`，文件名与 ID 一致。YAML 只保存
-短元数据；长文本位于固定章节 `题目`、`选项`、`答案`、`解析`、`评分要点` 和
-`审阅备注`。保存时按此顺序规范化；读取时允许缺少非必需章节。
-
-原始 HTML 被明确禁用：Markdown 渲染器会将其转义，避免题目内容向预览或导出页面
-注入脚本。公式通过 MathJax CDN 渲染；完全离线时普通文本与本地图片仍可查看，但公式
-只显示 TeX 源文本。
-
-本地图片必须使用题库相对路径、位于配置的 `assets` 目录、实际存在，并同时列在
-题目 YAML 的 `assets` 与 Markdown 图片引用中。HTTP、HTTPS 及 `//host` 图片允许，
-但校验与构建会发出 `external_asset` 警告；绝对路径、`file:`、`data:` 和越界路径
-会被拒绝。
-
-Jinja 模板在沙箱环境中执行，但模板文件仍属于题库的可信代码边界：只应使用自己
-编写或审查过的 `templates/paper.md.j2` 与 `templates/paper.html.j2`，不要直接运行
-来源不明的模板。
-
-Markdown 是唯一题目源数据。`.qbank/index.sqlite` 可以安全删除，再用
-`qbank index rebuild` 重建。所有真实写操作在 `.qbank/history/` 留下 JSON 摘要；
-仍建议用 Git 管理完整版本历史。
-
-`taxonomy.yaml` 只保存标签的规范 slug、中英文显示名、别名、颜色、说明、父标签和
-整理状态；它不保存题目—标签关系。该关系仍只取自题目 Markdown 的 `topics`。
-`views.yaml` 保存用户命名的组合筛选，可随题库一同用 Git 管理；标签改名或合并后，视图会
-通过 taxonomy 别名解析到新的规范 slug。固定的 `all`、`draft`、`needs_redraw` 和
-`current_paper` 视图由程序提供，不写入该文件。SQLite 中的全文、计数和共现数据都只是
-可重建投影；标签计数与共现表随 FTS 在同一个 SQLite 事务中更新。
-
-`status`、`doctor`、`search` 和索引更新时间读取使用 SQLite 只读连接，不会创建
-`.qbank`、数据库、表或 dirty marker。索引缺失、损坏或存在 dirty marker 时，
-`search` 会以退出码 3 明确失败并提示执行 `qbank index rebuild`；`doctor` 报告 FAIL，
-`status.index_dirty` 为 `true`。已禁用索引不视为 dirty；已确认 stale 的投影也会由
-`status` 和 `doctor` 报告。
-
-## 内部架构与维护
-
-完整边界、审查规则、兼容策略和决策记录见
-[`docs/architecture.md`](docs/architecture.md)、
-[`docs/code_review.md`](docs/code_review.md)、
-[`docs/compatibility-policy.md`](docs/compatibility-policy.md) 与
-[`docs/adr/`](docs/adr/)。
-
-内部依赖方向固定为“CLI → 应用服务 → 领域模型”，基础设施通过
-`qbank.bootstrap` 组合根注入应用端口。每条命令只解析一次不可变 `ProjectContext`；每个用例通过
-`MarkdownQuestionRepository` 生成一次 `RepositorySnapshot`，其中同时保留合法题目、
-损坏源、身份提示和重复 ID，供校验、查询、组卷、预览与诊断复用。
-
-SQLite 字段由唯一的 `IndexDocument` 投影定义。Markdown 与 history 是可回滚的权威
-提交单元，索引只在其后以单一事务同步；索引同步失败不会撤销 Markdown，而会留下
-dirty marker。`AssetService` 和 `RenderService` 统一资源分类、复制、MarkdownIt
-图片路径重写、禁用原始 HTML 与 Jinja 沙箱策略。
-
-## 桌面编辑器
-
-可选的轻量桌面编辑器复用相同的应用服务，不引入 Web 后端、第二套数据模型或数据库。
-建议在标准 CPython 虚拟环境中安装桌面依赖（Anaconda 自带的 Qt DLL 可能与 PySide6
-冲突）：
+### 标签与保存视图
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e ".[desktop]"
-qbank desktop
+qbank tag list --format json
+qbank tag stats --format json
+qbank view list --format json
+qbank tag rename old-slug canonical-slug --dry-run --format json
 ```
 
-界面采用“题库导航与检索 / Markdown 或 TeX 源码与实时预览 / 属性、资源、来源和历史”
-的两栏半布局。正文保存仍通过结构化 patch，并且程序自动先 dry-run 再提交和校验。
-浅色、深色、Qt 控件、CodeMirror 与预览由同一语义设计 token 生成；运行
-`python -m qbank.studio_gallery` 可检查长期维护的组件与交互状态。Studio 的视觉或交互
-修改必须先遵循仓库 `$qbank-ui-design` Skill，并用隔离题库执行其截图验收脚本。
-左栏底部提供可折叠标签分面：标签数量按当前结果实时计算，单击依次切换“包含 / 排除 /
-未选”，并可用 AND/OR 与文本、状态、题型、章节、年份和难度叠加。筛选芯片可单独移除，
-当前组合可保存、重命名或删除；“全部题目”始终保留。题目列表支持多选后批量添加或移除
-标签，写入仍由应用服务执行 dry-run、逐题 diff、原子 Markdown/history 提交和索引同步。
-保存视图是可编辑的筛选快照：选择后全部条件都会显示在控件和可换行芯片中，继续修改会
-标记为“已修改”，不会保留不可见的旧约束；可从视图菜单恢复原快照。清除操作会一次性
-返回“全部题目”并同步刷新题目列表、标签计数和结果摘要。
+标签修改会预览 taxonomy 与受影响题目的完整差异；保存视图只保存查询条件，不改变题目数据。
 
-右侧标签编辑器按中文名、英文名、slug 和别名补全，并显示使用次数；未知输入会转换为
-规范 slug 并标为“待整理”；发现疑似同义标签时，会在真正加入前用原生确认框列出候选项。
-标签管理器支持全局重命名、合并、删除、别名和颜色，提交前显示影响题目数及字段 diff，
-提交后可撤销最近操作。
-“标签概览”只提供频次条形、Top-N 共现矩阵和年份/章节覆盖热力图；点击图元会回填左栏的
-真实筛选，不提供默认全库关系图。
-
-Studio 顶部采用单层紧凑工具栏：默认只显示题库名和校验/索引状态符号，完整路径及状态
-说明通过提示读取。齿轮按钮打开“Studio 设置”，可选择浅色/深色主题、默认编辑视图、
-详情栏初始状态，以及是否在顶栏显示完整路径；这些偏好不修改题库内容。切换题库、新建/
-复制/导入/删除题目都通过同一应用服务执行。打开题目只决定编辑对象，不会隐式加入批量选择。试卷也不会在
-启动时自动选中：用户必须显式选择或新建试卷，随后才能添加题目、校验、构建或导出。
-来源类型和可定位引用可直接编辑，并与正文、待整理标签和历史记录一起原子保存。全文搜索
-使用可重建 SQLite 投影在后台执行，快速连续输入时只采用最新一代结果。
-保存标记按源码和元数据的已保存快照计算；撤销回快照会清除标题星号与关闭提示。
-切换题目会立即显示目标 ID 的加载态，并用生成代次拒绝过期预览。
-预览中的每张图绑定稳定逻辑 ID；推荐使用 `qbank-asset:<asset-id>`，TeX 源码可用
-`\qbankasset{<asset-id>}`。旧 `asset:` 和受管本地路径继续可读，首次执行资源操作时
-才会规范化，单纯打开和预览不会写入。
-
-图片使用原生 Qt 右键菜单，Escape、外部点击、切换题目或视图以及窗口失焦都会关闭。
-菜单固定提供八项操作：用 Ipe 编辑、替换为本地文件、从剪贴板替换、打开原始
-参考图、重新渲染、设为首选表示、在资源管理器中显示、恢复上一版本。Ipe 编辑使用新的
-版本化工作副本；保存后旧渲染会标为 stale，必须显式重新渲染，且不会自动标记为 final。
-替换和恢复同样保留原文件与历史。拖到已有图片会替换，拖到空白预览区会创建资源并插入
-稳定引用。公式继续由 MathJax CDN 渲染，离线时显示 TeX 源文。
-
-维护默认资源或内部边界后应运行完整质量门：
+### 逻辑资产
 
 ```powershell
-ruff format --check .
-ruff check .
-pyright
-lint-imports
-deptry .
-pytest --cov=qbank --cov-branch --cov-fail-under=0 --cov-report=json:build/audit/coverage.json
-python scripts/check_branch_coverage.py build/audit/coverage.json
-pip check
-pip-audit
-python -m pip wheel . --no-deps --no-build-isolation
-python -m qbank --help
+qbank schema --kind asset-package --format json
+qbank asset ingest OPT-INT-0001 build\ai\asset-package.json --dry-run --format json
+qbank asset ingest OPT-INT-0001 build\ai\asset-package.json --format json
+qbank asset validate --format json
 ```
 
-## Codex 原生接入
+新 Markdown 使用 `qbank-asset:<asset-id>`，TeX 使用 `\qbankasset{<asset-id>}`。替换和渲染
+采用追加式版本管理，不覆盖旧表示。完整流程见 [用户指南](docs/user-guide.md) 和
+[逻辑资产文档](docs/logical-asset-management-report.md)。
 
-每个新题库都包含简短的 `AGENTS.md` 和仓库级 `$qbank` Skill。适用于 Codex CLI、
-Codex desktop、IDE extension 和 Windows PowerShell；qbank 仍是纯本地工具，不需要
-OpenAI API key，也不调用任何大模型 SDK。
+### 组卷与导出
 
-先检查 Skill、运行环境和工作流命令：
+```powershell
+qbank paper validate papers\generated\optics-test.yaml --format json
+qbank paper build papers\generated\optics-test.yaml --format md `
+  --output exports\optics-test-student.md
+qbank paper build papers\generated\optics-test.yaml --format md `
+  --with-solutions --output exports\optics-test-solutions.md
+```
+
+DOCX 由系统 Pandoc 生成；Pandoc 不可用时 Markdown 和 HTML 构建不受影响。
+
+## Codex 接入
+
+每个新题库包含仓库级 `AGENTS.md` 和 `$qbank` Skill。Codex Desktop、IDE 和 CLI 可以依据
+这些规则调用本地 qbank 命令；qbank 本身不需要 OpenAI API key，也不嵌入模型 SDK。
 
 ```powershell
 qbank codex check --format json
 qbank codex instructions --format markdown
-qbank codex instructions --format json
-```
-
-`codex check` 检查 AGENTS、Skill frontmatter、项目与用户 Skill 漂移、当前目录、
-Codex CLI 以及工作流命令。JSON 中的 `repository_ready`、`codex_cli_ready` 和
-`degraded` 分别表示仓库、外部 CLI 与降级状态；兼容字段 `ok` 仍只在仓库级 FAIL
-时变为 `false`。因此 Codex CLI 不在 PATH 时会产生 WARN 和
-`codex_cli_ready: false`，但仓库级 Skill 仍可供 Codex Desktop 或 IDE 使用。
-`codex instructions` 在旧 `command_sequences` 之外提供结构化 `workflows`。
-
-如需让其他仓库也发现同一个 Skill，可先查看计划，再确认安装到当前用户目录：
-
-```powershell
 qbank codex install-skill --user --dry-run --format json
-qbank codex install-skill --user
-# 自动化环境中显式授权：
-qbank codex install-skill --user --yes --format json
 ```
 
-默认和 `--user` 的目标路径都是 `$HOME/.agents/skills/qbank/`；`--project` 则以安装包
-内的权威资源为源，更新当前项目的仓库级 Skill。内容不同时必须先显式加入
-`--update --dry-run` 查看文件级差异，再确认更新：
+仓库就绪、Codex CLI 可用和用户级 Skill 同步是相互独立的状态。完整检查、安装、更新和备份
+语义见 [Codex 接入指南](docs/codex-integration.md)。
 
-```powershell
-qbank codex install-skill --project --update --dry-run --format json
-qbank codex install-skill --project --update
-qbank codex install-skill --user --update --dry-run --format json
-qbank codex install-skill --user --update
-```
+## 文档索引
 
-项目备份保存到配置的 state 目录下 `codex-skill-backups/`，用户备份保存到
-`$HOME/.agents/.qbank-backups/skills/qbank/`。未经确认不会覆盖 Skill。题目写入仍须先
-dry-run，临时 AI 交换文件写入 `build/ai/`，生成的试卷定义写入
-`papers/generated/`，最终产物写入 `exports/`。
-
-### MCP 状态
-
-0.1.0 不实现 MCP Server。业务逻辑位于独立 service layer，未来可用同一服务实现
-`qbank mcp`，并通过以下方式注册本地 STDIO 服务：
-
-```powershell
-codex mcp add qbank -- qbank mcp
-```
-
-该命令只是未来边界说明，当前版本不要执行。
-
-## AI 工作流
-
-读取机器可用 Schema：
-
-```powershell
-qbank schema --format json
-qbank schema --kind paper --format json
-qbank schema --kind patch --format json
-qbank schema --kind asset-package --format json
-```
-
-## 逻辑资产与 Ipe 工作包
-
-题目 Markdown 仍是唯一的题目正文权威来源，但现在可以引用稳定逻辑资产 ID，
-例如 `asset:question-figure` 或固定 representation `asset:question-figure#render-svg`。
-每个逻辑资产由 `assets/<QUESTION_ID>/<ASSET_ID>/asset.yaml` 描述，并可以同时保留
-原始参考图、Base64 解码文件、远程 URL、PDF 裁剪元数据、TikZ、可编辑 Ipe 与
-PDF/SVG/PNG 渲染版本。旧的 `assets/...` 字符串路径仍可读取；确认后可使用
-`qbank asset normalize` 将带有已保存来源关系的旧引用迁移为逻辑 ID。
-
-电子化项目只输出 `asset-package.json`，qbank 负责规范化、哈希、复制、生命周期、
-选择和历史记录。导入前先执行演练，随后执行真实写入：
-
-```powershell
-qbank asset ingest DEMO-GEO-0001 .\asset-package.json --dry-run --format json
-qbank asset ingest DEMO-GEO-0001 .\asset-package.json --format json
-qbank asset validate --format json
-qbank asset show DEMO-GEO-0001 figure-1 --format json
-```
-
-可直接添加本地文件、Base64/data URI、内联 TikZ、HTTP(S) URL、PDF 页/裁剪元数据和
-Ipe 文件。`replace` 永远新增哈希版本，绝不覆盖旧表示；`render` 只通过已发现或已配置
-的 Ipe 可执行文件生成 PDF/SVG/PNG，并且失败不会报告为成功。
-
-```powershell
-qbank asset edit DEMO-GEO-0001 figure-1 --dry-run --format json
-qbank asset render DEMO-GEO-0001 figure-1 --dry-run --format json
-qbank asset render DEMO-GEO-0001 figure-1 --format json
-qbank asset set-render DEMO-GEO-0001 figure-1 render-svg-<hash> --format json
-qbank asset finalize DEMO-GEO-0001 figure-1 --format json
-```
-
-`assets.editors.ipe.command`、`assets.renderers.ipe.iperender` 与
-`assets.renderers.ipe.ipetoipe` 可指定 Windows Ipe 路径；未配置时会在 PATH 和常见
-Ipe 安装目录中发现。Ipe、系统打开和文本编辑器都只接受已登记、受题库
-containment 校验的 representation，绝不把网页或 CLI 输入作为 shell 命令执行。
-
-运行 `qbank preview --serve` 会先构建静态预览，再仅绑定 `127.0.0.1` 的资产管理页。
-该页显示原始图、当前预览、所有表示、来源、状态和衍生关系；按钮通过带本地随机令牌与
-same-origin 校验的 HTTP API 调用 qbank 服务，实际执行打开、编辑、重新渲染、替换、选择
-和定稿。静态 `qbank preview` 页面不伪装这些本地操作按钮。
-
-试卷构建只复制最终渲染正文实际引用的资源：学生版不会把仅出现在答案或解析中的图形
-列入产物资源清单，答案版则会按其可见内容补齐这些资源。
-
-添加一题（JSON 字段与 `qbank get ID --format json` 对称）：
-
-```powershell
-Get-Content .\question.json -Raw -Encoding utf8 |
-  qbank add --stdin --format json
-```
-
-先验证再批量导入 JSONL。默认全批预检；任何记录失败时不会写入部分结果：
-
-```powershell
-qbank ingest ..\examples\questions.jsonl --dry-run --format json
-qbank ingest ..\examples\questions.jsonl --format json
-qbank ingest .\updates.jsonl --upsert --format json
-qbank ingest .\mixed.jsonl --continue-on-error --format json
-```
-
-JSONL 按物理行独立解析，结果包含 `line` 和 `skipped`。默认任何一行失败都会零写入；
-`--continue-on-error` 才会跳过坏行并以一个事务写入其余有效记录。
-
-查询和全文搜索：
-
-```powershell
-qbank query `
-  --subject optics `
-  --topic interferometry `
-  --difficulty-min 1 `
-  --difficulty-max 3 `
-  --status reviewed `
-  --fields id,title,type,difficulty,topics `
-  --format json
-
-qbank search "Michelson 光程差" --format json
-qbank get OPT-INT-0001 --format json
-```
-
-多个 `--topic` 默认是 AND；用 `--topic-mode or` 改为 OR。
-`--exclude-topic` 可排除包含某标签的题目，`--search`、`--year` 可与其他字段同时使用。
-
-题库级标签和查询视图：
-
-```powershell
-qbank tag list --format json
-qbank tag normalize --dry-run --format json
-qbank tag normalize --format json
-qbank tag rename old-slug canonical-slug --dry-run --format json
-qbank tag merge alias-slug canonical-slug --dry-run --format json
-qbank tag stats --format json
-qbank tag cooccur --top-n 12 --format json
-
-qbank view save optics-review --subject optics --topic interference `
-  --exclude-topic deprecated-concept --dry-run --format json
-qbank view save optics-review --subject optics --topic interference `
-  --exclude-topic deprecated-concept --format json
-qbank view apply optics-review --format json
-```
-
-所有 `tag` 写操作先计算完整题目 diff，并把 taxonomy、Markdown 和历史作为一个原子提交
-单元；索引随后批量更新。标签合并会把旧名称保留为目标标签的别名。所有 `view` 写操作也
-支持 `--dry-run --format json`。
-
-结构化修改先 dry-run，再正式写入：
-
-```powershell
-Get-Content ..\examples\patch.json -Raw -Encoding utf8 |
-  qbank patch OPT-INT-0001 --stdin --dry-run
-
-Get-Content ..\examples\patch.json -Raw -Encoding utf8 |
-  qbank patch OPT-INT-0001 --stdin
-```
-
-Patch 不能修改 ID、时间戳或未知字段；修改后会重新经过完整校验。
-
-## 组卷
-
-AI 只需按 `schemas/paper.schema.json` 生成 `paper.yaml`，列出分区、题目 ID 和分值。
-先验证，再构建学生版或答案版：
-
-```powershell
-qbank paper validate papers\demo-paper.yaml --format json
-qbank paper build papers\demo-paper.yaml --format md
-qbank paper build papers\demo-paper.yaml --format html
-qbank paper build papers\demo-paper.yaml --format md --with-solutions `
-  --output build\demo-paper-solutions.md
-```
-
-`--with-solutions` 会自动包含答案。成对参数
-`--with-answers/--without-answers`、`--with-solutions/--without-solutions`、
-`--with-rubric/--without-rubric` 和 `--show-ids/--hide-ids` 可双向覆盖
-`paper.yaml` 的默认选项。HTML/Markdown 输出会复制所需 assets。
-
-DOCX 由系统 Pandoc 生成：
-
-```powershell
-qbank paper build papers\demo-paper.yaml --format docx
-```
-
-如果 Pandoc 不存在，Markdown 和 HTML 不受影响；DOCX 命令返回清晰错误和退出码 7，
-`qbank doctor` 返回 WARN。可将自定义 Pandoc reference DOCX 放到
-`templates/reference.docx`；文件缺失时使用 Pandoc 默认样式。
-
-## 普通导出与预览
-
-普通导出处理筛选结果，不包含试卷分区或分值：
-
-```powershell
-qbank export --subject optics --status reviewed --format jsonl `
-  --output exports\optics-reviewed.jsonl
-```
-
-支持 `json`、`jsonl`、`md`、`html` 和 `txt`。纯文本导出通过统一导出器注册表实现；
-静态预览无需服务器：
-
-```powershell
-qbank preview
-Start-Process build\preview\index.html
-qbank preview --serve
-```
-
-预览支持前端全文搜索及 subject、type、status、difficulty 筛选，答案与解析默认折叠。
-
-## 命令速查
-
-| 命令 | 用途 |
+| 文档 | 内容 |
 | --- | --- |
-| `qbank init [DIR]` | 初始化题库 |
-| `qbank status` | 数量、状态、题型和索引摘要 |
-| `qbank doctor` | 环境与完整性诊断 |
-| `qbank schema [--kind question\|paper\|patch\|asset\|asset-package]` | 输出 JSON Schema |
-| `qbank add` / `qbank ingest` | 单题或 JSONL 批量导入 |
-| `qbank validate [ID] [--changed]` | 校验题库 |
-| `qbank list` / `get` / `query` | 读取和筛选 |
-| `qbank tag list/show/stats/cooccur` | 读取标签注册表、频次与共现投影 |
-| `qbank tag rename/merge/delete/normalize` | dry-run 后原子维护标签及题目关系 |
-| `qbank view list/save/apply/rename/delete` | 保存和恢复组合筛选 |
-| `qbank search` | SQLite FTS5 全文搜索 |
-| `qbank patch` / `delete` | 结构化修改或删除 |
-| `qbank index rebuild` | 完整重建索引 |
-| `qbank preview` | 生成静态浏览页 |
-| `qbank asset list\|show\|ingest\|add\|open\|edit\|render\|replace\|set-render\|set-editor\|finalize\|normalize\|validate` | 管理多表示逻辑资产 |
-| `qbank export` | 导出查询结果 |
-| `qbank paper validate` / `build` | 校验和构建试卷 |
-| `qbank codex check` / `instructions` | 检查并输出 Codex 仓库规则 |
-| `qbank codex install-skill` | 预览、安装或更新项目级/用户级 qbank Skill |
+| [用户指南](docs/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
+| [Studio 用户文档](docs/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
+| [Codex 接入指南](docs/codex-integration.md) | 仓库级 Skill、用户级 Skill 和 Codex CLI |
+| [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
+| [兼容性策略](docs/compatibility-policy.md) | 0.1.x 公共行为与变更规则 |
+| [代码审查指南](docs/code_review.md) | 质量门、依赖边界和审查要求 |
+| [Studio 设计系统](docs/ui/design-system.md) | 主题、控件状态、可访问性和截图验收 |
 
-所有命令都有 `--help`。面向自动化的命令提供 `--format json` 或 JSONL 输出；正式结果
-写 stdout，诊断写 stderr。
-
-## 退出码
-
-| 代码 | 含义 |
-| ---: | --- |
-| 0 | 成功 |
-| 1 | 一般错误或项目不存在 |
-| 2 | CLI 参数错误 |
-| 3 | 数据、题目或试卷校验失败 |
-| 4 | 题目不存在 |
-| 5 | 冲突或重复 ID |
-| 6 | 导出失败 |
-| 7 | Pandoc 等外部依赖缺失 |
+所有命令均提供 `--help`。自动化命令的正式结果写入 stdout，诊断信息写入 stderr；需要机器
+读取时使用 `--format json`。
 
 ## 当前限制
 
-- 0.1.0 是私有冻结基线，尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和
-  已记录的 JSON 字段按兼容策略维护。
-- LaTeX 只做定界符、美元符号和花括号的轻量检查，不执行 TeX 编译。
-- 单选/多选答案检查识别常见的 `A.`、`B)` 等标签，不试图理解任意自然语言答案。
-- HTML 预览使用 CDN MathJax；离线时不渲染公式。
-- Markdown 与历史记录作为一个可回滚的权威提交单元；索引更新发生在其后。索引失败
-  不撤销源文件，而会写入 `.qbank/index.dirty`，由 `status`/`doctor` 报告，成功执行
-  `qbank index rebuild` 后清除。
-- `--changed` 依赖可用的 Git 工作区；否则安全地回退为全量校验。
+- `0.1.0` 尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和已记录 JSON 字段按
+  兼容性策略维护。
+- LaTeX 只执行轻量结构检查，不进行 TeX 编译。
+- HTML 预览使用 MathJax CDN；完全离线时公式显示 TeX 源文本。
+- `--changed` 依赖可用的 Git 工作区，否则安全回退为全量校验。
+- qbank 不实现 MCP Server、在线考试服务、OCR 或自动选题算法。
 
 ## 许可证
 
-qbank 以 [MIT License](LICENSE) 发布。嵌入 Studio 的第三方前端资源及其许可信息列于
-`src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md`。公开仓库前应运行仓库级
-`$oss-readiness`，逐项确认依赖、图片、字体、示例数据和构建归档的再分发依据。
+qbank 以 [MIT License](LICENSE) 发布。Studio 内嵌第三方前端资源及其许可信息列于
+[`THIRD_PARTY_NOTICES.md`](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md)。

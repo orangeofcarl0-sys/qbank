@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -28,7 +29,7 @@ def _parse_options() -> CaptureOptions:
     parser.add_argument("--scale", choices=("1", "1.25"), default="1")
     parser.add_argument(
         "--state",
-        choices=("main", "selection", "manager", "overview", "preferences"),
+        choices=("main", "assets", "selection", "manager", "overview", "preferences"),
         default="main",
     )
     parser.add_argument("--tab", type=int, choices=range(4), default=0)
@@ -53,53 +54,72 @@ def main() -> int:
 def _run(options: CaptureOptions) -> int:
     """Build the real Studio process after Qt scaling has been configured."""
 
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QSettings, QTimer
     from PySide6.QtWidgets import QApplication, QWidget
 
     from qbank.bootstrap import create_project_services
     from qbank.context import ProjectContext
     from qbank.desktop.controller import DesktopController, InteractiveRenderer
     from qbank.desktop.main_window import DesktopMainWindow
+    from qbank.desktop.preferences_dialog import StudioPreferences, save_studio_preferences
     from qbank.presentation.studio.design.palette import ThemeName
     from qbank.presentation.studio.design.stylesheet import apply_theme
 
-    project = options.project.resolve()
-    context = ProjectContext.from_root(project)
-    services = create_project_services(context)
-    application = cast(QApplication, QApplication.instance() or QApplication(sys.argv))
-    application.setApplicationName("qbank Studio UI Audit")
-    theme = cast(ThemeName, options.theme)
-    apply_theme(application, theme)
-    controller = DesktopController(
-        context,
-        services,
-        cast(InteractiveRenderer, services.renderer),
-    )
-    window = DesktopMainWindow(controller, theme)
-    window.resize(1680, 1020)
-    window.show()
-    capture_target: list[QWidget] = [window]
-
-    def configure_state() -> None:
-        capture_target[0] = _show_state(
-            window,
-            controller,
-            theme,
-            options.state,
-            options.tab,
+    with tempfile.TemporaryDirectory(prefix="qbank-ui-settings-") as settings_dir:
+        QSettings.setDefaultFormat(QSettings.Format.IniFormat)
+        QSettings.setPath(
+            QSettings.Format.IniFormat,
+            QSettings.Scope.UserScope,
+            settings_dir,
         )
+        project = options.project.resolve()
+        context = ProjectContext.from_root(project)
+        services = create_project_services(context)
+        application = cast(QApplication, QApplication.instance() or QApplication(sys.argv))
+        theme = cast(ThemeName, options.theme)
+        save_studio_preferences(
+            StudioPreferences(
+                theme=theme,
+                workspace_mode="split",
+                show_detail_drawer=True,
+                show_project_path=False,
+            )
+        )
+        apply_theme(application, theme)
+        controller = DesktopController(
+            context,
+            services,
+            cast(InteractiveRenderer, services.renderer),
+        )
+        window = DesktopMainWindow(controller, theme)
+        window.resize(1680, 1020)
+        window.show()
+        capture_target: list[QWidget] = [window]
 
-    def capture() -> None:
-        options.capture.parent.mkdir(parents=True, exist_ok=True)
-        capture_target[0].grab().save(str(options.capture), "PNG")
-        if capture_target[0] is not window:
-            capture_target[0].close()
-        window.close()
-        application.quit()
+        def configure_state() -> None:
+            capture_target[0] = _show_state(
+                window,
+                controller,
+                theme,
+                options.state,
+                options.tab,
+            )
 
-    QTimer.singleShot(1200, configure_state)
-    QTimer.singleShot(4800, capture)
-    return application.exec()
+        def capture() -> None:
+            if window.project_path.text():
+                raise RuntimeError("deterministic capture exposed the project path")
+            options.capture.parent.mkdir(parents=True, exist_ok=True)
+            pixmap = capture_target[0].grab()
+            if pixmap.isNull() or not pixmap.save(str(options.capture), "PNG"):
+                raise RuntimeError(f"failed to save UI capture: {options.capture}")
+            if capture_target[0] is not window:
+                capture_target[0].close()
+            window.close()
+            application.quit()
+
+        QTimer.singleShot(1200, configure_state)
+        QTimer.singleShot(4800, capture)
+        return application.exec()
 
 
 def _show_state(
@@ -118,6 +138,9 @@ def _show_state(
     if state == "selection":
         for row in range(min(2, window.navigation.questions.count())):
             window.navigation.questions.item(row).setSelected(True)
+        return window
+    if state == "assets":
+        window.drawer.tabs.setCurrentIndex(1)
         return window
     if state == "main":
         window.navigation.filters_toggle.setChecked(True)

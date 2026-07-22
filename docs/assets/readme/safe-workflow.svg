@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" role="img" aria-labelledby="title desc">
+  <title id="title">qbank 安全写入流程</title>
+  <desc id="desc">从检查项目、读取 Schema、执行 dry-run、正式提交到完整校验；索引同步失败时写入 dirty marker，并通过显式重建恢复。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6686a3"/>
+    </marker>
+    <style>
+      .canvas{fill:#f7f6f2}.step{fill:#fff;stroke:#c7d0d8;stroke-width:2}.write{fill:#e8f0f7;stroke:#6f91af;stroke-width:2}.ok{fill:#edf5ef;stroke:#71927b;stroke-width:2}.warn{fill:#fff4df;stroke:#b58a45;stroke-width:2}.title{fill:#26323c;font:700 28px 'Segoe UI',sans-serif}.heading{fill:#26323c;font:600 18px 'Segoe UI',sans-serif}.body{fill:#52616e;font:14px 'Segoe UI',sans-serif}.number{fill:#fff;font:700 15px 'Segoe UI',sans-serif}.badge{fill:#6686a3}.arrow{stroke:#6686a3;stroke-width:3;fill:none;marker-end:url(#arrow)}.warnline{stroke:#b58a45;stroke-width:3;fill:none;stroke-dasharray:7 6;marker-end:url(#arrow)}
+      @media (prefers-color-scheme:dark){.canvas{fill:#20252b}.step{fill:#292f36;stroke:#46515c}.write{fill:#263c50;stroke:#6f91af}.ok{fill:#27382d;stroke:#71927b}.warn{fill:#3b3323;stroke:#b58a45}.title,.heading{fill:#eef2f5}.body{fill:#c4cdd5}}
+    </style>
+  </defs>
+  <rect class="canvas" width="1200" height="660" rx="18"/>
+  <text class="title" x="55" y="60">先预演，再提交，最后验证</text>
+  <text class="body" x="55" y="88">题目、标签、视图和资产写入使用相同的确定性安全流程。</text>
+
+  <g transform="translate(55 140)">
+    <rect class="step" width="170" height="120" rx="10"/>
+    <circle class="badge" cx="28" cy="28" r="16"/><text class="number" x="23" y="34">1</text>
+    <text class="heading" x="22" y="66">检查项目</text>
+    <text class="body" x="22" y="91">doctor / status</text>
+  </g>
+  <path class="arrow" d="M 225 200 H 265"/>
+  <g transform="translate(265 140)">
+    <rect class="step" width="170" height="120" rx="10"/>
+    <circle class="badge" cx="28" cy="28" r="16"/><text class="number" x="23" y="34">2</text>
+    <text class="heading" x="22" y="66">读取 Schema</text>
+    <text class="body" x="22" y="91">确认输入契约</text>
+  </g>
+  <path class="arrow" d="M 435 200 H 475"/>
+  <g transform="translate(475 140)">
+    <rect class="step" width="170" height="120" rx="10"/>
+    <circle class="badge" cx="28" cy="28" r="16"/><text class="number" x="23" y="34">3</text>
+    <text class="heading" x="22" y="66">执行 dry-run</text>
+    <text class="body" x="22" y="91">检查错误与完整 diff</text>
+  </g>
+  <path class="arrow" d="M 645 200 H 685"/>
+  <g transform="translate(685 140)">
+    <rect class="write" width="170" height="120" rx="10"/>
+    <circle class="badge" cx="28" cy="28" r="16"/><text class="number" x="23" y="34">4</text>
+    <text class="heading" x="22" y="66">权威提交</text>
+    <text class="body" x="22" y="91">Markdown + history</text>
+  </g>
+  <path class="arrow" d="M 855 200 H 895"/>
+  <g transform="translate(895 140)">
+    <rect class="ok" width="250" height="120" rx="10"/>
+    <circle class="badge" cx="28" cy="28" r="16"/><text class="number" x="23" y="34">5</text>
+    <text class="heading" x="22" y="66">完整校验</text>
+    <text class="body" x="22" y="91">validate --format json</text>
+  </g>
+
+  <path class="warnline" d="M 560 260 V 330 H 350"/>
+  <rect class="warn" x="55" y="310" width="295" height="105" rx="10"/>
+  <text class="heading" x="80" y="350">预演不通过</text>
+  <text class="body" x="80" y="377">修正交换文件或人工修复损坏源，</text>
+  <text class="body" x="80" y="399">保持零权威写入后重新预演。</text>
+  <path class="arrow" d="M 202 310 V 285 H 560 V 270"/>
+
+  <path class="arrow" d="M 770 260 V 470 H 895"/>
+  <rect class="step" x="895" y="435" width="250" height="105" rx="10"/>
+  <text class="heading" x="920" y="475">同步搜索索引</text>
+  <text class="body" x="920" y="502">权威提交成功后执行</text>
+  <path class="arrow" d="M 1020 540 V 590 H 760"/>
+  <rect class="ok" x="510" y="555" width="250" height="75" rx="10"/>
+  <text class="heading" x="535" y="585">流程完成</text>
+  <text class="body" x="535" y="609">JSON 结果保持可解析</text>
+
+  <path class="warnline" d="M 895 487 H 650"/>
+  <rect class="warn" x="310" y="445" width="340" height="85" rx="10"/>
+  <text class="heading" x="335" y="477">索引同步失败</text>
+  <text class="body" x="335" y="503">保留 Markdown，写入 index.dirty</text>
+  <path class="arrow" d="M 480 530 V 555"/>
+  <text class="body" x="235" y="608">恢复：qbank index rebuild --format json</text>
+</svg>
