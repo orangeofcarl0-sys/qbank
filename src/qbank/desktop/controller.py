@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 from qbank.application.service import question_matches
 from qbank.asset_references import AssetKind, classify_resource_uri, extract_image_resources
@@ -17,6 +17,7 @@ from qbank.assets import (
 )
 from qbank.bootstrap import ProjectServices
 from qbank.context import ProjectContext
+from qbank.desktop.state import PaperContext
 from qbank.errors import DataValidationError
 from qbank.markdown_codec import parse_sections
 from qbank.models import (
@@ -31,6 +32,7 @@ from qbank.models import (
     AssetRenderResult,
     AssetStatus,
     DesktopAssetItem,
+    DesktopHistoryEntry,
     DesktopNavigationData,
     DesktopPreviewResult,
     DesktopQuestionDocument,
@@ -38,6 +40,8 @@ from qbank.models import (
     DesktopQuestionSummary,
     Diagnostic,
     DiagnosticCode,
+    Paper,
+    PaperBuildRequest,
     PatchQuestionResult,
     QueryFilters,
     Question,
@@ -48,14 +52,23 @@ from qbank.models import (
     TagUsage,
     TaxonomyTag,
 )
-from qbank.papers import load_paper
 from qbank.presentation.studio.design.palette import ThemeName
 from qbank.presentation.studio.design.web_theme import css_variables
 from qbank.question_layout import QUESTION_SECTIONS
 
 DesktopView = str
 _DESKTOP_METADATA_FIELDS = frozenset(
-    {"title", "type", "subject", "chapter", "topics", "difficulty", "status", "language"}
+    {
+        "title",
+        "type",
+        "subject",
+        "chapter",
+        "topics",
+        "difficulty",
+        "status",
+        "language",
+        "source",
+    }
 )
 _FORMAT_BY_SUFFIX = {
     ".png": AssetFormat.PNG,
@@ -114,7 +127,18 @@ class DesktopController:
         self.services = services
         self.renderer = renderer
         self.assets = AssetService(context, services.assets)
-        self.current_paper_ids: tuple[str, ...] = ()
+        self.paper_context = PaperContext()
+        self._question_cache: tuple[Question, ...] | None = None
+        self._redraw_cache: frozenset[str] | None = None
+
+    @property
+    def current_paper_ids(self) -> tuple[str, ...]:
+        """Compatibility projection for special saved-view membership."""
+        return self.paper_context.question_ids
+
+    @current_paper_ids.setter
+    def current_paper_ids(self, values: tuple[str, ...]) -> None:
+        self.paper_context = PaperContext(path=self.paper_context.path, question_ids=values)
 
     def list_questions(
         self,
@@ -134,10 +158,14 @@ class DesktopController:
         search: str = "",
         filters: QueryFilters | None = None,
     ) -> DesktopQuestionListResult:
-        """Return question rows and tag counts from the exact same result set."""
+        """Return rows plus tag counts computed without self-filter disappearance."""
         questions, redraw_ids = self._filtered_questions(view, search, filters)
-        counts = Counter(topic for question in questions for topic in set(question.topics))
+        active = filters or QueryFilters(text=search or None, limit=100_000)
+        facet_filters = active.model_copy(update={"topics": [], "excluded_topics": []})
+        facet_questions, _ = self._filtered_questions(view, search, facet_filters)
+        counts = Counter(topic for question in facet_questions for topic in set(question.topics))
         metadata = self.services.tags.registry().by_slug()
+        slugs = set(counts) | set(active.topics) | set(active.excluded_topics)
         tags = [
             TagUsage(
                 slug=slug,
@@ -145,7 +173,8 @@ class DesktopController:
                 registered=slug in metadata,
                 metadata=metadata.get(slug),
             )
-            for slug, count in sorted(counts.items())
+            for slug in sorted(slugs)
+            for count in (counts.get(slug, 0),)
         ]
         return DesktopQuestionListResult(
             rows=[self._summary(question, redraw_ids) for question in questions],
@@ -159,7 +188,7 @@ class DesktopController:
         search: str,
         filters: QueryFilters | None,
     ) -> tuple[list[Question], set[str]]:
-        questions = self.services.questions.query_questions(QueryFilters(limit=100_000))
+        questions = list(self._questions())
         redraw_ids = self._redraw_question_ids()
         view_name = "current_paper" if view == "paper" else view
         definition = self.services.views.resolve(view_name)
@@ -169,18 +198,27 @@ class DesktopController:
         elif definition.kind.value == "current_paper":
             visible_ids = set(self.current_paper_ids)
         active = filters or QueryFilters(text=search or None, limit=100_000)
+        saved_filter = definition.filters if filters is None else None
+        search_ids: set[str] | None = None
+        if active.text is not None:
+            search_ids = {
+                hit.id
+                for hit in self.services.questions.search_projection(active.text, limit=100_000)
+            }
+            active = active.model_copy(update={"text": None})
         matches = [
             question
             for question in questions
-            if question_matches(question, definition.filters)
+            if (saved_filter is None or question_matches(question, saved_filter))
             and (visible_ids is None or question.id in visible_ids)
+            and (search_ids is None or question.id in search_ids)
             and question_matches(question, active)
         ]
         return matches, redraw_ids
 
     def navigation_data(self) -> DesktopNavigationData:
         """Return current saved views and deterministic facet choices."""
-        questions = self.services.questions.query_questions(QueryFilters(limit=100_000))
+        questions = list(self._questions())
         years = sorted(
             {
                 int(question.created_at[:4])
@@ -193,9 +231,11 @@ class DesktopController:
             tags=self.services.tags.list_tags(),
             statuses=sorted({question.status.value for question in questions}),
             question_types=sorted({question.type.value for question in questions}),
+            subjects=sorted({question.subject for question in questions}),
             chapters=sorted(
                 {question.chapter for question in questions if question.chapter is not None}
             ),
+            languages=sorted({question.language for question in questions}),
             years=years,
         )
 
@@ -238,29 +278,43 @@ class DesktopController:
         dry_run: bool = False,
     ) -> TagMutationResult:
         """Apply a multi-selection topic edit through one atomic use case."""
-        return self.services.tags.bulk_edit(
+        result = self.services.tags.bulk_edit(
             question_ids,
             add=add or [],
             remove=remove or [],
             dry_run=dry_run,
             command="qbank desktop bulk tags",
         )
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
 
     def rename_tag(self, old: str, new: str, *, dry_run: bool = False) -> TagMutationResult:
         """Plan or commit a global tag rename."""
-        return self.services.tags.rename(
+        result = self.services.tags.rename(
             old, new, dry_run=dry_run, command="qbank desktop tag rename"
         )
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
 
     def merge_tag(self, source: str, target: str, *, dry_run: bool = False) -> TagMutationResult:
         """Plan or commit a global tag merge."""
-        return self.services.tags.merge(
+        result = self.services.tags.merge(
             source, target, dry_run=dry_run, command="qbank desktop tag merge"
         )
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
 
     def delete_tag(self, slug: str, *, dry_run: bool = False) -> TagMutationResult:
         """Plan or commit a global tag deletion."""
-        return self.services.tags.delete(slug, dry_run=dry_run, command="qbank desktop tag delete")
+        result = self.services.tags.delete(
+            slug, dry_run=dry_run, command="qbank desktop tag delete"
+        )
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
 
     def update_tag(self, tag: TaxonomyTag, *, dry_run: bool = False) -> TagMutationResult:
         """Plan or commit tag display metadata changes."""
@@ -276,13 +330,14 @@ class DesktopController:
         """Load one editable body plus assets and asset history."""
         question = self.services.questions.get_question(question_id)
         assets = self.services.assets.list_assets(question_id).assets
-        history = self.services.assets.history(question_id).events
+        asset_history = self.services.assets.history(question_id).events
+        history = self.services.history.timeline(question_id, asset_history)
         return DesktopQuestionDocument(
             question=question,
             source=question_body_source(question),
             assets=assets,
-            history=history,
-            asset_items=self._desktop_asset_items(question, assets, history),
+            history=cast(list[DesktopHistoryEntry | AssetHistoryEntry], history),
+            asset_items=self._desktop_asset_items(question, assets, asset_history),
         )
 
     def _desktop_asset_items(
@@ -477,28 +532,19 @@ class DesktopController:
     ) -> PatchQuestionResult:
         """Dry-run and then commit one editor buffer through qbank mutations."""
         patch = self._patch(question_id, source, metadata)
-        planned = self.services.questions.patch_question(
+        planned = self.services.studio.save_question(
             question_id,
             patch,
             dry_run=True,
-            command="qbank desktop save",
         )
         if not planned.ok:
             return planned
-        committed = self.services.questions.patch_question(
+        committed = self.services.studio.save_question(
             question_id,
             patch,
             dry_run=False,
-            command="qbank desktop save",
         )
-        if committed.ok:
-            question = self.services.questions.get_question(question_id)
-            pending = self.services.tags.register_pending(
-                question.topics,
-                dry_run=False,
-                command="qbank desktop register pending tags",
-            )
-            committed.warnings.extend(pending.warnings)
+        self.invalidate_repository_cache()
         return committed
 
     def preview_source(
@@ -538,16 +584,88 @@ class DesktopController:
         )
 
     def load_current_paper(self, path: Path | None = None) -> tuple[str, ...]:
-        """Select a paper for the navigation view using qbank's paper loader."""
-        selected = path or _default_paper(self.context.paths.papers)
-        if selected is None:
-            self.current_paper_ids = ()
+        """Select only an explicitly supplied paper for the navigation view."""
+        if path is None:
+            self.paper_context = PaperContext()
             return ()
-        paper = load_paper(selected)
-        self.current_paper_ids = tuple(
-            item.id for section in paper.sections for item in section.questions
+        selected = path.resolve()
+        ids = self.services.studio_project.paper_ids(selected)
+        self.paper_context = PaperContext(path=selected, question_ids=ids)
+        return ids
+
+    def list_papers(self) -> list[Path]:
+        """Return paper definitions without changing the current selection."""
+        return self.services.studio_project.list_papers()
+
+    def project_status(self):
+        """Return read-only project validation and index state for the title bar."""
+        return self.services.studio_project.status()
+
+    def create_question(self, question_id: str, title: str, *, dry_run: bool):
+        """Create a schema-valid draft placeholder through the normal add transaction."""
+        result = self.services.studio_project.create_question(question_id, title, dry_run=dry_run)
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
+
+    def copy_question(self, source_id: str, new_id: str, *, dry_run: bool):
+        """Copy one question as an independently reviewed draft."""
+        result = self.services.studio_project.copy_question(source_id, new_id, dry_run=dry_run)
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
+
+    def import_questions(self, path: Path, *, dry_run: bool):
+        """Import JSON or JSONL through the batch transaction."""
+        result = self.services.studio_project.import_questions(path, dry_run=dry_run)
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
+
+    def delete_question(self, question_id: str, *, dry_run: bool):
+        """Preview or commit an authoritative question deletion."""
+        result = self.services.studio_project.delete_question(question_id, dry_run=dry_run)
+        if not dry_run:
+            self.invalidate_repository_cache()
+        return result
+
+    def create_paper(
+        self,
+        path: Path,
+        title: str,
+        question_ids: list[str],
+        *,
+        dry_run: bool,
+    ) -> Paper:
+        """Create an explicitly named paper from selected questions."""
+        paper = self.services.studio_project.create_paper(
+            path, title, question_ids, dry_run=dry_run
         )
-        return self.current_paper_ids
+        if not dry_run:
+            self.load_current_paper(path)
+        return paper
+
+    def add_to_current_paper(self, question_ids: list[str], *, dry_run: bool) -> Paper:
+        """Add unique questions to the explicitly selected paper."""
+        path = self.paper_context.path
+        if path is None:
+            raise DataValidationError("select or create a paper first")
+        updated = self.services.studio_project.add_to_paper(path, question_ids, dry_run=dry_run)
+        if not dry_run:
+            self.load_current_paper(path)
+        return updated
+
+    def validate_current_paper(self):
+        """Validate the explicitly selected paper."""
+        if self.paper_context.path is None:
+            raise DataValidationError("select or create a paper first")
+        return self.services.studio_project.validate_paper(self.paper_context.path)
+
+    def build_current_paper(self, request: PaperBuildRequest):
+        """Build the explicitly selected paper through the shared renderer."""
+        if self.paper_context.path is None:
+            raise DataValidationError("select or create a paper first")
+        return self.services.studio_project.build_paper(self.paper_context.path, request)
 
     def begin_asset_edit(self, question_id: str, asset_id: str) -> str:
         """Dry-run and open a versioned preferred-editor working copy."""
@@ -777,6 +895,7 @@ class DesktopController:
         )
         if not committed.ok:
             raise DataValidationError("desktop asset declaration failed during commit")
+        self.invalidate_repository_cache()
 
     def set_preferred_render(
         self,
@@ -840,8 +959,10 @@ class DesktopController:
         return Question.model_validate(values)
 
     def _redraw_question_ids(self) -> set[str]:
+        if self._redraw_cache is not None:
+            return set(self._redraw_cache)
         redraw: set[str] = set()
-        for question in self.services.questions.query_questions():
+        for question in self._questions():
             for manifest in self.services.assets.list_assets(question.id).assets:
                 unfinished = manifest.status in {
                     AssetStatus.RAW,
@@ -851,7 +972,20 @@ class DesktopController:
                 }
                 if unfinished or any(item.stale for item in manifest.representations):
                     redraw.add(question.id)
+        self._redraw_cache = frozenset(redraw)
         return redraw
+
+    def _questions(self) -> tuple[Question, ...]:
+        if self._question_cache is None:
+            self._question_cache = tuple(
+                self.services.questions.query_questions(QueryFilters(limit=100_000))
+            )
+        return self._question_cache
+
+    def invalidate_repository_cache(self) -> None:
+        """Invalidate projections after a committed authoritative mutation."""
+        self._question_cache = None
+        self._redraw_cache = None
 
     def _matches_view(
         self,
@@ -1026,10 +1160,3 @@ def _format_from_data_uri(source: str, name: str | None) -> AssetFormat:
 def _representation_id(name: str) -> str:
     value = re.sub(r"[^A-Za-z0-9_.-]+", "-", Path(name).stem).strip("-")
     return value or "desktop-source"
-
-
-def _default_paper(root: Path) -> Path | None:
-    demo = root / "demo-paper.yaml"
-    if demo.is_file():
-        return demo
-    return next(iter(sorted(root.rglob("*.yaml"), key=lambda item: item.as_posix())), None)

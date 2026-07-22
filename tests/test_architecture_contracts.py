@@ -327,6 +327,11 @@ def test_cli_questions_has_no_direct_storage_or_sqlite_imports() -> None:
         assert forbidden not in source
 
 
+def test_cli_usage_uses_only_public_click_apis() -> None:
+    source = (Path(__file__).parents[1] / "src/qbank/cli_usage.py").read_text(encoding="utf-8")
+    assert "typer import _click" not in source
+
+
 def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> None:
     package_root = Path(__file__).parents[1] / "src/qbank"
     presentation_roots = [package_root / "desktop", package_root / "presentation"]
@@ -345,6 +350,21 @@ def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> No
         "index.sqlite",
         ".write_text(",
         ".write_bytes(",
+    ):
+        assert forbidden not in source
+
+
+def test_desktop_controller_delegates_project_workflows() -> None:
+    source = (Path(__file__).parents[1] / "src/qbank/desktop/controller.py").read_text(
+        encoding="utf-8"
+    )
+    for forbidden in (
+        "qbank.application.exchange",
+        "qbank.diagnostics",
+        "qbank.operations",
+        "qbank.papers",
+        "qbank.transaction",
+        "qbank.yaml_io",
     ):
         assert forbidden not in source
 

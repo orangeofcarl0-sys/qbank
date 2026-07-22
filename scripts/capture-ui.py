@@ -26,7 +26,11 @@ def _parse_options() -> CaptureOptions:
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--theme", choices=("light", "dark"), default="light")
     parser.add_argument("--scale", choices=("1", "1.25"), default="1")
-    parser.add_argument("--state", choices=("main", "manager", "overview"), default="main")
+    parser.add_argument(
+        "--state",
+        choices=("main", "selection", "manager", "overview", "preferences"),
+        default="main",
+    )
     parser.add_argument("--tab", type=int, choices=range(4), default=0)
     args = parser.parse_args()
     return CaptureOptions(
@@ -106,16 +110,50 @@ def _show_state(
     tab: int,
 ):
     """Configure one interaction state and return the widget to capture."""
+    from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesDialog
     from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
     from qbank.models import QueryFilters
+    from qbank.presentation.studio.design.palette import ThemeName
 
+    if state == "selection":
+        for row in range(min(2, window.navigation.questions.count())):
+            window.navigation.questions.item(row).setSelected(True)
+        return window
     if state == "main":
         window.navigation.filters_toggle.setChecked(True)
         rows = controller.list_tags()
-        if rows:
-            chosen = sorted(rows, key=lambda item: (-item.count, item.slug))[0].slug
-            window.navigation.set_transient_filters(QueryFilters(topics=[chosen]))
+        if rows and window.current_id is not None:
+            question = controller.load_question(window.current_id).question
+            excluded = next(
+                (row.slug for row in rows if row.slug not in question.topics),
+                None,
+            )
+            window.navigation.set_query_state(
+                "all",
+                QueryFilters(
+                    text=question.title[:4],
+                    topics=question.topics[:1],
+                    excluded_topics=[excluded] if excluded is not None else [],
+                    question_type=question.type,
+                    status=question.status,
+                    difficulty_min=question.difficulty,
+                    difficulty_max=question.difficulty,
+                    chapter=question.chapter,
+                    year=int(question.created_at[:4]) if question.created_at else None,
+                    limit=100_000,
+                ),
+            )
         return window
+    if state == "preferences":
+        dialog = StudioPreferencesDialog(
+            StudioPreferences(theme=cast(ThemeName, theme)),
+            cast(ThemeName, theme),
+            window,
+        )
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        return dialog
     dialog_type = TagManagerDialog if state == "manager" else TagOverviewDialog
     dialog = dialog_type(controller, theme, window)
     if isinstance(dialog, TagOverviewDialog):

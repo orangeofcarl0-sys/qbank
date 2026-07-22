@@ -61,3 +61,36 @@ id,title,subject,chapter,topics,type,difficulty,status
 
 Codex selects and orders questions. qbank performs deterministic validation and rendering;
 do not implement or assume an automatic selection algorithm.
+
+## E. Manage logical assets
+
+1. Run `qbank schema --kind asset-package --format json`.
+2. Inspect the current asset with `qbank asset show <question-id> <asset-id> --format json`.
+3. Generate the package under `build/ai/`.
+4. Run `qbank asset ingest <question-id> build/ai/<asset>.json --dry-run --format json`.
+5. Inspect every representation and warning.
+6. Apply the same package without `--dry-run`.
+7. Run `qbank asset validate --format json`.
+
+Keep local representations inside the configured assets directory. Do not automatically
+download external resources or launch an editor.
+
+## F. Manage tags and saved views
+
+1. Inspect `qbank tag list --format json`, `qbank tag stats --format json`, and
+   `qbank view list --format json`.
+2. Preview the complete question and taxonomy diff with
+   `qbank tag rename <old> <new> --dry-run --format json` or the corresponding operation.
+3. Apply only the inspected change.
+4. Run `qbank validate --format json`.
+
+Saved views affect query results only. Never infer a taxonomy rename from spelling alone.
+
+## G. Explicit maintenance
+
+- Run `qbank index rebuild --format json` only when the index is reported unavailable,
+  dirty, corrupt, or stale.
+- Delete only an exact user-confirmed ID, starting with
+  `qbank delete <id> --dry-run --format json`.
+- `qbank preview --serve` and `qbank desktop` are blocking interactive commands. Do not
+  launch them unless the user explicitly asks for an interactive session.

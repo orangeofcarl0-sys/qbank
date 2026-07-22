@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import partial
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -17,12 +18,16 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesForm
+from qbank.desktop.question_dialog import QuestionIdentityForm
 from qbank.desktop.widgets import (
     InspectorSummary,
     MetadataPanel,
@@ -35,6 +40,8 @@ from qbank.models import (
     DesktopQuestionSummary,
     QueryFilters,
     Question,
+    QuestionStatus,
+    QuestionType,
     SavedView,
     TagStatus,
     TagUsage,
@@ -103,7 +110,7 @@ class StudioGallery(QMainWindow):
         row.addStretch()
         layout.addLayout(row)
         search = QLineEdit()
-        search.setPlaceholderText("搜索题目、主题或公式")
+        search.setPlaceholderText("搜索题目、标签或公式")
         search.setClearButtonEnabled(True)
         layout.addWidget(search)
         states = QHBoxLayout()
@@ -117,6 +124,10 @@ class StudioGallery(QMainWindow):
             states.addWidget(label)
         states.addStretch()
         layout.addLayout(states)
+        layout.addWidget(self._project_context_prototype())
+        layout.addWidget(self._selection_prototype())
+        layout.addWidget(self._question_identity_prototype())
+        layout.addWidget(self._preferences_prototype())
         fields = QHBoxLayout()
         combo = ModernComboBox(self.theme_name)
         combo.addItems(["draft", "reviewed", "final"])
@@ -131,6 +142,77 @@ class StudioGallery(QMainWindow):
         fields.addWidget(dialog_button)
         fields.addStretch()
         layout.addLayout(fields)
+        return panel
+
+    @staticmethod
+    def _project_context_prototype() -> QFrame:
+        project = QFrame()
+        project.setObjectName("projectContextBar")
+        row = QHBoxLayout(project)
+        row.setContentsMargins(8, 4, 4, 4)
+        row.addWidget(QLabel("demo-bank"))
+        path = QLabel("workspace/demo-bank")
+        path.setObjectName("fieldHint")
+        row.addWidget(path, 1)
+        healthy = QLabel("✓ 校验通过")
+        healthy.setObjectName("statusSuccess")
+        row.addWidget(healthy)
+        index = QLabel("✓ 索引正常")
+        index.setObjectName("statusSuccess")
+        row.addWidget(index)
+        paper = QLabel("试卷：未选择")
+        paper.setObjectName("fieldHint")
+        row.addWidget(paper)
+        return project
+
+    def _selection_prototype(self) -> QFrame:
+        selection = QFrame()
+        selection.setObjectName("selectionBar")
+        row = QHBoxLayout(selection)
+        row.setContentsMargins(8, 4, 4, 4)
+        selected = QLabel("已选择 2 道题 · OPT-INT-0001、OPT-DIF-0001")
+        selected.setObjectName("selectionSummary")
+        selected.setMinimumWidth(0)
+        selected.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        row.addWidget(selected, 1)
+        for icon_name, accessible in (
+            ("add", "为已选择题目添加标签"),
+            ("remove", "从已选择题目移除标签"),
+        ):
+            button = QToolButton()
+            button.setObjectName("selectionAction")
+            button.setText("标签")
+            button.setIcon(icon(icon_name, self.theme_name, semantic="accent"))
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setFixedWidth(68)
+            button.setAccessibleName(accessible)
+            row.addWidget(button)
+        return selection
+
+    @staticmethod
+    def _question_identity_prototype() -> QFrame:
+        panel = QFrame()
+        panel.setObjectName("inspectorSection")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        title = QLabel("新建题目 · 完整身份信息")
+        title.setObjectName("inspectorSectionLabel")
+        layout.addWidget(title)
+        form = QuestionIdentityForm("new", "general", "zh-CN")
+        form.id_input.setText("OPT-NEW-0001")
+        form.title_input.setText("新建题目预览")
+        layout.addWidget(form)
+        return panel
+
+    def _preferences_prototype(self) -> QFrame:
+        panel = QFrame()
+        panel.setObjectName("inspectorSection")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        title = QLabel("Studio 设置 · 次级界面偏好")
+        title.setObjectName("inspectorSectionLabel")
+        layout.addWidget(title)
+        layout.addWidget(StudioPreferencesForm(StudioPreferences(), self.theme_name))
         return panel
 
     def _inspector(self) -> QFrame:
@@ -216,6 +298,21 @@ class StudioGallery(QMainWindow):
                 ),
             ],
             "OPT-INT-0001",
+        )
+        navigation.select_view("图形覆盖待审")
+        navigation.set_transient_filters(
+            QueryFilters(
+                text="干涉",
+                topics=["interference"],
+                excluded_topics=["needs-review"],
+                topic_mode="and",
+                status=QuestionStatus.REVIEWED,
+                question_type=QuestionType.CALCULATION,
+                chapter="interferometry",
+                year=2026,
+                difficulty_min=2,
+                difficulty_max=4,
+            )
         )
         layout.addWidget(navigation)
         return panel

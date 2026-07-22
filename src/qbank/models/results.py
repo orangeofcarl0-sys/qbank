@@ -348,6 +348,18 @@ class AssetHistoryResult(ResultModel):
     events: list[AssetHistoryEntry]
 
 
+class DesktopHistoryEntry(ResultModel):
+    """One normalized question or asset event in the Studio timeline."""
+
+    timestamp: str
+    operation: str
+    question_id: str
+    source: str
+    fields: list[str] = Field(default_factory=list)
+    asset_id: str | None = None
+    changes: list[dict[str, Any]] = Field(default_factory=_change_dict_list)
+
+
 class DesktopQuestionSummary(ResultModel):
     """One lightweight navigation row for the desktop editor."""
 
@@ -399,7 +411,7 @@ class DesktopQuestionDocument(ResultModel):
     question: Question
     source: str
     assets: list[AssetManifest]
-    history: list[AssetHistoryEntry]
+    history: list[DesktopHistoryEntry | AssetHistoryEntry]
     asset_items: list[DesktopAssetItem] = Field(default_factory=_desktop_asset_items)
 
 
@@ -491,6 +503,15 @@ class DoctorReport(ResultModel):
     checks: list[DoctorCheck]
 
 
+class CodexCheckReport(DoctorReport):
+    """Backward-compatible Codex integration readiness report."""
+
+    repository_ready: bool
+    codex_cli_ready: bool
+    degraded: bool
+    integration_revision: int
+
+
 class SearchHit(ResultModel):
     """One full-text search result."""
 
@@ -518,7 +539,9 @@ class DesktopNavigationData(ResultModel):
     tags: list[TagUsage]
     statuses: list[str]
     question_types: list[str]
+    subjects: list[str] = Field(default_factory=list)
     chapters: list[str]
+    languages: list[str] = Field(default_factory=list)
     years: list[int]
 
 
@@ -601,6 +624,33 @@ class IndexHealth(ResultModel):
         return self.state not in {"disabled", "clean"}
 
 
+class CodexWorkflowStep(ResultModel):
+    """One structured Codex workflow step."""
+
+    command: str
+    description: str
+    command_path: list[str] = Field(default_factory=list)
+    writes: bool = False
+    dry_run_required: bool = False
+    explicit_authorization: bool = False
+    interactive: bool = False
+    expected: str = ""
+
+
+class CodexWorkflow(ResultModel):
+    """One structured, bounded Codex workflow."""
+
+    name: str
+    title: str
+    purpose: str
+    preconditions: list[str]
+    steps: list[CodexWorkflowStep]
+
+
+def _codex_workflow_list() -> list[CodexWorkflow]:
+    return []
+
+
 class CodexInstructionsResult(ResultModel):
     """Repository-scoped operating rules exposed to AI clients."""
 
@@ -609,6 +659,21 @@ class CodexInstructionsResult(ResultModel):
     rules: list[str]
     command_sequences: dict[str, list[str]]
     paths: dict[str, str]
+    integration_revision: int = 1
+    workflows: list[CodexWorkflow] = Field(default_factory=_codex_workflow_list)
+
+
+class SkillFileChange(ResultModel):
+    """One deterministic file-level Skill installation difference."""
+
+    path: str
+    action: Literal["add", "modify", "delete"]
+    before_sha256: str | None = None
+    after_sha256: str | None = None
+
+
+def _skill_file_change_list() -> list[SkillFileChange]:
+    return []
 
 
 class SkillInstallResult(ResultModel):
@@ -616,7 +681,10 @@ class SkillInstallResult(ResultModel):
 
     ok: bool
     dry_run: bool
-    action: Literal["plan", "installed", "already_installed"]
+    action: Literal["plan", "installed", "updated", "already_installed"]
     source: str
     destination: str
     files: int
+    scope: Literal["user", "project"] = "user"
+    backup: str | None = None
+    changes: list[SkillFileChange] = Field(default_factory=_skill_file_change_list)

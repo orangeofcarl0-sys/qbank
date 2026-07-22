@@ -1,7 +1,29 @@
 # Changelog
 
-## 0.1.0 - 2026-07-18
+## 0.1.0 - 2026-07-23
 
+- Frozen the first private release baseline and completed the README with explicit product
+  boundaries, Studio/CLI/Codex entry points, installation paths, artifact verification, and
+  compatibility expectations.
+
+- Added repository-scoped OSS readiness, release preparation, approval-gated GitHub publishing,
+  and thin open-source orchestration Skills with deterministic, redacted reports.
+- Added isolated wheel/sdist construction, installed-artifact smoke tests, archive manifests,
+  SHA-256 checksums, release-plan generation, and a fully self-authored public demo bank.
+- Documented public-release safety rules and made all remote repository, push, tag, and Release
+  operations require a reviewed prepare plan plus explicit user confirmation.
+- Made Codex readiness explicit and fast with in-process command discovery, project/user
+  Skill drift checks, structured workflows, and separate repository, CLI, and degraded
+  states while preserving the existing `ok`, checks, and command-sequence fields.
+- Added dry-run-first project and user Skill updates with deterministic file diffs,
+  explicit authorization, atomic replacement, retained backups, JSON output, and rollback
+  that preserves the original commit error.
+- Hardened CLI preflight validation so unsupported output formats are zero-write,
+  accepted UTF-8 BOM exchange files from Windows PowerShell, removed the private
+  Typer API dependency, and normalized optional Qt load failures to exit code 7.
+- Moved Studio question, project-status, and paper workflows behind a typed project
+  port shared with the CLI mutation layer, and split core versus Qt development
+  dependencies so CLI tests remain runnable without a working desktop runtime.
 - Added project-level `taxonomy.yaml` metadata while keeping question Markdown
   `topics` as the sole tag-relation authority, plus persistent `views.yaml` query views.
 - Added atomic `qbank tag` rename, merge, delete, normalize, statistics, and
@@ -14,6 +36,19 @@
   now produce real main-window filters without adding a dashboard or graph database.
 - Added rebuildable SQLite tag-count/co-occurrence projections, alias-safe saved views,
   native synonym confirmation, and themed readable Top-N table headers.
+- Fixed Studio filter clearing and saved-view snapshot semantics so visible chips are
+  authoritative, query transitions refresh once, combined chips wrap in the compact
+  navigation column, and out-of-result open questions are identified explicitly.
+- Added an explicit project and paper context workflow, transactional question
+  create/copy/import/delete actions, editable source provenance, and a unified question
+  and asset history timeline. Studio saves now commit Markdown, pending taxonomy, and
+  history together, while background SQLite searches discard stale generations.
+- Separated the open editor identity from explicit multi-selection, simplified the
+  default navigation surface, completed subject/language and enum facet restoration,
+  and replaced ambiguous tag cycling with accessible include/exclude/clear controls.
+- Slimmed Studio to a fixed-height single-row toolbar with compact project health,
+  paper, syntax, workspace, and editor actions; added a native persistent settings
+  window for theme, default view, detail-drawer, and optional project-path preferences.
 
 - Modernized Studio with centralized light/dark design tokens shared by Qt,
   CodeMirror, and Markdown/MathJax, plus a maintained component gallery and

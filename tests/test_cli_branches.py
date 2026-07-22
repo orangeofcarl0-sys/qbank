@@ -24,6 +24,54 @@ def test_init_human_output_and_conflict(
     assert "managed file conflict" in conflict.stderr
 
 
+def test_invalid_output_format_is_rejected_before_any_mutation(
+    runner: CliRunner,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    question_data: dict[str, Any],
+) -> None:
+    target = tmp_path / "invalid-format-bank"
+    initialized = runner.invoke(app, ["init", str(target), "--format", "yaml"])
+    assert initialized.exit_code == 3
+    assert not target.exists()
+
+    project = tmp_path / "bank"
+    monkeypatch.chdir(tmp_path)
+    assert runner.invoke(app, ["init", str(project), "--format", "json"]).exit_code == 0
+    monkeypatch.chdir(project)
+    added = runner.invoke(
+        app,
+        ["add", "--stdin", "--format", "yaml"],
+        input=json.dumps(question_data, ensure_ascii=False),
+    )
+    assert added.exit_code == 3
+    assert not list((project / "questions").rglob("*.md"))
+
+
+def test_utf8_bom_exchange_files_are_accepted(
+    runner: CliRunner,
+    cli_project: Path,
+    question_data: dict[str, Any],
+) -> None:
+    question_file = cli_project / "question-with-bom.json"
+    question_file.write_text(
+        json.dumps(question_data, ensure_ascii=False),
+        encoding="utf-8-sig",
+    )
+    added = runner.invoke(app, ["add", str(question_file), "--format", "json"])
+    assert added.exit_code == 0, added.output
+
+    patch_file = cli_project / "patch-with-bom.json"
+    patch_file.write_text('{"set":{"difficulty":4}}', encoding="utf-8-sig")
+    patched = runner.invoke(
+        app,
+        ["patch", question_data["id"], "--file", str(patch_file), "--format", "json"],
+    )
+    assert patched.exit_code == 0, patched.output
+    loaded = runner.invoke(app, ["get", question_data["id"], "--format", "json"])
+    assert json.loads(loaded.stdout)["difficulty"] == 4
+
+
 def test_status_and_doctor_table_and_invalid_formats(runner: CliRunner, cli_project: Path) -> None:
     status = runner.invoke(app, ["status"])
     assert status.exit_code == 0

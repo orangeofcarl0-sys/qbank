@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-pytest.importorskip("PySide6")
+pytest.importorskip("PySide6.QtCore")
 
 
 def test_desktop_qt_composition_handles_owned_and_existing_applications(

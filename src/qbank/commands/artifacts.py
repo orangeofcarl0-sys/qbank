@@ -14,6 +14,7 @@ from qbank.cli_support import (
     discover_context,
     emit_json,
     emit_warnings,
+    require_output_format,
     resolve_project_path,
 )
 from qbank.errors import DataValidationError, ExitCode
@@ -37,6 +38,7 @@ def preview_command(
 ) -> None:
     """Build a searchable static preview under build/preview."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         result = build_preview_in_context(
@@ -45,8 +47,6 @@ def preview_command(
             services.renderer,
             services.assets,
         )
-        if output_format not in {"json", "table"}:
-            raise DataValidationError(f"unsupported output format: {output_format}")
         emit_warnings(result, output_format)
         if not serve:
             if output_format == "json":
@@ -132,6 +132,7 @@ def paper_validate_command(
 ) -> None:
     """Validate a paper file against the current question bank."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         paper = load_paper(resolve_project_path(context, paper_file))
@@ -190,6 +191,7 @@ def paper_build_command(
 ) -> None:
     """Build a student or answer paper as Markdown, HTML, or DOCX."""
     try:
+        require_output_format(result_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         request = PaperBuildRequest.model_validate(

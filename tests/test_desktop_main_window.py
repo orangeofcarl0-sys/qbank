@@ -3,25 +3,40 @@
 from __future__ import annotations
 
 import base64
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-pytest.importorskip("PySide6")
+pytest.importorskip("PySide6.QtCore")
 pytest.importorskip("pytestqt")
 
 from PySide6.QtCore import QEvent
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QImage
-from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QInputDialog,
+    QMessageBox,
+    QToolBar,
+)
 from pytestqt.qtbot import QtBot
 
 from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
 from qbank.desktop.controller import DesktopController
 from qbank.desktop.main_window import DesktopMainWindow
-from qbank.models import AssetCapabilities, DesktopAssetItem, QueryFilters, Question
+from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesDialog
+from qbank.desktop.question_dialog import QuestionIdentity, QuestionIdentityDialog
+from qbank.models import (
+    AssetCapabilities,
+    DesktopAssetItem,
+    DesktopQuestionListResult,
+    QueryFilters,
+    Question,
+)
 from qbank.operations import add_question
 from qbank.rendering import RenderService
 
@@ -100,7 +115,7 @@ def test_real_main_window_edit_preview_save_theme_and_navigation(  # noqa: PLR09
     window._render_scheduled_preview()
     window._render_preview(0, question.id)
     window.validate_current()
-    assert dialogs[-1][0] == "校验通过"
+    assert dialogs[-1] == ("校验通过", "0 个校验错误，2 个提示")
     assert window.save_current()
     assert not window.dirty
     assert "changed" in controller.load_question(question.id).source
@@ -129,6 +144,79 @@ def test_real_main_window_edit_preview_save_theme_and_navigation(  # noqa: PLR09
     close = QCloseEvent()
     window.closeEvent(close)
     assert close.isAccepted()
+
+
+def test_main_toolbar_is_compact_and_preferences_apply_immediately(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "qbank.desktop.main_window.load_studio_preferences",
+        lambda theme: StudioPreferences(theme=theme),
+    )
+    window, _controller = _window(project, question, qtbot)
+    toolbars = {toolbar.objectName(): toolbar for toolbar in window.findChildren(QToolBar)}
+
+    assert set(toolbars) >= {"projectToolbar", "editorToolbar"}
+    toolbar_heights = {
+        name: (
+            toolbars[name].minimumHeight(),
+            toolbars[name].height(),
+            toolbars[name].maximumHeight(),
+        )
+        for name in ("projectToolbar", "editorToolbar")
+    }
+    assert all(
+        minimum == height == maximum and height <= 38
+        for minimum, height, maximum in toolbar_heights.values()
+    ), toolbar_heights
+    assert window.language_mode.width() == 124
+    assert window.language_mode.accessibleName() == "编辑器语法"
+    assert "settings" in window._icon_actions
+    assert "theme" not in window._icon_actions
+    assert window.project_path.text() == ""
+    assert window.validation_state.text() in {"✓", "×"}
+    assert window.index_state.text() in {"✓", "△", ""}
+
+    selected = StudioPreferences(
+        theme="dark",
+        workspace_mode="preview",
+        show_detail_drawer=False,
+        show_project_path=True,
+    )
+    saved: list[StudioPreferences] = []
+    opened_with: list[StudioPreferences] = []
+
+    def select_preferences(
+        current: StudioPreferences,
+        parent: object = None,
+    ) -> StudioPreferences | None:
+        del parent
+        opened_with.append(current)
+        return selected if len(opened_with) == 1 else None
+
+    monkeypatch.setattr(
+        StudioPreferencesDialog,
+        "get_preferences",
+        select_preferences,
+    )
+    monkeypatch.setattr("qbank.desktop.main_window.save_studio_preferences", saved.append)
+
+    window._show_preferences()
+
+    assert saved == [selected]
+    assert window.theme_name == "dark"
+    assert window._workspace_mode == "preview"
+    assert not window.workspace.preview.isHidden()
+    assert window.workspace.editor.isHidden()
+    assert window.drawer.isHidden()
+    assert window.project_path.text() == str(project[0])
+
+    window._show_preferences()
+
+    assert opened_with[-1].show_project_path
 
 
 def test_real_main_window_asset_capabilities_dispatch_and_reference_safety(  # noqa: PLR0915
@@ -456,3 +544,166 @@ def test_real_main_window_saved_views_bulk_tags_and_chart_filter(
     window._apply_overview_filter(QueryFilters(topics=["bulk-topic"]))
     assert window.navigation.current_filters().topics == ["bulk-topic"]
     window._tag_metadata_changed()
+
+
+def test_real_main_window_clear_and_overview_each_refresh_once(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    original = controller.navigation_result
+    calls: list[QueryFilters] = []
+
+    def counted_navigation_result(
+        *, view: str, search: str = "", filters: QueryFilters | None = None
+    ):
+        if filters is not None:
+            calls.append(filters)
+        return original(view=view, search=search, filters=filters)
+
+    monkeypatch.setattr(controller, "navigation_result", counted_navigation_result)
+    window.navigation.set_transient_filters(QueryFilters(topics=["missing-topic"], limit=100_000))
+    assert window.navigation.questions.count() == 0
+    calls.clear()
+
+    window.navigation.clear_filter.click()
+
+    assert len(calls) == 1
+    assert window.navigation.questions.count() == 1
+    assert window.navigation.current_filters().topics == []
+    assert not window.navigation.clear_filter.isEnabled()
+    calls.clear()
+
+    window._apply_overview_filter(QueryFilters(topics=[question.topics[0]], limit=100_000))
+
+    assert len(calls) == 1
+    assert window.navigation.current_view() == "all"
+    assert window.navigation.current_filters().topics == [question.topics[0]]
+
+
+def test_rapid_navigation_search_discards_stale_background_result(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    applied: list[int] = []
+
+    def navigation_result(*, view: str, filters: QueryFilters, **_kwargs: object):
+        del view
+        if filters.text == "old":
+            time.sleep(0.05)
+            total = 1
+        else:
+            total = 2
+        return DesktopQuestionListResult(rows=[], tags=[], total=total)
+
+    monkeypatch.setattr(controller, "navigation_result", navigation_result)
+    monkeypatch.setattr(
+        window,
+        "_apply_navigation_result",
+        lambda result: applied.append(result.total),
+    )
+
+    window.navigation.search.setText("old")
+    window.navigation.search_timer.stop()
+    window._start_navigation_search("old")
+    window.navigation.search.setText("new")
+    window.navigation.search_timer.stop()
+    window._start_navigation_search("new")
+
+    qtbot.waitUntil(lambda: applied == [2], timeout=5000)
+    assert 1 not in applied
+    window.close()
+
+
+def test_main_window_new_and_copy_question_use_visible_repository_workflow(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    monkeypatch.setattr(
+        QuestionIdentityDialog,
+        "get_new_question",
+        lambda *_args, **_kwargs: QuestionIdentity("UI-NEW-0001", "UI new question"),
+    )
+
+    window._new_question()
+
+    assert window.current_id == "UI-NEW-0001"
+    assert controller.load_question("UI-NEW-0001").question.title == "UI new question"
+    monkeypatch.setattr(
+        QuestionIdentityDialog,
+        "get_question_copy",
+        lambda *_args, **_kwargs: QuestionIdentity("UI-COPY-0001"),
+    )
+
+    window._copy_current_question()
+
+    copied = controller.load_question("UI-COPY-0001").question
+    assert window.current_id == copied.id
+    assert copied.status.value == "draft"
+    window.close()
+
+
+def test_question_identity_dialog_validates_once_and_uses_localized_actions(
+    qtbot: QtBot,
+) -> None:
+    dialog = QuestionIdentityDialog("new", "general", "zh-CN")
+    qtbot.addWidget(dialog)
+
+    assert not dialog.accept_button.isEnabled()
+    assert dialog.accept_button.text() == "创建"
+    assert dialog.cancel_button.text() == "取消"
+    dialog.form.id_input.setText("bad id")
+    assert dialog.form.feedback.objectName() == "statusError"
+    dialog.form.id_input.setText("OPT-NEW-0001")
+    dialog.form.title_input.setText("新建题目")
+
+    assert dialog.accept_button.isEnabled()
+    assert dialog.form.values() == QuestionIdentity("OPT-NEW-0001", "新建题目")
+    assert "questions/general/OPT-NEW-0001.md" in dialog.form.target.text()
+
+
+def test_loaded_question_updates_navigation_membership_immediately(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+) -> None:
+    window, _controller = _window(project, question, qtbot)
+    window.navigation.set_current_question("NOT-IN-RESULT")
+    assert "当前题目不在筛选结果中" in window.navigation.active_filter.text()
+
+    window._load_question(question.id)
+
+    assert "当前题目不在筛选结果中" not in window.navigation.active_filter.text()
+
+
+def test_paper_menu_disables_context_actions_until_a_paper_is_selected(
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    window._refresh_paper_actions()
+
+    assert window._paper_actions["select"].isEnabled()
+    assert window._paper_actions["new"].isEnabled()
+    assert not window._paper_actions["add"].isEnabled()
+    assert not window._paper_actions["validate"].isEnabled()
+    assert not window._paper_actions["build"].isEnabled()
+    assert not window._paper_actions["export"].isEnabled()
+
+    paper_path = controller.context.paths.papers / "generated" / "ui-paper.yaml"
+    controller.create_paper(paper_path, "UI paper", [question.id], dry_run=True)
+    controller.create_paper(paper_path, "UI paper", [question.id], dry_run=False)
+    window._refresh_paper_state()
+
+    assert all(
+        window._paper_actions[key].isEnabled() for key in ("add", "validate", "build", "export")
+    )

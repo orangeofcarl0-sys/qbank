@@ -6,17 +6,78 @@ YAML front matter 的 Markdown 文件保存；JSON/JSONL 用于 AI 交换；SQLi
 
 它不提供在线考试、用户账号、学习记录、自动判题、OCR、内置 AI 或网络服务。
 
-## 安装与开发
+> **版本状态：** `0.1.0` 是当前冻结的私有基线，要求 Python 3.11 或更高版本。
+> 题目 Markdown 是唯一权威数据；SQLite、预览和导出物均可重建。
 
-需要 Python 3.11 或更高版本。在 Windows PowerShell 中：
+| 使用入口 | 适合场景 | 启动方式 |
+| --- | --- | --- |
+| Studio | 日常浏览、编辑、标签整理和组卷 | `qbank desktop` |
+| CLI | 批处理、校验、导入导出和自动化 | `qbank --help` |
+| Codex Skill | 让 Codex 按同一数据边界协作 | `qbank codex check --format json` |
+
+## 定位与功能
+
+qbank 面向希望将题目长期保存在普通文件、同时让人类与自动化工具共享同一套数据边界的
+个人和小型团队。核心功能包括结构化题目录入与修订、确定性校验、标签与保存视图、全文
+检索、静态预览、Studio 桌面编辑、试卷构建，以及 Markdown、HTML、JSON/JSONL、纯文本
+和 DOCX 导出。Markdown 始终是权威数据，索引与导出物都可重建。
+
+## 快速开始
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
+pip install -e .
+qbank init demo-bank
+Set-Location demo-bank
+qbank doctor --format json
+```
+
+仓库中的 `examples/public-demo/` 是完全自制的最小公开示例，包含一道题和一幅 SVG；它不
+来自真实考试或用户题库。
+
+## 安装与开发
+
+需要 Python 3.11 或更高版本。只使用核心 CLI：
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
 python -m pip install -U pip
-pip install -e ".[dev]"
+pip install .
 qbank --help
 ```
+
+安装 Studio 桌面端：
+
+```powershell
+pip install ".[desktop]"
+qbank desktop
+```
+
+从私有 GitHub Release 下载 wheel 后，可先核对同一 Release 中 `checksums.txt` 的
+SHA-256，再安装：
+
+```powershell
+Get-FileHash .\qbank-0.1.0-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.1.0-py3-none-any.whl
+```
+
+参与开发时安装完整检查工具和 Studio 测试依赖：
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install -e ".[dev,studio-dev]"
+qbank --help
+```
+
+只开发和测试核心 CLI 时可安装 `.[dev]`；`.[studio-dev]` 单独提供 Qt 与
+pytest-qt，使未安装或无法加载 Qt 的环境仍能运行核心测试。
+
+Release 附件中的 wheel 提供核心 CLI；需要 Studio 时还应从受信任的软件源安装
+`PySide6>=6.8,<7` 与 `QtAwesome>=1.4,<2`，或直接从源码使用上面的 `.[desktop]` extra。
 
 Windows PowerShell 5.x 把文本传给原生命令前，请先将管道设为 UTF-8；读取 JSON 时也
 显式指定 UTF-8，避免中文被系统代码页改写：
@@ -133,7 +194,7 @@ dirty marker。`AssetService` 和 `RenderService` 统一资源分类、复制、
 冲突）：
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[desktop]"
 qbank desktop
@@ -148,13 +209,24 @@ qbank desktop
 未选”，并可用 AND/OR 与文本、状态、题型、章节、年份和难度叠加。筛选芯片可单独移除，
 当前组合可保存、重命名或删除；“全部题目”始终保留。题目列表支持多选后批量添加或移除
 标签，写入仍由应用服务执行 dry-run、逐题 diff、原子 Markdown/history 提交和索引同步。
+保存视图是可编辑的筛选快照：选择后全部条件都会显示在控件和可换行芯片中，继续修改会
+标记为“已修改”，不会保留不可见的旧约束；可从视图菜单恢复原快照。清除操作会一次性
+返回“全部题目”并同步刷新题目列表、标签计数和结果摘要。
 
-右侧主题编辑器按中文名、英文名、slug 和别名补全，并显示使用次数；未知输入会转换为
+右侧标签编辑器按中文名、英文名、slug 和别名补全，并显示使用次数；未知输入会转换为
 规范 slug 并标为“待整理”；发现疑似同义标签时，会在真正加入前用原生确认框列出候选项。
 标签管理器支持全局重命名、合并、删除、别名和颜色，提交前显示影响题目数及字段 diff，
 提交后可撤销最近操作。
 “标签概览”只提供频次条形、Top-N 共现矩阵和年份/章节覆盖热力图；点击图元会回填左栏的
 真实筛选，不提供默认全库关系图。
+
+Studio 顶部采用单层紧凑工具栏：默认只显示题库名和校验/索引状态符号，完整路径及状态
+说明通过提示读取。齿轮按钮打开“Studio 设置”，可选择浅色/深色主题、默认编辑视图、
+详情栏初始状态，以及是否在顶栏显示完整路径；这些偏好不修改题库内容。切换题库、新建/
+复制/导入/删除题目都通过同一应用服务执行。打开题目只决定编辑对象，不会隐式加入批量选择。试卷也不会在
+启动时自动选中：用户必须显式选择或新建试卷，随后才能添加题目、校验、构建或导出。
+来源类型和可定位引用可直接编辑，并与正文、待整理标签和历史记录一起原子保存。全文搜索
+使用可重建 SQLite 投影在后台执行，快速连续输入时只采用最新一代结果。
 保存标记按源码和元数据的已保存快照计算；撤销回快照会清除标题星号与关闭提示。
 切换题目会立即显示目标 ID 的加载态，并用生成代次拒绝过期预览。
 预览中的每张图绑定稳定逻辑 ID；推荐使用 `qbank-asset:<asset-id>`，TeX 源码可用
@@ -198,22 +270,39 @@ qbank codex instructions --format markdown
 qbank codex instructions --format json
 ```
 
-`codex check` 检查 AGENTS、Skill frontmatter、qbank 可执行性、当前目录、Codex CLI
-以及工作流命令。Codex CLI 不在 PATH 时只产生 WARN，不会使 qbank 自身失败。
-`codex instructions` 输出稳定的规则、推荐命令序列和数据路径。
+`codex check` 检查 AGENTS、Skill frontmatter、项目与用户 Skill 漂移、当前目录、
+Codex CLI 以及工作流命令。JSON 中的 `repository_ready`、`codex_cli_ready` 和
+`degraded` 分别表示仓库、外部 CLI 与降级状态；兼容字段 `ok` 仍只在仓库级 FAIL
+时变为 `false`。因此 Codex CLI 不在 PATH 时会产生 WARN 和
+`codex_cli_ready: false`，但仓库级 Skill 仍可供 Codex Desktop 或 IDE 使用。
+`codex instructions` 在旧 `command_sequences` 之外提供结构化 `workflows`。
 
 如需让其他仓库也发现同一个 Skill，可先查看计划，再确认安装到当前用户目录：
 
 ```powershell
-qbank codex install-skill --user --dry-run
+qbank codex install-skill --user --dry-run --format json
 qbank codex install-skill --user
 # 自动化环境中显式授权：
-qbank codex install-skill --user --yes
+qbank codex install-skill --user --yes --format json
 ```
 
-目标路径是 `$HOME/.agents/skills/qbank/`。命令未经确认不会写用户目录，也不会覆盖内容
-不同的现有 Skill。题目写入仍须先 dry-run，临时 AI 交换文件写入 `build/ai/`，生成的
-试卷定义写入 `papers/generated/`，最终产物写入 `exports/`。
+默认和 `--user` 的目标路径都是 `$HOME/.agents/skills/qbank/`；`--project` 则以安装包
+内的权威资源为源，更新当前项目的仓库级 Skill。内容不同时必须先显式加入
+`--update --dry-run` 查看文件级差异，再确认更新：
+
+```powershell
+qbank codex install-skill --project --update --dry-run --format json
+qbank codex install-skill --project --update
+qbank codex install-skill --user --update --dry-run --format json
+qbank codex install-skill --user --update
+```
+
+项目备份保存到配置的 state 目录下 `codex-skill-backups/`，用户备份保存到
+`$HOME/.agents/.qbank-backups/skills/qbank/`。未经确认不会覆盖 Skill。题目写入仍须先
+dry-run，临时 AI 交换文件写入 `build/ai/`，生成的试卷定义写入
+`papers/generated/`，最终产物写入 `exports/`。
+
+### MCP 状态
 
 0.1.0 不实现 MCP Server。业务逻辑位于独立 service layer，未来可用同一服务实现
 `qbank mcp`，并通过以下方式注册本地 STDIO 服务：
@@ -248,10 +337,10 @@ PDF/SVG/PNG 渲染版本。旧的 `assets/...` 字符串路径仍可读取；确
 选择和历史记录。导入前先执行演练，随后执行真实写入：
 
 ```powershell
-qbank asset ingest ZJU841-2005-CALC-06 .\asset-package.json --dry-run --format json
-qbank asset ingest ZJU841-2005-CALC-06 .\asset-package.json --format json
+qbank asset ingest DEMO-GEO-0001 .\asset-package.json --dry-run --format json
+qbank asset ingest DEMO-GEO-0001 .\asset-package.json --format json
 qbank asset validate --format json
-qbank asset show ZJU841-2005-CALC-06 question-6 --format json
+qbank asset show DEMO-GEO-0001 figure-1 --format json
 ```
 
 可直接添加本地文件、Base64/data URI、内联 TikZ、HTTP(S) URL、PDF 页/裁剪元数据和
@@ -259,16 +348,16 @@ Ipe 文件。`replace` 永远新增哈希版本，绝不覆盖旧表示；`rende
 的 Ipe 可执行文件生成 PDF/SVG/PNG，并且失败不会报告为成功。
 
 ```powershell
-qbank asset edit ZJU841-2005-CALC-06 question-6 --dry-run --format json
-qbank asset render ZJU841-2005-CALC-06 question-6 --dry-run --format json
-qbank asset render ZJU841-2005-CALC-06 question-6 --format json
-qbank asset set-render ZJU841-2005-CALC-06 question-6 render-svg-<hash> --format json
-qbank asset finalize ZJU841-2005-CALC-06 question-6 --format json
+qbank asset edit DEMO-GEO-0001 figure-1 --dry-run --format json
+qbank asset render DEMO-GEO-0001 figure-1 --dry-run --format json
+qbank asset render DEMO-GEO-0001 figure-1 --format json
+qbank asset set-render DEMO-GEO-0001 figure-1 render-svg-<hash> --format json
+qbank asset finalize DEMO-GEO-0001 figure-1 --format json
 ```
 
 `assets.editors.ipe.command`、`assets.renderers.ipe.iperender` 与
 `assets.renderers.ipe.ipetoipe` 可指定 Windows Ipe 路径；未配置时会在 PATH 和常见
-`E:/Tool/ipe-*/bin` 目录中发现。Ipe、系统打开和文本编辑器都只接受已登记、受题库
+Ipe 安装目录中发现。Ipe、系统打开和文本编辑器都只接受已登记、受题库
 containment 校验的 representation，绝不把网页或 CLI 输入作为 shell 命令执行。
 
 运行 `qbank preview --serve` 会先构建静态预览，再仅绑定 `127.0.0.1` 的资产管理页。
@@ -421,7 +510,7 @@ qbank preview --serve
 | `qbank export` | 导出查询结果 |
 | `qbank paper validate` / `build` | 校验和构建试卷 |
 | `qbank codex check` / `instructions` | 检查并输出 Codex 仓库规则 |
-| `qbank codex install-skill` | 经确认安装用户级 qbank Skill |
+| `qbank codex install-skill` | 预览、安装或更新项目级/用户级 qbank Skill |
 
 所有命令都有 `--help`。面向自动化的命令提供 `--format json` 或 JSONL 输出；正式结果
 写 stdout，诊断写 stderr。
@@ -441,6 +530,8 @@ qbank preview --serve
 
 ## 当前限制
 
+- 0.1.0 是私有冻结基线，尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和
+  已记录的 JSON 字段按兼容策略维护。
 - LaTeX 只做定界符、美元符号和花括号的轻量检查，不执行 TeX 编译。
 - 单选/多选答案检查识别常见的 `A.`、`B)` 等标签，不试图理解任意自然语言答案。
 - HTML 预览使用 CDN MathJax；离线时不渲染公式。
@@ -448,3 +539,9 @@ qbank preview --serve
   不撤销源文件，而会写入 `.qbank/index.dirty`，由 `status`/`doctor` 报告，成功执行
   `qbank index rebuild` 后清除。
 - `--changed` 依赖可用的 Git 工作区；否则安全地回退为全量校验。
+
+## 许可证
+
+qbank 以 [MIT License](LICENSE) 发布。嵌入 Studio 的第三方前端资源及其许可信息列于
+`src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md`。公开仓库前应运行仓库级
+`$oss-readiness`，逐项确认依赖、图片、字体、示例数据和构建归档的再分发依据。

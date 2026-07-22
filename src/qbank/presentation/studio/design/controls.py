@@ -3,15 +3,104 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import cast
 
-from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent
-from PySide6.QtWidgets import QAbstractSpinBox, QComboBox, QSpinBox, QToolButton
+from PySide6.QtWidgets import (
+    QAbstractSpinBox,
+    QComboBox,
+    QLayout,
+    QLayoutItem,
+    QSpinBox,
+    QToolButton,
+    QWidget,
+)
 
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.metrics import METRICS
 from qbank.presentation.studio.design.palette import ThemeName
 from qbank.presentation.studio.design.tokens import tokens_for
+
+
+class FlowLayout(QLayout):
+    """Compact wrapping layout for narrow, keyboard-accessible chip bars."""
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        horizontal_spacing: int = METRICS.space_1,
+        vertical_spacing: int = METRICS.space_1,
+    ) -> None:
+        super().__init__(parent)
+        self._items: list[QLayoutItem] = []
+        self._horizontal_spacing = horizontal_spacing
+        self._vertical_spacing = vertical_spacing
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item: QLayoutItem) -> None:
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int) -> QLayoutItem | None:
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int) -> QLayoutItem:
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return cast(QLayoutItem, None)
+
+    def expandingDirections(self) -> Qt.Orientation:
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._layout_items(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect) -> None:
+        super().setGeometry(rect)
+        self._layout_items(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        return size + QSize(
+            margins.left() + margins.right(),
+            margins.top() + margins.bottom(),
+        )
+
+    def _layout_items(self, rect: QRect, *, test_only: bool) -> int:
+        margins = self.contentsMargins()
+        area = rect.adjusted(
+            margins.left(),
+            margins.top(),
+            -margins.right(),
+            -margins.bottom(),
+        )
+        x, y, line_height = area.x(), area.y(), 0
+        for item in self._items:
+            hint = item.sizeHint()
+            next_x = x + hint.width() + self._horizontal_spacing
+            if line_height and next_x - self._horizontal_spacing > area.right() + 1:
+                x = area.x()
+                y += line_height + self._vertical_spacing
+                next_x = x + hint.width() + self._horizontal_spacing
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), hint))
+            x = next_x
+            line_height = max(line_height, hint.height())
+        return y + line_height - rect.y() + margins.bottom()
 
 
 class ModernComboBox(QComboBox):

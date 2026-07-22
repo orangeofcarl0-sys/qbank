@@ -11,7 +11,14 @@ qbank schema --kind patch --format json
 qbank schema --kind asset-package --format json
 qbank codex check --format json
 qbank codex instructions --format json
+qbank codex install-skill --user --dry-run --format json
+qbank codex install-skill --project --update --dry-run --format json
 ```
+
+`codex check` reports repository and Codex CLI readiness separately. Skill differences
+are warnings until an explicit `install-skill --update` is confirmed. Project updates
+back up the current Skill under `.qbank/codex-skill-backups/`; user updates use
+`$HOME/.agents/.qbank-backups/skills/qbank/`.
 
 ## Read and search
 
@@ -60,6 +67,9 @@ qbank preview --serve
 qbank desktop
 ```
 
+`preview --serve` and `desktop` are blocking interactive commands. Do not launch either
+from unattended automation or without an explicit user request.
+
 Use `qbank-asset:<asset-id>` in new Markdown and `\qbankasset{<asset-id>}` in
 TeX. Legacy `asset:<asset-id>` remains readable after an explicit
 `qbank asset normalize`.
@@ -85,6 +95,31 @@ qbank export --subject optics --status reviewed --format jsonl `
 
 Use `--without-answers`, `--without-solutions`, `--without-rubric`, and `--hide-ids`
 when the paper YAML enables content that the requested student version must suppress.
+
+## Tags and saved views
+
+```powershell
+qbank tag list --format json
+qbank tag stats --format json
+qbank view list --format json
+qbank tag rename old-slug new-slug --dry-run --format json
+qbank tag rename old-slug new-slug --format json
+qbank validate --format json
+```
+
+Use the corresponding dry-run before tag merge, delete, or normalize operations. Saved
+views affect only query results and must not silently change question data.
+
+## Explicit maintenance
+
+```powershell
+qbank index rebuild --format json
+qbank delete OPT-INT-0001 --dry-run --format json
+qbank delete OPT-INT-0001 --yes --format json
+```
+
+Rebuild the disposable index only when reported unavailable or stale. Delete only after
+the user confirms the exact ID and the dry-run result.
 
 ## Stable paths
 

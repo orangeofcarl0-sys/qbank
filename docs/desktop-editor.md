@@ -11,7 +11,7 @@ transactions, validation, and history used by the CLI.
 Install and launch it with:
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[desktop]"
 qbank desktop
@@ -32,6 +32,27 @@ The window has a two-and-a-half-column layout:
 Unknown Inspector topics are normalized to pending slugs. If registered names or
 aliases look similar, Studio asks for confirmation before retaining the new chip.
 Saved views resolve retained taxonomy aliases after a global rename or merge.
+They are editable snapshots rather than hidden base constraints: every active
+condition remains visible, modifications are marked, and the original snapshot
+can be restored from the view menu. Filter chips wrap inside the compact
+navigation column instead of being clipped.
+
+The single compact toolbar names the active bank and exposes validation and
+index state through accessible status symbols and complete tooltips. The full
+project path is optional. The Studio settings button opens presentation-only
+preferences for theme, default source/preview/split mode, detail-drawer startup
+visibility, and project-path visibility. Opening a question does not select it
+for bulk operations; selection is explicit and summarized next to the bulk tag
+actions. Question create, copy, JSON/JSONL import, and delete commands always
+dry-run before their authoritative transaction. Source type and reference are
+editable fields and are saved in the same transaction as Markdown, pending
+taxonomy entries, and one unified history event.
+
+Paper context is explicit. Studio does not silently choose the first YAML file at
+startup. The paper menu selects or creates a definition before add, validate,
+build, or export actions become meaningful. Search is debounced and evaluated
+against the rebuildable SQLite projection off the UI thread; generation tokens
+prevent an older result from replacing a newer query.
 
 Save, undo, redo, validate, source/preview/split, and Markdown/TeX controls stay
 close to the editor. CodeMirror 6 is bundled in the wheel and does not need a

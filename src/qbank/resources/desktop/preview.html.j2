@@ -95,11 +95,13 @@
       tip.className = 'asset-tip';
       tip.textContent = '右键或 Shift+F10 操作';
       wrapper.append(tip);
+      image.addEventListener('pointerdown', () => image.focus({preventScroll: true}));
     });
     document.addEventListener('contextmenu', event => {
       const image = assetImage(event.target);
       if (!image || !window.qbankAssetActionsEnabled) return;
       event.preventDefault();
+      image.focus({preventScroll: true});
       if (bridge) bridge.requestContextMenu(image.dataset.assetId, event.clientX, event.clientY);
     });
     document.addEventListener('dblclick', event => {

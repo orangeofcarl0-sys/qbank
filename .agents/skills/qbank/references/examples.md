@@ -37,3 +37,26 @@ Expected approach:
 5. Validate the paper.
 6. Build `exports/optics-40-student.md` and
    `exports/optics-40-solutions.md`.
+
+## Revise a logical asset
+
+Request: “Update figure-1 for OPT-INT-0001 from this confirmed source package.”
+
+Expected approach:
+
+1. Read the asset-package Schema and inspect the current manifest.
+2. Put the proposed package under `build/ai/`.
+3. Dry-run asset ingest and report every representation change.
+4. Commit only after the proposed diff is accepted.
+5. Run asset validation.
+
+## Normalize a project tag
+
+Request: “Rename the confirmed legacy tag `wave_optics` to `wave-optics`.”
+
+Expected approach:
+
+1. Inspect tag usage and affected questions.
+2. Dry-run the rename and report the full question diff.
+3. Commit the same operation only after confirmation.
+4. Validate the repository.

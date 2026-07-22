@@ -32,7 +32,14 @@ def build_stylesheet(theme: ThemeName) -> str:
     QDockWidget {{ color: {p.text_primary}; titlebar-close-icon: none; titlebar-normal-icon: none; }}
     QDockWidget::title {{ padding: {m.space_2}px {m.space_3}px; background: {p.surface}; border-bottom: {m.border_width}px solid {p.border_subtle}; }}
     #navigationPane, #detailDrawer QWidget {{ background: {p.surface}; }}
-    QToolBar {{ min-height: {m.toolbar_height}px; spacing: {m.space_1}px; padding: 0 {m.space_2}px; background: {p.surface}; border: 0; border-bottom: {m.border_width}px solid {p.border_subtle}; }}
+    QToolBar {{ min-height: {m.toolbar_height}px; max-height: {m.toolbar_height}px; spacing: 2px; padding: 0 {m.space_1}px; background: {p.surface}; border: 0; border-bottom: {m.border_width}px solid {p.border_subtle}; }}
+    QToolBar::separator {{ width: {m.border_width}px; margin: {m.space_2}px {m.space_1}px; background: {p.border_subtle}; }}
+    QToolBar QToolButton {{ min-width: 28px; min-height: 28px; max-height: 28px; padding: 0 2px; }}
+    QToolBar QComboBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}
+    QToolBar#projectToolbar {{ spacing: 2px; }}
+    QLabel#projectName {{ color: {p.text_primary}; font-weight: 600; }}
+    QLabel#projectPath {{ color: {p.text_secondary}; font-size: {_point_css(t.typography.small_size)}; }}
+    QLabel#projectState {{ color: {p.text_secondary}; background: {p.background}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; padding: 2px {m.space_2}px; }}
     QToolButton {{ min-width: {m.control_height}px; min-height: {m.control_height}px; border: {m.border_width}px solid transparent; border-radius: {m.radius_small}px; padding: 0 {m.space_1}px; }}
     QToolButton:hover {{ background: {p.surface_hover}; }}
     QToolButton:focus {{ border-color: {p.focus}; }}
@@ -67,6 +74,7 @@ def build_stylesheet(theme: ThemeName) -> str:
     QMenu {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_strong}; padding: {m.space_1}px; }}
     QMenu::item {{ padding: {m.space_2}px {m.space_6}px {m.space_2}px {m.space_3}px; border-radius: {m.radius_small}px; }}
     QMenu::item:selected {{ color: {p.text_primary}; background: {p.selection}; }}
+    QMenu::item:disabled {{ color: {p.text_disabled}; background: transparent; }}
     QMessageBox {{ background: {p.surface_elevated}; }}
     QLabel#sectionLabel, QLabel#activeFilter {{ color: {p.text_secondary}; }}
     #navigationPane QLineEdit, #navigationPane QComboBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}
@@ -75,8 +83,21 @@ def build_stylesheet(theme: ThemeName) -> str:
     QToolButton#tagSelectorToggle {{ color: {p.text_primary}; font-weight: 600; text-align: left; }}
     QListWidget#tagFacetList {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; }}
     QListWidget#tagFacetList::item {{ min-height: 20px; padding: 2px {m.space_2}px; }}
+    QFrame#tagFacetRow {{ background: transparent; border: 0; }}
+    QLabel#tagCount {{ color: {p.text_secondary}; }}
+    QToolButton#tagStateChip {{ min-width: 22px; max-width: 22px; min-height: 22px; max-height: 22px; padding: 0; border-radius: 11px; color: {p.text_secondary}; background: transparent; }}
+    QToolButton#tagStateChip:hover {{ color: {p.text_primary}; background: {p.surface_hover}; }}
+    QToolButton#tagStateChip:checked {{ color: {p.accent}; background: {p.selection}; border-color: {p.border_strong}; }}
+    QToolButton#tagStateChip:disabled {{ color: {p.text_disabled}; background: transparent; }}
     QToolButton#filterChip {{ min-height: 22px; max-height: 22px; color: {p.accent}; background: {p.selection}; border: {m.border_width}px solid {p.border_subtle}; border-radius: 11px; padding: 0 {m.space_2}px; }}
     QToolButton#filterChip:hover {{ border-color: {p.focus}; }}
+    QFrame#selectionBar, QFrame#projectContextBar {{ background: {p.surface_elevated}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_medium}px; }}
+    QLabel#selectionSummary {{ color: {p.text_secondary}; }}
+    QToolButton#selectionAction {{ min-width: 68px; max-width: 68px; min-height: 28px; max-height: 28px; color: {p.accent}; background: {p.selection}; border: {m.border_width}px solid {p.border_subtle}; border-radius: {m.radius_small}px; padding: 0 {m.space_1}px; font-weight: 600; }}
+    QToolButton#selectionAction:hover {{ color: {p.accent_hover}; border-color: {p.focus}; }}
+    QToolButton#selectionAction:focus {{ border-color: {p.focus}; }}
+    QToolButton#selectionAction:pressed {{ background: {p.surface_hover}; }}
+    QToolButton#selectionAction:disabled {{ color: {p.text_disabled}; background: transparent; border-color: {p.border_subtle}; }}
     #detailDrawer {{ background: {p.surface}; }}
     #detailDrawer QScrollArea, #detailDrawer QScrollArea > QWidget > QWidget {{ background: {p.surface}; }}
     #detailDrawer QLineEdit, #detailDrawer QComboBox, #detailDrawer QSpinBox {{ min-height: 28px; max-height: 28px; border-radius: {m.radius_small}px; }}

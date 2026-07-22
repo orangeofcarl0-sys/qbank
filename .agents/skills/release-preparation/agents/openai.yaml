@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Preparation"
+  short_description: "Prepare and verify release artifacts safely"
+  default_prompt: "Use $release-preparation to prepare this repository for a release without publishing."

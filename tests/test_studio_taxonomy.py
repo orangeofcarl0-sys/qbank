@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-pytest.importorskip("PySide6")
+pytest.importorskip("PySide6.QtCore")
 pytest.importorskip("pytestqt")
 
 from PySide6.QtCore import Qt
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QToolButton,
 )
@@ -27,8 +28,15 @@ from qbank.context import ProjectContext
 from qbank.desktop.controller import DesktopController
 from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
 from qbank.desktop.widgets import NavigationPane, TopicTagEditor
-from qbank.models import QueryFilters, TagStatus
+from qbank.models import (
+    DesktopQuestionSummary,
+    QueryFilters,
+    QuestionStatus,
+    QuestionType,
+    TagStatus,
+)
 from qbank.operations import add_question_in_context
+from qbank.presentation.studio.design.controls import FlowLayout
 from qbank.rendering import RenderService
 
 
@@ -74,6 +82,22 @@ def _controller(
     return DesktopController(context, create_project_services(context), RenderService(context))
 
 
+def _tag_action(pane: NavigationPane, slug: str, action: str) -> QToolButton:
+    item = next(
+        pane.tags.list.item(index)
+        for index in range(pane.tags.list.count())
+        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == slug
+    )
+    widget = pane.tags.list.itemWidget(item)
+    assert widget is not None
+    prefix = {"include": "包含", "exclude": "排除", "clear": "清除"}[action]
+    return next(
+        button
+        for button in widget.findChildren(QToolButton)
+        if button.accessibleName().startswith(prefix)
+    )
+
+
 def test_navigation_tag_states_and_field_facets_form_one_query(
     project: tuple[Path, Any], make_question: Any, qtbot: QtBot
 ) -> None:
@@ -97,36 +121,21 @@ def test_navigation_tag_states_and_field_facets_form_one_query(
     pane.tags.search.clear()
     pane.tags.sort.setCurrentIndex(0)
 
-    waves = next(
-        pane.tags.list.item(index)
-        for index in range(pane.tags.list.count())
-        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == "waves"
-    )
-    pane.tags.list.itemClicked.emit(waves)
+    _tag_action(pane, "waves", "include").click()
     assert pane.current_filters().topics == ["waves"]
     assert {
         row.id
         for row in controller.navigation_result(view="all", filters=pane.current_filters()).rows
     } == {"OPT-TAG-0001", "OPT-TAG-0002"}
 
-    interference = next(
-        pane.tags.list.item(index)
-        for index in range(pane.tags.list.count())
-        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == "interference"
-    )
-    pane.tags.list.itemClicked.emit(interference)
+    _tag_action(pane, "interference", "include").click()
     assert pane.current_filters().topics == ["interference", "waves"]
     assert controller.navigation_result(view="all", filters=pane.current_filters()).total == 1
     pane.tags.mode.setCurrentIndex(1)
     assert pane.current_filters().topic_mode == "or"
     assert controller.navigation_result(view="all", filters=pane.current_filters()).total == 2
 
-    waves = next(
-        pane.tags.list.item(index)
-        for index in range(pane.tags.list.count())
-        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == "waves"
-    )
-    pane.tags.list.itemClicked.emit(waves)
+    _tag_action(pane, "waves", "exclude").click()
     assert pane.current_filters().excluded_topics == ["waves"]
     assert controller.navigation_result(view="all", filters=pane.current_filters()).total == 0
     assert any(
@@ -137,6 +146,263 @@ def test_navigation_tag_states_and_field_facets_form_one_query(
     pane.facets.status.setCurrentIndex(pane.facets.status.findData("draft"))
     filtered = controller.navigation_result(view="all", filters=pane.current_filters())
     assert [row.id for row in filtered.rows] == ["OPT-TAG-0002"]
+
+
+def test_clear_tag_filter_refreshes_the_complete_result_once(
+    project: tuple[Path, Any], make_question: Any, qtbot: QtBot
+) -> None:
+    controller = _controller(project, make_question)
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    pane.set_navigation_data(controller.navigation_data())
+    initial = controller.navigation_result(view="all", filters=pane.current_filters())
+    pane.set_rows(initial.rows, None)
+    pane.set_tag_rows(initial.tags, initial.total)
+    totals: list[int] = []
+
+    def refresh() -> None:
+        result = controller.navigation_result(
+            view=pane.current_view(), filters=pane.current_filters()
+        )
+        pane.set_rows(result.rows, None)
+        pane.set_tag_rows(result.tags, result.total)
+        totals.append(result.total)
+
+    pane.filters_changed.connect(refresh)
+    _tag_action(pane, "interference", "include").click()
+    assert totals == [1]
+    totals.clear()
+
+    pane.clear_filter.click()
+
+    assert totals == [2]
+    assert pane.current_view() == "all"
+    assert pane.current_filters().topics == []
+    assert pane.questions.count() == 2
+    assert pane.tags.list.count() == 3
+    assert not pane.clear_filter.isEnabled()
+
+
+def test_saved_view_is_an_editable_visible_snapshot(
+    project: tuple[Path, Any], make_question: Any, qtbot: QtBot
+) -> None:
+    controller = _controller(project, make_question)
+    saved = QueryFilters(topics=["interference"], limit=100_000)
+    controller.save_view("interference-view", saved, dry_run=False)
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    pane.set_navigation_data(controller.navigation_data())
+    view_events: list[str] = []
+    search_events: list[str] = []
+    pane.view_changed.connect(view_events.append)
+    pane.search_changed.connect(search_events.append)
+    pane.select_view("interference-view")
+
+    assert view_events == ["interference-view"]
+    assert search_events == []
+    assert pane.current_filters().topics == ["interference"]
+    assert (
+        controller.navigation_result(view="interference-view", filters=pane.current_filters()).total
+        == 1
+    )
+    pane._remove_chip("topic", "interference")
+
+    assert pane.current_filters().topics == []
+    assert pane.current_view_is_modified()
+    assert "已修改" in pane.active_filter.text()
+    assert (
+        controller.navigation_result(view="interference-view", filters=pane.current_filters()).total
+        == 2
+    )
+    assert controller.navigation_result(view="interference-view", filters=None).total == 1
+
+    pane.restore_current_view()
+
+    assert pane.current_filters().topics == ["interference"]
+    assert not pane.current_view_is_modified()
+    assert "已修改" not in pane.active_filter.text()
+    filter_events: list[bool] = []
+    pane.filters_changed.connect(lambda: filter_events.append(True))
+
+    pane.clear_filters()
+
+    assert filter_events == [True]
+    assert pane.current_view() == "all"
+    assert pane.current_filters().topics == []
+
+
+def test_special_view_membership_combines_with_complete_visible_filters(
+    project: tuple[Path, Any], make_question: Any
+) -> None:
+    controller = _controller(project, make_question)
+    controller.current_paper_ids = ("OPT-TAG-0001",)
+
+    assert (
+        controller.navigation_result(
+            view="current_paper",
+            filters=QueryFilters(topics=["waves"], limit=100_000),
+        ).total
+        == 1
+    )
+    assert (
+        controller.navigation_result(
+            view="current_paper",
+            filters=QueryFilters(topics=["diffraction"], limit=100_000),
+        ).total
+        == 0
+    )
+
+
+def test_filter_chips_wrap_and_tag_controls_expose_accessible_states(
+    project: tuple[Path, Any], make_question: Any, qtbot: QtBot
+) -> None:
+    controller = _controller(project, make_question)
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    data = controller.navigation_data()
+    pane.set_navigation_data(data)
+    result = controller.navigation_result(view="all", filters=pane.current_filters())
+    pane.set_rows(result.rows, "NOT-IN-RESULT")
+    pane.set_tag_rows(result.tags, result.total)
+    pane.resize(256, 900)
+    pane.show()
+    pane.set_transient_filters(
+        QueryFilters(
+            text="optics",
+            topics=["interference"],
+            excluded_topics=["diffraction"],
+            status=QuestionStatus(data.statuses[0]),
+            question_type=QuestionType(data.question_types[0]),
+            chapter=data.chapters[0],
+            year=data.years[0] if data.years else None,
+            difficulty_min=1,
+            difficulty_max=4,
+            limit=100_000,
+        )
+    )
+    qtbot.wait(50)
+
+    layout = cast(FlowLayout, pane.filter_chips.layout())
+    buttons = pane.filter_chips.findChildren(QToolButton)
+    assert len(buttons) >= 8
+    assert layout.heightForWidth(pane.filter_chips.width()) > 22
+    assert len({button.y() for button in buttons}) > 1
+    assert all(
+        button.geometry().right() <= pane.filter_chips.contentsRect().right() for button in buttons
+    )
+    assert pane.tags.sort.accessibleName() == "标签排序方式"
+    assert pane.tags.mode.accessibleName() == "多标签匹配方式"
+    assert "当前题目不在筛选结果中" in pane.active_filter.text()
+    pane.set_current_question(result.rows[0].id)
+    assert "当前题目不在筛选结果中" not in pane.active_filter.text()
+    tag_item = pane.tags.list.item(0)
+    assert "标签" in str(tag_item.data(Qt.ItemDataRole.AccessibleTextRole))
+    assert "单击或按空格循环" in str(tag_item.data(Qt.ItemDataRole.AccessibleDescriptionRole))
+
+
+def test_tag_rows_cycle_with_space_and_advanced_filters_preserve_navigation_height(
+    project: tuple[Path, Any], make_question: Any, qtbot: QtBot
+) -> None:
+    controller = _controller(project, make_question)
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    pane.resize(256, 900)
+    pane.show()
+    pane.set_navigation_data(controller.navigation_data())
+    result = controller.navigation_result(view="all", filters=pane.current_filters())
+    pane.set_rows(result.rows, result.rows[0].id)
+    pane.set_tag_rows(result.tags, result.total)
+    pane.advanced_toggle.setChecked(True)
+    qtbot.wait(50)
+
+    assert pane.advanced_scroll.isVisible()
+    assert pane.questions.height() >= pane.questions.minimumHeight()
+    assert pane.questions.minimumHeight() > 100
+
+    item = next(
+        pane.tags.list.item(index)
+        for index in range(pane.tags.list.count())
+        if pane.tags.list.item(index).data(Qt.ItemDataRole.UserRole) == "interference"
+    )
+    pane.tags.list.itemClicked.emit(item)
+    assert pane.current_filters().topics == ["interference"]
+    qtbot.keyClick(pane.tags.list, Qt.Key.Key_Space)
+    assert pane.current_filters().topics == []
+    assert pane.current_filters().excluded_topics == ["interference"]
+    qtbot.keyClick(pane.tags.list, Qt.Key.Key_Space)
+    assert pane.current_filters().excluded_topics == []
+
+
+def test_saved_facets_restore_complete_values_and_empty_draft_view(
+    project: tuple[Path, Any], make_question: Any, qtbot: QtBot
+) -> None:
+    controller = _controller(project, make_question)
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    pane.set_navigation_data(controller.navigation_data())
+    filters = QueryFilters(
+        subject="astronomy",
+        language="fr-FR",
+        status=QuestionStatus.DEPRECATED,
+        question_type=QuestionType.ESSAY,
+        limit=100_000,
+    )
+
+    pane.set_query_state("all", filters)
+
+    assert pane.current_filters().semantic_values() == filters.semantic_values()
+    assert pane.facets.subject.text() == "astronomy"
+    assert pane.facets.language.text() == "fr-FR"
+    assert pane.facets.status.currentData() == "deprecated"
+    assert pane.facets.question_type.currentData() == "essay"
+
+    pane.set_query_state(
+        "draft",
+        QueryFilters(status=QuestionStatus.DRAFT, subject="astronomy", limit=100_000),
+    )
+    empty = controller.navigation_result(view="draft", filters=pane.current_filters())
+    pane.set_rows(empty.rows, None)
+    pane.set_tag_rows(empty.tags, empty.total)
+    assert pane.current_view() == "draft"
+    assert pane.current_filters().status == QuestionStatus.DRAFT
+
+
+def test_open_question_is_not_an_implicit_bulk_selection(qtbot: QtBot) -> None:
+    pane = NavigationPane()
+    qtbot.addWidget(pane)
+    rows = [
+        DesktopQuestionSummary(
+            id="Q-001",
+            title="Question one",
+            subject="optics",
+            status="reviewed",
+            question_type="other",
+            difficulty=1,
+            needs_redraw=False,
+        ),
+        DesktopQuestionSummary(
+            id="Q-002",
+            title="Question two",
+            subject="optics",
+            status="reviewed",
+            question_type="other",
+            difficulty=1,
+            needs_redraw=False,
+        ),
+    ]
+
+    pane.set_rows(rows, "Q-001")
+
+    assert pane.questions.currentItem().data(Qt.ItemDataRole.UserRole) == "Q-001"
+    assert pane.selected_question_ids() == []
+    assert not pane.bulk_add.isEnabled()
+    assert not pane.bulk_remove.isEnabled()
+    assert pane.selection_summary.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
+    for button in (pane.bulk_add, pane.bulk_remove):
+        assert button.minimumWidth() == button.maximumWidth() == 68
+        assert button.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        assert not button.icon().isNull()
+        assert button.text() == "标签"
 
 
 def test_topic_editor_resolves_aliases_blocks_duplicates_and_marks_pending(

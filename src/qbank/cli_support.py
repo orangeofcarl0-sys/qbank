@@ -33,6 +33,16 @@ def emit_json(data: Any) -> None:
     typer.echo(json_text(data))
 
 
+def require_output_format(value: str, *allowed: str) -> str:
+    """Reject unsupported output formats before a command performs any work."""
+    if value not in allowed:
+        expected = ", ".join(allowed)
+        raise DataValidationError(
+            f"unsupported output format: {value}; expected one of: {expected}"
+        )
+    return value
+
+
 def abort(exc: Exception, *, output_format: str = "table") -> NoReturn:
     """Map an exception to stable CLI output and an exit code."""
     if isinstance(exc, QBankError):
@@ -104,7 +114,7 @@ def read_stdin() -> str:
 def read_utf8(path: Path, *, label: str = "input") -> str:
     """Read one UTF-8 input and normalize decoding failures as validation errors."""
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8-sig")
     except UnicodeError as exc:
         raise DataValidationError(f"{label} must be valid UTF-8: {path}") from exc
 

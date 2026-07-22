@@ -13,6 +13,7 @@ from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
 from qbank.desktop.controller import DesktopController, InteractiveRenderer
 from qbank.desktop.main_window import DesktopMainWindow
+from qbank.desktop.preferences_dialog import load_studio_preferences
 from qbank.presentation.studio.design.palette import ThemeName
 from qbank.presentation.studio.design.stylesheet import apply_theme
 
@@ -30,7 +31,12 @@ def launch_desktop(project: Path | None = None) -> int:
     application = cast(QApplication, application)
     application.setApplicationName("qbank")
     application.setOrganizationName("qbank")
-    theme: ThemeName = "dark" if os.environ.get("QBANK_STUDIO_THEME") == "dark" else "light"
+    environment_theme = os.environ.get("QBANK_STUDIO_THEME")
+    theme: ThemeName = (
+        cast(ThemeName, environment_theme)
+        if environment_theme in {"light", "dark"}
+        else load_studio_preferences().theme
+    )
     apply_theme(application, theme)
     controller = DesktopController(
         context,

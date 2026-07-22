@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSS Readiness"
+  short_description: "Audit repository safety before open sourcing"
+  default_prompt: "Use $oss-readiness to audit this repository before open sourcing."

@@ -5,23 +5,13 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol, cast
 
+from click import echo
 from typer.core import TyperGroup
 
 from qbank.errors import ExitCode
 from qbank.models import DiagnosticCode
-
-if TYPE_CHECKING:
-    from click import echo
-    from click.exceptions import Abort, Exit, UsageError
-else:
-    from typer import _click
-
-    Abort = _click.exceptions.Abort
-    Exit = _click.exceptions.Exit
-    UsageError = _click.exceptions.UsageError
-    echo = _click.echo
 
 
 def _option_value(arguments: Sequence[str], name: str) -> str | None:
@@ -40,6 +30,23 @@ def _requests_json(arguments: Sequence[str]) -> bool:
     if len(arguments) >= 2 and arguments[:2] == ["paper", "build"]:
         return _option_value(arguments, "--result-format") == "json"
     return _option_value(arguments, "--format") == "json"
+
+
+def _exception_named(exc: Exception, name: str) -> bool:
+    """Match public Click and Typer's vendored Click exceptions without private imports."""
+    return any(base.__name__ == name for base in type(exc).__mro__)
+
+
+class _UsageErrorLike(Protocol):
+    exit_code: int
+
+    def format_message(self) -> str: ...
+
+    def show(self) -> None: ...
+
+
+class _ExitLike(Protocol):
+    exit_code: int
 
 
 class JsonUsageGroup(TyperGroup):
@@ -67,28 +74,31 @@ class JsonUsageGroup(TyperGroup):
             if isinstance(result, int) and result:
                 raise SystemExit(result)
             return result
-        except UsageError as exc:
-            if _requests_json(arguments):
-                echo(
-                    json.dumps(
-                        {
-                            "ok": False,
-                            "code": DiagnosticCode.CLI_USAGE,
-                            "error": exc.format_message(),
-                            "exit_code": int(ExitCode.CLI_USAGE),
-                        },
-                        ensure_ascii=False,
+        except Exception as exc:
+            if _exception_named(exc, "UsageError"):
+                usage_error = cast(_UsageErrorLike, exc)
+                if _requests_json(arguments):
+                    echo(
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "code": DiagnosticCode.CLI_USAGE,
+                                "error": usage_error.format_message(),
+                                "exit_code": int(ExitCode.CLI_USAGE),
+                            },
+                            ensure_ascii=False,
+                        )
                     )
-                )
-                raise SystemExit(int(ExitCode.CLI_USAGE)) from None
-            if not standalone_mode:
+                    raise SystemExit(int(ExitCode.CLI_USAGE)) from None
+                if not standalone_mode:
+                    raise
+                usage_error.show()
+                raise SystemExit(usage_error.exit_code) from None
+            if _exception_named(exc, "Exit"):
+                raise SystemExit(cast(_ExitLike, exc).exit_code) from None
+            if _exception_named(exc, "Abort"):
+                if standalone_mode:
+                    echo("Aborted!", err=True)
+                    raise SystemExit(int(ExitCode.GENERAL)) from None
                 raise
-            exc.show()
-            raise SystemExit(exc.exit_code) from None
-        except Exit as exc:
-            raise SystemExit(exc.exit_code) from None
-        except Abort:
-            if standalone_mode:
-                echo("Aborted!", err=True)
-                raise SystemExit(int(ExitCode.GENERAL)) from None
             raise

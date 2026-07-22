@@ -73,6 +73,10 @@ class QuestionService:
         self.index.ensure_searchable(snapshot)
         return self.index.search(text, limit=limit)
 
+    def search_projection(self, text: str, *, limit: int = 20) -> list[SearchHit]:
+        """Search the maintained projection without rescanning Markdown."""
+        return self.index.search(text, limit=limit)
+
     def rebuild_index(self) -> int:
         """Rebuild the projection from one consistent repository snapshot."""
         snapshot = self.repository.scan()

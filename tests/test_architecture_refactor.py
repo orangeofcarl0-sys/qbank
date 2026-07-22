@@ -259,7 +259,11 @@ def test_development_lock_covers_declared_dev_and_build_requirements() -> None:
     declared = [
         *project["build-system"]["requires"],
         *project["project"]["dependencies"],
-        *project["project"]["optional-dependencies"]["dev"],
+        *(
+            requirement
+            for group in project["project"]["optional-dependencies"].values()
+            for requirement in group
+        ),
     ]
     locked: dict[str, Version] = {}
     for line in (

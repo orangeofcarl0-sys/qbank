@@ -24,10 +24,14 @@ def desktop_command(
         code = launch(project.resolve() if project is not None else None)
         if code:
             raise typer.Exit(code=code)
-    except ModuleNotFoundError as exc:
-        if exc.name is not None and exc.name.startswith("PySide6"):
+    except ImportError as exc:
+        missing = exc.name or ""
+        if missing.startswith("PySide6") or "DLL load failed" in str(exc):
             abort(
-                DependencyMissingError("dependency_missing: install qbank with the 'desktop' extra")
+                DependencyMissingError(
+                    "dependency_missing: PySide6 could not be loaded; "
+                    "reinstall qbank with the 'desktop' extra"
+                )
             )
         raise
     except typer.Exit:

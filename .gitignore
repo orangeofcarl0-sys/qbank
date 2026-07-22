@@ -10,6 +10,10 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+*.log
+*.sqlite
+*.sqlite3
+.qbank/
 Thumbs.db
 .DS_Store
 

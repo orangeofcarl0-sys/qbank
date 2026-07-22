@@ -18,7 +18,7 @@
 
 ## 5. Ipe
 
-Ipe 适配器会发现 `ipe`、`ipetoipe` 与 `iperender`，缺失时返回明确错误。`asset edit` 只打开已注册且位于资产目录内的 `.ipe` 表示；`asset render` 以真实 Ipe 命令生成 PDF、SVG、PNG，并验证每个输出文件存在且非空。真实验收使用 `E:/Tool/ipe-7.2.29/bin/ipe.exe` 打开了 `ZJU841-2005-CALC-06/question-6` 的受管 Ipe 源文件，并通过 `ipetoipe.exe`、`iperender.exe` 成功生成三个渲染表示；相同内容哈希复用了既有表示 ID，随后将 `render-svg` 设为首选并重新标记为 final。
+Ipe 适配器会发现 `ipe`、`ipetoipe` 与 `iperender`，缺失时返回明确错误。`asset edit` 只打开已注册且位于资产目录内的 `.ipe` 表示；`asset render` 以真实 Ipe 命令生成 PDF、SVG、PNG，并验证每个输出文件存在且非空。验收使用配置的 `<IPE_INSTALL>/bin/ipe.exe` 打开合成题目 `QUESTION-0001/figure-1` 的受管 Ipe 源文件，并通过 `ipetoipe.exe`、`iperender.exe` 成功生成三个渲染表示；相同内容哈希复用了既有表示 ID，随后将 `render-svg` 设为首选并重新标记为 final。
 
 ## 6. localhost 管理页
 

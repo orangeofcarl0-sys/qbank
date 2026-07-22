@@ -11,12 +11,13 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "qbank contributors" }]
 dependencies = [
+  "click>=8.2,<9",
   "jinja2>=3.1,<4",
   "markdown-it-py>=3.0,<5",
   "pydantic>=2.7,<3",
   "rich>=13.7,<15",
   "ruamel.yaml>=0.18,<0.19",
-  "typer>=0.12,<1",
+  "typer>=0.27,<1",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +26,6 @@ desktop = [
   "QtAwesome>=1.4,<2",
 ]
 dev = [
-  "click>=8.2,<9",
   "deptry>=0.23,<1",
   "hatchling>=1.25,<2",
   "import-linter>=2.8,<3",
@@ -33,10 +33,12 @@ dev = [
   "mypy>=1.11,<2",
   "pytest>=8.2,<10",
   "pytest-cov>=5.0,<8",
-  "pytest-qt>=4.4,<5",
   "pyright>=1.1,<2",
-  "QtAwesome>=1.4,<2",
   "ruff>=0.6,<1",
+]
+studio-dev = [
+  "pytest-qt>=4.4,<5",
+  "QtAwesome>=1.4,<2",
   "PySide6>=6.8,<7",
 ]
 
@@ -106,7 +108,8 @@ ignore_missing_imports = true
 
 [tool.deptry]
 known_first_party = ["qbank"]
-optional_dependencies_dev_groups = ["dev"]
+optional_dependencies_dev_groups = ["dev", "studio-dev"]
+package_module_name_map = { PySide6 = ["PySide6"] }
 
 [tool.importlinter]
 root_package = "qbank"

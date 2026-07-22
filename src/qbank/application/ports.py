@@ -15,16 +15,26 @@ from qbank.domain import (
     RepositorySnapshot,
 )
 from qbank.models import (
+    AddQuestionResult,
     AssetFormat,
     AssetHistoryEntry,
     AssetManifest,
     AssetPackageRepresentation,
+    DeleteQuestionResult,
+    DesktopHistoryEntry,
     Diagnostic,
     IndexHealth,
+    IngestResult,
+    Paper,
+    PaperBuildRequest,
+    PaperBuildResult,
+    PaperValidationReport,
     PatchQuestionResult,
     Question,
     QuestionPatch,
     SearchHit,
+    StatusResult,
+    Taxonomy,
     ValidationReport,
 )
 
@@ -78,6 +88,54 @@ class QuestionMutationPort(Protocol):
     ) -> PatchQuestionResult: ...
 
 
+class StudioQuestionMutationPort(Protocol):
+    """Atomic interactive save including taxonomy registration and history."""
+
+    def save_question(
+        self,
+        question_id: str,
+        patch: QuestionPatch,
+        *,
+        dry_run: bool,
+        command: str,
+    ) -> PatchQuestionResult: ...
+
+
+class StudioProjectPort(Protocol):
+    """Qt-independent project workflows used by the Studio presentation."""
+
+    def status(self) -> StatusResult: ...
+
+    def create_question(
+        self, question_id: str, title: str, *, dry_run: bool
+    ) -> AddQuestionResult: ...
+
+    def copy_question(self, source_id: str, new_id: str, *, dry_run: bool) -> AddQuestionResult: ...
+
+    def import_questions(self, path: Path, *, dry_run: bool) -> IngestResult: ...
+
+    def delete_question(self, question_id: str, *, dry_run: bool) -> DeleteQuestionResult: ...
+
+    def list_papers(self) -> list[Path]: ...
+
+    def paper_ids(self, path: Path) -> tuple[str, ...]: ...
+
+    def create_paper(
+        self,
+        path: Path,
+        title: str,
+        question_ids: list[str],
+        *,
+        dry_run: bool,
+    ) -> Paper: ...
+
+    def add_to_paper(self, path: Path, question_ids: list[str], *, dry_run: bool) -> Paper: ...
+
+    def validate_paper(self, path: Path) -> PaperValidationReport: ...
+
+    def build_paper(self, path: Path, request: PaperBuildRequest) -> PaperBuildResult: ...
+
+
 class IndexHealthPort(Protocol):
     """Read-only projection health consumed by diagnostics."""
 
@@ -88,6 +146,19 @@ class HistoryStorePort(Protocol):
     """Prepare history content for the same transaction as source files."""
 
     def prepare(self, record: HistoryRecord) -> tuple[Path, str]: ...
+
+    def list(self, question_id: str) -> tuple[DesktopHistoryEntry, ...]: ...
+
+
+class MutableTaxonomyStorePort(Protocol):
+    """Validated taxonomy read and deterministic transaction serialization."""
+
+    @property
+    def path(self) -> Path: ...
+
+    def load(self) -> Taxonomy: ...
+
+    def text(self, taxonomy: Taxonomy) -> str: ...
 
 
 class RenderingPort(Protocol):

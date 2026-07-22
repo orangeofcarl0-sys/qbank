@@ -2,113 +2,107 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
-from collections.abc import Callable
-from pathlib import Path
-from typing import cast
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from importlib.resources import files
+from pathlib import Path, PurePosixPath
+from typing import Literal, cast
 
+from qbank.codex_manifest import (
+    CODEX_RULES,
+    INTEGRATION_REVISION,
+    LEGACY_COMMAND_SEQUENCES,
+    REQUIRED_COMMANDS,
+    SKILL_FILES,
+    WORKFLOWS,
+)
 from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError
 from qbank.models import (
+    CodexCheckReport,
     CodexInstructionsResult,
+    CodexWorkflow,
     DoctorCheck,
-    DoctorReport,
     DoctorSummary,
+    SkillFileChange,
     SkillInstallResult,
 )
 from qbank.storage import split_frontmatter
 from qbank.yaml_io import load_yaml
 
 SKILL_DIRECTORY = Path(".agents/skills/qbank")
-REQUIRED_WORKFLOW_COMMANDS = (
-    ("doctor",),
-    ("schema",),
-    ("ingest",),
-    ("validate",),
-    ("preview",),
-    ("query",),
-    ("search",),
-    ("get",),
-    ("patch",),
-    ("export",),
-    ("paper", "validate"),
-    ("paper", "build"),
-)
-
-CODEX_RULES = [
-    "Markdown under questions/ is authoritative question data.",
-    "JSON and JSONL are AI exchange formats; SQLite is only a rebuildable index.",
-    "Read the question Schema before creating exchange data.",
-    "Do not directly edit question Markdown or the SQLite index by default.",
-    "Use add or ingest to create questions and patch to revise them.",
-    "Dry-run every write, inspect diagnostics, then perform the write.",
-    "Run validate with JSON output after every real write.",
-    "Never silently overwrite an existing question ID.",
-    "Keep uncertain questions draft and never invent answers or provenance.",
-]
-
-COMMAND_SEQUENCES = {
-    "import": [
-        "qbank doctor --format json",
-        "qbank schema --format json",
-        "qbank ingest build/ai/<job>.jsonl --dry-run --format json",
-        "qbank ingest build/ai/<job>.jsonl --format json",
-        "qbank validate --format json",
-        "qbank preview",
-    ],
-    "revise": [
-        "qbank query <filters> --format json",
-        "qbank get <candidate-ids> --format json",
-        "qbank patch ID --file PATCH --dry-run --format json",
-        "qbank patch ID --file PATCH --format json",
-        "qbank validate --format json",
-    ],
-    "select": [
-        "qbank query <filters> --fields id,title,subject,chapter,topics,type,difficulty,status --format json",
-        "qbank search <text> --format json",
-        "qbank get <candidate-ids> --format json",
-    ],
-    "paper": [
-        "qbank query <filters> --format json",
-        "qbank get <candidate-ids> --format json",
-        "qbank paper validate papers/generated/<paper>.yaml --format json",
-        "qbank paper build papers/generated/<paper>.yaml --format md --output exports/<paper>-student.md",
-        "qbank paper build papers/generated/<paper>.yaml --format md --with-solutions --output exports/<paper>-solutions.md",
-    ],
-}
-
+REQUIRED_WORKFLOW_COMMANDS = REQUIRED_COMMANDS
+SkillScope = Literal["user", "project"]
 CommandProbe = Callable[[tuple[str, ...]], bool]
+
+
+@dataclass(frozen=True, slots=True)
+class _SkillOutcome:
+    scope: SkillScope
+    action: Literal["plan", "installed", "updated", "already_installed"]
+    dry_run: bool
+    backup: str | None = None
 
 
 def check_codex_integration(
     context: ProjectContext,
     *,
     command_probe: CommandProbe | None = None,
-) -> DoctorReport:
-    """Check repository instructions, Skill metadata, commands, and Codex availability."""
-    probe = command_probe or _command_probe(context)
+    available_commands: set[tuple[str, ...]] | None = None,
+    user_skill: Path | None = None,
+) -> CodexCheckReport:
+    """Check project instructions, active Skills, commands, and Codex availability."""
+    project_skill = context.root / SKILL_DIRECTORY
+    canonical = canonical_skill_contents()
+    if command_probe is None:
+        inventory = available_commands if available_commands is not None else set(REQUIRED_COMMANDS)
+        executable_ok = True
+        workflow_check = _workflow_inventory_check(inventory)
+    else:
+        executable_ok = command_probe(())
+        workflow_check = _workflow_probe_check(command_probe)
+    codex_cli = _codex_cli_check()
     checks = [
         _file_check("agents_md", context.root / "AGENTS.md"),
-        _file_check("skill", context.root / SKILL_DIRECTORY / "SKILL.md"),
-        _skill_frontmatter_check(context.root / SKILL_DIRECTORY / "SKILL.md"),
+        _file_check("skill", project_skill / "SKILL.md"),
+        _skill_frontmatter_check(project_skill / "SKILL.md"),
+        _skill_sync_check(
+            "project_skill_sync",
+            project_skill,
+            canonical,
+            optional=False,
+        ),
         _status_check(
             "qbank_executable",
-            probe(()),
+            executable_ok,
             "qbank is executable through the current Python environment",
             "qbank cannot be executed through the current Python environment",
         ),
         _working_directory_check(context),
-        _codex_cli_check(),
-        _workflow_commands_check(probe),
+        codex_cli,
+        _skill_sync_check(
+            "user_skill_sync",
+            user_skill or user_skill_destination(),
+            _safe_project_skill_contents(project_skill),
+            optional=True,
+        ),
+        workflow_check,
     ]
     failures = sum(check.status == "FAIL" for check in checks)
     warnings = sum(check.status == "WARN" for check in checks)
-    return DoctorReport(
-        ok=failures == 0,
+    repository_ready = failures == 0
+    return CodexCheckReport(
+        ok=repository_ready,
+        repository_ready=repository_ready,
+        codex_cli_ready=codex_cli.status == "PASS",
+        degraded=failures > 0 or warnings > 0,
+        integration_revision=INTEGRATION_REVISION,
         summary=DoctorSummary(
             **{
                 "pass": len(checks) - failures - warnings,
@@ -121,12 +115,14 @@ def check_codex_integration(
 
 
 def codex_instructions(context: ProjectContext) -> CodexInstructionsResult:
-    """Return deterministic repository rules, command sequences, and data paths."""
+    """Return deterministic repository rules, workflows, commands, and data paths."""
     return CodexInstructionsResult(
         ok=True,
         project_root=str(context.root),
         rules=list(CODEX_RULES),
-        command_sequences={name: list(commands) for name, commands in COMMAND_SEQUENCES.items()},
+        command_sequences={
+            name: list(commands) for name, commands in LEGACY_COMMAND_SEQUENCES.items()
+        },
         paths={
             "questions": _relative(context, context.paths.questions),
             "assets": _relative(context, context.paths.assets),
@@ -135,6 +131,31 @@ def codex_instructions(context: ProjectContext) -> CodexInstructionsResult:
             "exports": _relative(context, context.paths.exports),
             "index": _relative(context, context.paths.state / "index.sqlite"),
         },
+        integration_revision=INTEGRATION_REVISION,
+        workflows=[
+            CodexWorkflow.model_validate(
+                {
+                    "name": workflow.name,
+                    "title": workflow.title,
+                    "purpose": workflow.purpose,
+                    "preconditions": workflow.preconditions,
+                    "steps": [
+                        {
+                            "command": step.command,
+                            "description": step.description,
+                            "command_path": step.command_path,
+                            "writes": step.writes,
+                            "dry_run_required": step.dry_run_required,
+                            "explicit_authorization": step.explicit_authorization,
+                            "interactive": step.interactive,
+                            "expected": step.expected,
+                        }
+                        for step in workflow.steps
+                    ],
+                }
+            )
+            for workflow in WORKFLOWS
+        ],
     )
 
 
@@ -144,17 +165,55 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
         "# qbank Codex instructions",
         "",
         f"Project root: `{instructions.project_root}`",
+        f"Integration revision: `{instructions.integration_revision}`",
         "",
         "## Rules",
         "",
         *(f"- {rule}" for rule in instructions.rules),
         "",
-        "## Recommended command sequences",
+        "## Recommended workflows",
         "",
     ]
-    for name, commands in instructions.command_sequences.items():
-        lines.extend((f"### {name}", "", "```powershell", *commands, "```", ""))
-    lines.extend(("## Data paths", ""))
+    for workflow in instructions.workflows:
+        lines.extend((f"### {workflow.name} — {workflow.title}", "", workflow.purpose, ""))
+        if workflow.preconditions:
+            lines.extend(("Prerequisites:", ""))
+            lines.extend(f"- {item}" for item in workflow.preconditions)
+            lines.append("")
+        for index, step in enumerate(workflow.steps, start=1):
+            flags: list[str] = []
+            if step.writes:
+                flags.append("writes")
+            if step.dry_run_required:
+                flags.append("dry-run")
+            if step.explicit_authorization:
+                flags.append("explicit authorization")
+            if step.interactive:
+                flags.append("interactive")
+            suffix = f" ({', '.join(flags)})" if flags else ""
+            lines.extend(
+                (
+                    f"{index}. `{step.command}`{suffix}",
+                    f"   {step.description}",
+                )
+            )
+            if step.expected:
+                lines.append(f"   Expected: {step.expected}")
+        lines.append("")
+    lines.extend(
+        (
+            "## Placeholders and recovery",
+            "",
+            "- Replace values such as `<filters>`, `<id>`, and `<paper>` with explicit user scope.",
+            "- Exit code 3 means validation failed; fix the input before retrying.",
+            "- Exit code 5 means a conflict; never bypass it by overwriting authoritative data.",
+            "- If search reports a missing, dirty, corrupt, or stale index, rebuild it only when authorized.",
+            "- Never launch `qbank preview --serve` or `qbank desktop` in unattended automation.",
+            "",
+            "## Data paths",
+            "",
+        )
+    )
     lines.extend(f"- `{name}`: `{path}`" for name, path in instructions.paths.items())
     return "\n".join(lines).rstrip() + "\n"
 
@@ -169,53 +228,149 @@ def install_repository_skill(
     *,
     dry_run: bool,
     home: Path | None = None,
+    scope: SkillScope = "user",
+    update: bool = False,
 ) -> SkillInstallResult:
-    """Plan or atomically copy the repository Skill into the user Skill directory."""
-    source = (context.root / SKILL_DIRECTORY).resolve()
-    destination = user_skill_destination(home)
-    _validate_skill_source(context, source)
-    files = len([path for path in source.rglob("*") if path.is_file()])
-    if destination.exists():
-        if _tree_contents(source) == _tree_contents(destination):
-            return _skill_install_result(
-                source,
-                destination,
-                files,
-                action="already_installed",
-                dry_run=dry_run,
-            )
+    """Plan, install, or explicitly update a project or user qbank Skill."""
+    source, source_label, destination = _skill_endpoints(context, scope=scope, home=home)
+    expected = source if isinstance(source, dict) else _validated_tree(context, source)
+    _validate_destination(destination)
+    exists = destination.exists()
+    current = _tree_contents(destination) if exists else {}
+    changes = _skill_changes(current, expected)
+    if exists and not changes:
+        return _skill_install_result(
+            source_label,
+            destination,
+            len(expected),
+            [],
+            _SkillOutcome(scope, "already_installed", dry_run),
+        )
+    if exists and not update:
         raise ConflictError(
-            f"user Skill already exists with different content: {destination}; "
-            "remove or back it up explicitly before installing"
+            f"{scope} Skill already exists with different content: {destination}; "
+            "inspect the diff with --update --dry-run before replacing it"
         )
     if dry_run:
         return _skill_install_result(
-            source,
+            source_label,
             destination,
-            files,
-            action="plan",
-            dry_run=True,
+            len(expected),
+            changes,
+            _SkillOutcome(scope, "plan", True),
         )
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary_root = Path(
-        tempfile.mkdtemp(
-            prefix=".qbank-skill-",
-            dir=destination.parent,
-        )
+    backup = _replace_skill_tree(
+        context,
+        destination,
+        expected,
+        scope=scope,
+        home=home,
+        update=exists,
     )
+    return _skill_install_result(
+        source_label,
+        destination,
+        len(expected),
+        changes,
+        _SkillOutcome(
+            scope,
+            "updated" if exists else "installed",
+            False,
+            backup,
+        ),
+    )
+
+
+def canonical_skill_contents() -> dict[str, bytes]:
+    """Read the packaged canonical Skill tree in source and wheel installations."""
+    root = files("qbank.resources").joinpath("init", "codex", "skill")
+    return {
+        relative: root.joinpath(*PurePosixPath(relative).parts)
+        .read_text(encoding="utf-8")
+        .encode("utf-8")
+        for relative in SKILL_FILES
+    }
+
+
+def _skill_endpoints(
+    context: ProjectContext,
+    *,
+    scope: SkillScope,
+    home: Path | None,
+) -> tuple[Path | dict[str, bytes], str, Path]:
+    if scope == "user":
+        source = context.root / SKILL_DIRECTORY
+        return source, str(source), user_skill_destination(home)
+    if scope == "project":
+        return (
+            canonical_skill_contents(),
+            "package:qbank.resources/init/codex/skill",
+            context.root / SKILL_DIRECTORY,
+        )
+    raise DataValidationError(f"unsupported Skill scope: {scope}")
+
+
+def _validated_tree(context: ProjectContext, source: Path) -> dict[str, bytes]:
+    _validate_skill_source(context, source)
+    return _tree_contents(source)
+
+
+def _replace_skill_tree(
+    context: ProjectContext,
+    destination: Path,
+    contents: Mapping[str, bytes],
+    *,
+    scope: SkillScope,
+    home: Path | None,
+    update: bool,
+) -> str | None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_root = Path(tempfile.mkdtemp(prefix=".qbank-skill-", dir=destination.parent))
     staged = temporary_root / "qbank"
+    backup: Path | None = None
+    moved_original = False
     try:
-        shutil.copytree(source, staged)
-        os.replace(staged, destination)
+        _write_tree(staged, contents)
+        if update:
+            backup = _backup_destination(context, scope=scope, home=home)
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(destination, backup)
+            moved_original = True
+        try:
+            os.replace(staged, destination)
+        except Exception as original_error:
+            if moved_original and backup is not None:
+                try:
+                    if destination.exists():
+                        shutil.rmtree(destination)
+                    os.replace(backup, destination)
+                except Exception as rollback_error:
+                    original_error.add_note(f"rollback failed: {rollback_error}")
+            raise
     finally:
         shutil.rmtree(temporary_root, ignore_errors=True)
-    return _skill_install_result(
-        source,
-        destination,
-        files,
-        action="installed",
-        dry_run=False,
-    )
+    return str(backup) if backup is not None else None
+
+
+def _backup_destination(
+    context: ProjectContext,
+    *,
+    scope: SkillScope,
+    home: Path | None,
+) -> Path:
+    token = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+    if scope == "project":
+        root = context.paths.state / "codex-skill-backups"
+    else:
+        root = (home or Path.home()).resolve() / ".agents" / ".qbank-backups" / "skills" / "qbank"
+    return root / token
+
+
+def _write_tree(root: Path, contents: Mapping[str, bytes]) -> None:
+    for relative, content in sorted(contents.items()):
+        destination = root.joinpath(*PurePosixPath(relative).parts)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
 
 
 def _file_check(name: str, path: Path) -> DoctorCheck:
@@ -255,6 +410,68 @@ def _skill_frontmatter_check(path: Path) -> DoctorCheck:
     )
 
 
+def _skill_sync_check(
+    name: str,
+    path: Path,
+    expected: Mapping[str, bytes],
+    *,
+    optional: bool,
+) -> DoctorCheck:
+    if path.is_symlink() or (path.exists() and any(item.is_symlink() for item in path.rglob("*"))):
+        return DoctorCheck(
+            name=name,
+            status="WARN" if optional else "FAIL",
+            message=f"Skill contains symbolic links and cannot be trusted: {path}",
+        )
+    if not path.is_dir():
+        if path.exists():
+            return DoctorCheck(
+                name=name,
+                status="WARN" if optional else "FAIL",
+                message=f"Skill path is not a directory: {path}",
+            )
+        return DoctorCheck(
+            name=name,
+            status="PASS" if optional else "FAIL",
+            message=(
+                f"optional user Skill is not installed: {path}"
+                if optional
+                else f"project Skill is missing: {path}"
+            ),
+        )
+    try:
+        changes = _skill_changes(_tree_contents(path), expected)
+    except OSError as exc:
+        return DoctorCheck(
+            name=name,
+            status="WARN" if optional else "FAIL",
+            message=f"cannot inspect Skill: {exc}",
+        )
+    if not changes:
+        return DoctorCheck(name=name, status="PASS", message=f"Skill is current: {path}")
+    counts = {action: 0 for action in ("add", "modify", "delete")}
+    for change in changes:
+        counts[change.action] += 1
+    return DoctorCheck(
+        name=name,
+        status="WARN",
+        message=(
+            f"Skill differs from its expected source: {path} "
+            f"({counts['add']} add, {counts['modify']} modify, {counts['delete']} delete); "
+            "inspect qbank codex install-skill --update --dry-run"
+        ),
+    )
+
+
+def _safe_project_skill_contents(path: Path) -> dict[str, bytes]:
+    if not path.is_dir() or path.is_symlink():
+        return canonical_skill_contents()
+    try:
+        return _tree_contents(path)
+    except OSError:
+        return canonical_skill_contents()
+
+
 def _working_directory_check(context: ProjectContext) -> DoctorCheck:
     current = Path.cwd().resolve()
     inside = current == context.root or current.is_relative_to(context.root)
@@ -272,7 +489,7 @@ def _codex_cli_check() -> DoctorCheck:
         return DoctorCheck(
             name="codex_cli",
             status="WARN",
-            message="Codex CLI is not on PATH; qbank remains usable",
+            message="Codex CLI is not on PATH; repository Skill clients remain usable",
         )
     try:
         result = subprocess.run(
@@ -280,7 +497,7 @@ def _codex_cli_check() -> DoctorCheck:
             capture_output=True,
             text=True,
             check=False,
-            timeout=15,
+            timeout=3,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         error = type(exc).__name__
@@ -309,32 +526,23 @@ def _codex_cli_check() -> DoctorCheck:
     )
 
 
-def _workflow_commands_check(probe: CommandProbe) -> DoctorCheck:
-    missing = [" ".join(parts) for parts in REQUIRED_WORKFLOW_COMMANDS if not probe(parts)]
+def _workflow_inventory_check(available: set[tuple[str, ...]]) -> DoctorCheck:
+    missing = [" ".join(parts) for parts in REQUIRED_COMMANDS if parts not in available]
+    return _workflow_status(missing)
+
+
+def _workflow_probe_check(probe: CommandProbe) -> DoctorCheck:
+    missing = [" ".join(parts) for parts in REQUIRED_COMMANDS if not probe(parts)]
+    return _workflow_status(missing)
+
+
+def _workflow_status(missing: list[str]) -> DoctorCheck:
     return _status_check(
         "workflow_commands",
         not missing,
-        f"{len(REQUIRED_WORKFLOW_COMMANDS)} required workflow commands are available",
+        f"{len(REQUIRED_COMMANDS)} required workflow commands are available",
         "missing command(s): " + ", ".join(missing),
     )
-
-
-def _command_probe(context: ProjectContext) -> CommandProbe:
-    def probe(parts: tuple[str, ...]) -> bool:
-        try:
-            result = subprocess.run(
-                [sys.executable, "-m", "qbank", *parts, "--help"],
-                cwd=context.root,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=30,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return False
-        return result.returncode == 0
-
-    return probe
 
 
 def _relative(context: ProjectContext, path: Path) -> str:
@@ -344,11 +552,23 @@ def _relative(context: ProjectContext, path: Path) -> str:
 def _validate_skill_source(context: ProjectContext, source: Path) -> None:
     if not source.is_dir() or not (source / "SKILL.md").is_file():
         raise DataValidationError(f"repository Skill is missing: {source}")
-    if not source.is_relative_to(context.root):
-        raise DataValidationError(f"repository Skill escapes project root: {source}")
-    symlinks = [path for path in source.rglob("*") if path.is_symlink()]
+    resolved = source.resolve()
+    if not resolved.is_relative_to(context.root):
+        raise DataValidationError(f"repository Skill escapes project root: {resolved}")
+    symlinks = [path for path in (source, *source.rglob("*")) if path.is_symlink()]
     if symlinks:
         raise DataValidationError(f"repository Skill contains symbolic links: {symlinks[0]}")
+
+
+def _validate_destination(destination: Path) -> None:
+    if destination.is_symlink():
+        raise DataValidationError(f"Skill destination is a symbolic link: {destination}")
+    if destination.exists():
+        if not destination.is_dir():
+            raise DataValidationError(f"Skill destination is not a directory: {destination}")
+        symlinks = [path for path in destination.rglob("*") if path.is_symlink()]
+        if symlinks:
+            raise DataValidationError(f"Skill destination contains symbolic links: {symlinks[0]}")
 
 
 def _tree_contents(root: Path) -> dict[str, bytes]:
@@ -359,21 +579,53 @@ def _tree_contents(root: Path) -> dict[str, bytes]:
     }
 
 
+def _skill_changes(
+    before: Mapping[str, bytes],
+    after: Mapping[str, bytes],
+) -> list[SkillFileChange]:
+    result: list[SkillFileChange] = []
+    for relative in sorted(set(before) | set(after)):
+        old = before.get(relative)
+        new = after.get(relative)
+        if old == new:
+            continue
+        action: Literal["add", "modify", "delete"]
+        if old is None:
+            action = "add"
+        elif new is None:
+            action = "delete"
+        else:
+            action = "modify"
+        result.append(
+            SkillFileChange(
+                path=relative,
+                action=action,
+                before_sha256=_sha256(old),
+                after_sha256=_sha256(new),
+            )
+        )
+    return result
+
+
+def _sha256(content: bytes | None) -> str | None:
+    return hashlib.sha256(content).hexdigest() if content is not None else None
+
+
 def _skill_install_result(
-    source: Path,
+    source: str,
     destination: Path,
-    files: int,
-    *,
-    action: str,
-    dry_run: bool,
+    files_count: int,
+    changes: list[SkillFileChange],
+    outcome: _SkillOutcome,
 ) -> SkillInstallResult:
-    return SkillInstallResult.model_validate(
-        {
-            "ok": True,
-            "dry_run": dry_run,
-            "action": action,
-            "source": str(source),
-            "destination": str(destination),
-            "files": files,
-        }
+    return SkillInstallResult(
+        ok=True,
+        dry_run=outcome.dry_run,
+        action=outcome.action,
+        source=source,
+        destination=str(destination),
+        files=files_count,
+        scope=outcome.scope,
+        backup=outcome.backup,
+        changes=changes,
     )

@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 import base64
+import queue
+import threading
+import weakref
 from functools import partial
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from PySide6.QtCore import (
     QBuffer,
     QEvent,
     QFileSystemWatcher,
     QIODevice,
+    QObject,
     QPoint,
     QSize,
     Qt,
     QTimer,
     QUrl,
+    Signal,
 )
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
@@ -31,14 +36,32 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QToolBar,
+    QToolButton,
 )
 
 from qbank.assets import stable_legacy_asset_id
-from qbank.desktop.controller import DesktopController
+from qbank.bootstrap import create_project_services
+from qbank.context import ProjectContext
+from qbank.desktop.controller import DesktopController, InteractiveRenderer
+from qbank.desktop.preferences_dialog import (
+    StudioPreferences,
+    StudioPreferencesDialog,
+    load_studio_preferences,
+    save_studio_preferences,
+)
+from qbank.desktop.question_dialog import QuestionIdentityDialog
 from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
 from qbank.desktop.widgets import DetailDrawer, NavigationPane, WebWorkspace, WorkspaceMode
 from qbank.errors import QBankError
-from qbank.models import AssetManifest, DesktopAssetItem, PatchQuestionResult, QueryFilters
+from qbank.models import (
+    AssetManifest,
+    DesktopAssetItem,
+    DesktopQuestionListResult,
+    DiagnosticCode,
+    PaperBuildRequest,
+    PatchQuestionResult,
+    QueryFilters,
+)
 from qbank.presentation.studio.design.controls import ModernComboBox
 from qbank.presentation.studio.design.icons import icon
 from qbank.presentation.studio.design.metrics import METRICS
@@ -71,6 +94,46 @@ _ASSET_MENU_ITEMS = (
 )
 
 
+class NavigationSearchBridge(QObject):
+    """Deliver background navigation results safely to the Qt UI thread."""
+
+    completed = Signal(int, object, object)
+
+    active = True
+
+
+SearchJob = tuple[
+    int,
+    DesktopController,
+    str,
+    QueryFilters,
+]
+SearchQueue = queue.Queue[SearchJob | None]
+
+
+def _search_loop(
+    jobs: SearchQueue,
+    bridge_ref: weakref.ReferenceType[NavigationSearchBridge],
+) -> None:
+    while (job := jobs.get()) is not None:
+        generation, controller, view, filters = job
+        bridge = bridge_ref()
+        if bridge is None or not bridge.active:
+            continue
+        try:
+            result = controller.navigation_result(view=view, filters=filters)
+            error: object = None
+        except Exception as exc:
+            result, error = None, exc
+        bridge = bridge_ref()
+        if bridge is None or not bridge.active:
+            continue
+        try:
+            bridge.completed.emit(generation, result, error)
+        except RuntimeError:
+            continue
+
+
 class DesktopMainWindow(QMainWindow):
     """Text-first two-and-a-half-column qbank desktop shell."""
 
@@ -89,9 +152,24 @@ class DesktopMainWindow(QMainWindow):
         self._preview_generation = 0
         self._scheduled_preview_generation = 0
         self._preview_loading = False
+        self._search_generation = 0
+        self._search_bridge = NavigationSearchBridge(self)
+        self._search_jobs: SearchQueue = queue.Queue()
+        self._search_thread: threading.Thread | None = None
         self._asset_menu: QMenu | None = None
         self._icon_actions: dict[str, QAction] = {}
+        self._paper_actions: dict[str, QAction] = {}
+        self._mode_actions: dict[str, QAction] = {}
         self._editing_targets: dict[str, tuple[str, str]] = {}
+        self._replacement_window: DesktopMainWindow | None = None
+        stored_preferences = load_studio_preferences(theme)
+        self.preferences = StudioPreferences(
+            theme=theme,
+            workspace_mode=stored_preferences.workspace_mode,
+            show_detail_drawer=stored_preferences.show_detail_drawer,
+            show_project_path=stored_preferences.show_project_path,
+        )
+        self._workspace_mode: WorkspaceMode = self.preferences.workspace_mode
         self.navigation = NavigationPane(theme)
         self.workspace = WebWorkspace(theme)
         self.drawer = DetailDrawer(
@@ -115,8 +193,11 @@ class DesktopMainWindow(QMainWindow):
         self.setCentralWidget(shell)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, _navigation_dock(self.navigation))
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.drawer)
+        self.drawer.setVisible(self.preferences.show_detail_drawer)
         QTimer.singleShot(0, self._apply_drawer_width)
+        self.addToolBar(self._project_toolbar())
         self.addToolBar(self._toolbar())
+        self.workspace.set_mode(self._workspace_mode)
         self.statusBar().showMessage("就绪")
 
     def _apply_drawer_width(self) -> None:
@@ -130,13 +211,76 @@ class DesktopMainWindow(QMainWindow):
     def _toolbar(self) -> QToolBar:
         toolbar = QToolBar("编辑")
         toolbar.setObjectName("editorToolbar")
-        toolbar.setIconSize(QSize(METRICS.icon_normal, METRICS.icon_normal))
+        self._configure_toolbar(toolbar, METRICS.icon_normal)
         self._add_edit_actions(toolbar)
         toolbar.addSeparator()
         self._add_mode_actions(toolbar)
         toolbar.addSeparator()
         self._add_context_actions(toolbar)
         return toolbar
+
+    def _project_toolbar(self) -> QToolBar:
+        toolbar = QToolBar("题库")
+        toolbar.setObjectName("projectToolbar")
+        self._configure_toolbar(toolbar, METRICS.icon_small)
+        self.project_name = QLabel()
+        self.project_name.setObjectName("projectName")
+        self.project_path = QLabel()
+        self.project_path.setObjectName("projectPath")
+        self.project_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.validation_state = QLabel()
+        self.index_state = QLabel()
+        for status in (self.validation_state, self.index_state):
+            status.setFixedWidth(METRICS.icon_normal + METRICS.space_1)
+            status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        toolbar.addWidget(self.project_name)
+        toolbar.addWidget(self.project_path)
+        toolbar.addWidget(self.validation_state)
+        toolbar.addWidget(self.index_state)
+        toolbar.addSeparator()
+        for key, label, callback in (
+            ("open-project", "打开题库", self._open_project),
+            ("add", "新建题目", self._new_question),
+            ("copy", "复制题目", self._copy_current_question),
+            ("import", "导入题目", self._import_questions),
+            ("delete", "删除题目", self._delete_current_question),
+        ):
+            action = self._action(key, label)
+            action.triggered.connect(callback)
+            toolbar.addAction(action)
+        toolbar.addSeparator()
+        self.paper_button = QToolButton()
+        self.paper_button.setIcon(icon("paper", self.theme_name))
+        self.paper_button.setText("试卷：未选择")
+        self.paper_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.paper_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.paper_button.setAccessibleName("当前试卷操作")
+        self.paper_button.setMenu(self._paper_menu())
+        toolbar.addWidget(self.paper_button)
+        return toolbar
+
+    @staticmethod
+    def _configure_toolbar(toolbar: QToolBar, icon_size: int) -> None:
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setIconSize(QSize(icon_size, icon_size))
+        toolbar.setFixedHeight(METRICS.toolbar_height)
+
+    def _paper_menu(self) -> QMenu:
+        menu = QMenu(self)
+        for key, label, callback in (
+            ("select", "选择试卷…", self._select_paper),
+            ("new", "新建试卷…", self._new_paper),
+            ("add", "加入题目", self._add_to_paper),
+            ("validate", "验证试卷", self._validate_paper),
+            ("build", "构建试卷", self._build_paper),
+            ("export", "导出试卷…", self._export_paper),
+        ):
+            action = menu.addAction(label)
+            action.triggered.connect(callback)
+            self._paper_actions[key] = action
+        menu.aboutToShow.connect(self._refresh_paper_actions)
+        return menu
 
     def _add_edit_actions(self, toolbar: QToolBar) -> None:
         save = self._action("save", "保存")
@@ -177,18 +321,21 @@ class DesktopMainWindow(QMainWindow):
             action = self._action(mode, label)
             action.setCheckable(True)
             action.setData(mode)
-            action.setChecked(mode == "split")
+            action.setChecked(mode == self._workspace_mode)
             action.triggered.connect(
                 lambda checked=False, value=mode: self._set_workspace_mode(value)
             )
             group.addAction(action)
             toolbar.addAction(action)
+            self._mode_actions[mode] = action
 
     def _add_context_actions(self, toolbar: QToolBar) -> None:
-        toolbar.addWidget(QLabel("语法："))
         language = self.language_mode
         language.addItem("Markdown", "markdown")
         language.addItem("TeX", "tex")
+        language.setAccessibleName("编辑器语法")
+        language.setToolTip("编辑器语法")
+        language.setFixedWidth(124)
         language.currentIndexChanged.connect(partial(self._language_mode_changed, language))
         toolbar.addWidget(language)
         toolbar.addSeparator()
@@ -198,12 +345,9 @@ class DesktopMainWindow(QMainWindow):
         drawer_action.setToolTip("显示或隐藏题目详情")
         self._icon_actions["properties"] = drawer_action
         toolbar.addAction(drawer_action)
-        toolbar.addSeparator()
-        theme = self._action("theme", "切换主题")
-        theme.setCheckable(True)
-        theme.setChecked(self.theme_name == "dark")
-        theme.triggered.connect(self._toggle_theme)
-        toolbar.addAction(theme)
+        settings = self._action("settings", "Studio 设置")
+        settings.triggered.connect(self._show_preferences)
+        toolbar.addAction(settings)
 
     def _action(self, key: str, label: str) -> QAction:
         action = QAction(icon(key, self.theme_name), label, self)
@@ -213,7 +357,7 @@ class DesktopMainWindow(QMainWindow):
 
     def _wire_events(self) -> None:
         self.navigation.view_changed.connect(self._refresh_navigation)
-        self.navigation.search_changed.connect(self._refresh_navigation)
+        self.navigation.search_changed.connect(self._start_navigation_search)
         self.navigation.filters_changed.connect(self._refresh_navigation)
         self.navigation.question_selected.connect(self._select_question)
         self.navigation.save_view_requested.connect(self._save_current_view)
@@ -237,33 +381,336 @@ class DesktopMainWindow(QMainWindow):
         self.drawer.restore_requested.connect(self._restore_current)
         self.preview_timer.timeout.connect(self._render_scheduled_preview)
         self.file_watcher.fileChanged.connect(self._editor_file_changed)
+        self._search_bridge.completed.connect(self._apply_navigation_search)
         self._wire_metadata_changes()
 
     def _wire_metadata_changes(self) -> None:
         self.drawer.metadata.metadata_changed.connect(self._metadata_changed)
         self.drawer.metadata.topics.pending_topic_created.connect(self._pending_topic_created)
+        self.drawer.source.changed.connect(self._metadata_changed)
 
     def _language_mode_changed(self, language: ModernComboBox, index: int) -> None:
         self.workspace.set_language_mode(str(language.itemData(index)))
 
     def _set_workspace_mode(self, mode: str) -> None:
         self._dismiss_asset_menu()
-        self.workspace.set_mode(cast(WorkspaceMode, mode))
+        self._workspace_mode = cast(WorkspaceMode, mode)
+        action = self._mode_actions.get(mode)
+        if action is not None:
+            action.setChecked(True)
+        self.workspace.set_mode(self._workspace_mode)
 
     def _workspace_mode_changed(self, mode: str) -> None:
         del mode
         self._dismiss_asset_menu()
 
+    def _show_preferences(self) -> None:
+        current = StudioPreferences(
+            theme=self.theme_name,
+            workspace_mode=self._workspace_mode,
+            show_detail_drawer=self.drawer.isVisible(),
+            show_project_path=self.preferences.show_project_path,
+        )
+        selected = StudioPreferencesDialog.get_preferences(current, self)
+        if selected is None:
+            return
+        save_studio_preferences(selected)
+        self.preferences = selected
+        if selected.theme != self.theme_name:
+            self.set_theme(selected.theme)
+        self._set_workspace_mode(selected.workspace_mode)
+        self.drawer.setVisible(selected.show_detail_drawer)
+        self._update_project_path_label()
+
     def _drawer_asset_activated(self, asset_id: str) -> None:
         self._asset_action(asset_id, "edit")
 
     def _load_initial_state(self) -> None:
-        try:
-            self.controller.load_current_paper()
-        except (QBankError, OSError, ValueError) as exc:
-            self.statusBar().showMessage(str(exc), 8000)
         self._refresh_navigation_data()
         self._refresh_navigation()
+        self._refresh_project_state()
+
+    def _refresh_project_state(self) -> None:
+        root = self.controller.context.root
+        self.project_name.setText(root.name)
+        self._update_project_path_label()
+        try:
+            status = self.controller.project_status()
+        except (QBankError, OSError, ValueError) as exc:
+            self.validation_state.setText("×")
+            self.validation_state.setObjectName("statusError")
+            self.validation_state.setAccessibleName("题库状态不可用")
+            self.validation_state.setToolTip(f"题库状态不可用：{exc}")
+            self.index_state.clear()
+            self.index_state.setAccessibleName("索引状态不可用")
+            return
+        valid = status.validation_errors == 0
+        validation_text = "校验通过" if valid else f"{status.validation_errors} 个校验错误"
+        self.validation_state.setText("✓" if valid else "×")
+        self.validation_state.setObjectName("statusSuccess" if valid else "statusError")
+        self.validation_state.setAccessibleName(validation_text)
+        self.validation_state.setToolTip(validation_text)
+        index_text = "索引需重建" if status.index_dirty else "索引正常"
+        self.index_state.setText("△" if status.index_dirty else "✓")
+        self.index_state.setObjectName("statusWarning" if status.index_dirty else "statusSuccess")
+        self.index_state.setAccessibleName(index_text)
+        self.index_state.setToolTip(index_text)
+        for label in (self.validation_state, self.index_state):
+            label.style().unpolish(label)
+            label.style().polish(label)
+        self._refresh_paper_state()
+
+    def _update_project_path_label(self) -> None:
+        path = str(self.controller.context.root)
+        if self.preferences.show_project_path:
+            self.project_path.setText(path)
+            self.project_path.setAccessibleName(f"题库路径：{path}")
+        else:
+            self.project_path.clear()
+            self.project_path.setAccessibleName("")
+        self.project_path.setToolTip(path)
+        self.project_path.updateGeometry()
+
+    def _refresh_paper_state(self) -> None:
+        context = self.controller.paper_context
+        self.paper_button.setText("试卷" if context.path is None else context.name)
+        self.paper_button.setAccessibleName(f"当前试卷操作，{context.name}")
+        self.paper_button.setToolTip(
+            str(context.path) if context.path is not None else "请选择或新建试卷"
+        )
+        self._refresh_paper_actions()
+
+    def _refresh_paper_actions(self) -> None:
+        context = self.controller.paper_context
+        has_paper = context.path is not None
+        has_question = self.current_id is not None or bool(self.navigation.selected_question_ids())
+        enabled = {
+            "select": True,
+            "new": has_question,
+            "add": has_paper and has_question,
+            "validate": has_paper,
+            "build": has_paper,
+            "export": has_paper,
+        }
+        for key, action in self._paper_actions.items():
+            action.setEnabled(enabled[key])
+            action.setStatusTip(
+                ""
+                if enabled[key]
+                else ("请先打开或选择题目" if key == "new" else "请先选择或新建试卷")
+            )
+
+    def _open_project(self) -> None:
+        if not self._can_leave_current():
+            return
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "打开 qbank 题库（请选择包含 qbank.yaml 的文件夹）",
+            str(self.controller.context.root.parent),
+        )
+        if not selected:
+            return
+        try:
+            context = ProjectContext.from_root(Path(selected))
+            services = create_project_services(context)
+            controller = DesktopController(
+                context,
+                services,
+                cast(InteractiveRenderer, services.renderer),
+            )
+            replacement = DesktopMainWindow(controller, self.theme_name)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+            return
+        self._replacement_window = replacement
+        replacement.show()
+        self.close()
+
+    def _new_question(self) -> None:
+        defaults = self.controller.context.config.defaults
+        identity = QuestionIdentityDialog.get_new_question(
+            self,
+            defaults.subject,
+            defaults.language,
+        )
+        if identity is None or identity.title is None:
+            return
+        try:
+            self.controller.create_question(identity.question_id, identity.title, dry_run=True)
+            self.controller.create_question(identity.question_id, identity.title, dry_run=False)
+            self._refresh_after_question_write(identity.question_id)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _copy_current_question(self) -> None:
+        if self.current_id is None:
+            return
+        try:
+            current = self.controller.load_question(self.current_id).question
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+            return
+        defaults = self.controller.context.config.defaults
+        identity = QuestionIdentityDialog.get_question_copy(
+            self,
+            defaults.subject,
+            defaults.language,
+            (current.id, current.title),
+        )
+        if identity is None:
+            return
+        try:
+            self.controller.copy_question(self.current_id, identity.question_id, dry_run=True)
+            self.controller.copy_question(self.current_id, identity.question_id, dry_run=False)
+            self._refresh_after_question_write(identity.question_id)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _import_questions(self) -> None:
+        selected, _ = QFileDialog.getOpenFileName(
+            self,
+            "导入题目",
+            str(self.controller.context.root),
+            "题目交换文件 (*.json *.jsonl)",
+        )
+        if not selected:
+            return
+        try:
+            planned = self.controller.import_questions(Path(selected), dry_run=True)
+            if not planned.ok:
+                raise ValueError("导入文件包含无效或冲突题目")
+            answer = self._message_box(
+                "确认导入",
+                f"将导入 {planned.would_write or 0} 道题。",
+                QMessageBox.Icon.Question,
+                QMessageBox.StandardButton.Apply | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Apply:
+                return
+            self.controller.import_questions(Path(selected), dry_run=False)
+            self._refresh_after_question_write(None)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _delete_current_question(self) -> None:
+        if self.current_id is None or not self._can_leave_current():
+            return
+        try:
+            planned = self.controller.delete_question(self.current_id, dry_run=True)
+            answer = self._message_box(
+                "删除题目",
+                f"将删除 {planned.id}\n{planned.path}\n\n此操作会写入历史记录。",
+                QMessageBox.Icon.Warning,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.controller.delete_question(self.current_id, dry_run=False)
+            self.current_id = None
+            self._refresh_after_question_write(None)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _refresh_after_question_write(self, question_id: str | None) -> None:
+        self._refresh_navigation_data()
+        self._refresh_navigation()
+        self._refresh_project_state()
+        if question_id is not None:
+            self._load_question(question_id)
+
+    def _select_paper(self) -> None:
+        selected, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择当前试卷",
+            str(self.controller.context.paths.papers),
+            "试卷定义 (*.yaml)",
+        )
+        if not selected:
+            return
+        try:
+            self.controller.load_current_paper(Path(selected))
+            self._refresh_paper_state()
+            self._refresh_navigation()
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _new_paper(self) -> None:
+        ids = self.navigation.selected_question_ids()
+        if not ids and self.current_id is not None:
+            ids = [self.current_id]
+        if not ids:
+            self.statusBar().showMessage("请先打开或选择至少一道题", 5000)
+            return
+        title, accepted = QInputDialog.getText(self, "新建试卷", "试卷标题：")
+        if not accepted or not title.strip():
+            return
+        filename, accepted = QInputDialog.getText(self, "新建试卷", "文件名：", text="paper.yaml")
+        if not accepted or not filename.strip():
+            return
+        path = self.controller.context.paths.papers / filename.strip()
+        try:
+            self.controller.create_paper(path, title.strip(), ids, dry_run=True)
+            self.controller.create_paper(path, title.strip(), ids, dry_run=False)
+            self._refresh_paper_state()
+            self._refresh_navigation()
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _add_to_paper(self) -> None:
+        ids = self.navigation.selected_question_ids()
+        if not ids and self.current_id is not None:
+            ids = [self.current_id]
+        if not ids:
+            return
+        try:
+            self.controller.add_to_current_paper(ids, dry_run=True)
+            self.controller.add_to_current_paper(ids, dry_run=False)
+            self._refresh_paper_state()
+            self._refresh_navigation()
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _validate_paper(self) -> None:
+        try:
+            result = self.controller.validate_current_paper()
+            self._message_box(
+                "试卷验证",
+                f"{result.summary.questions} 道题，{result.summary.errors} 个错误，"
+                f"{result.summary.warnings} 个提示。",
+                QMessageBox.Icon.Information if result.ok else QMessageBox.Icon.Warning,
+            )
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
+
+    def _build_paper(self) -> None:
+        self._run_paper_build(output=None)
+
+    def _export_paper(self) -> None:
+        selected, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出试卷",
+            str(self.controller.context.paths.exports / "paper.html"),
+            "HTML (*.html);;Markdown (*.md);;Word (*.docx)",
+        )
+        if selected:
+            self._run_paper_build(output=Path(selected))
+
+    def _run_paper_build(self, output: Path | None) -> None:
+        format_ = output.suffix.lower().lstrip(".") if output is not None else "html"
+        if format_ not in {"md", "html", "docx"}:
+            format_ = "html"
+        try:
+            result = self.controller.build_current_paper(
+                PaperBuildRequest(
+                    output_format=cast(Literal["md", "html", "docx"], format_),
+                    output=output,
+                )
+            )
+            self.statusBar().showMessage(f"试卷已生成：{result.output}", 8000)
+        except (QBankError, OSError, ValueError) as exc:
+            self._show_error(exc)
 
     def _refresh_navigation_data(self) -> None:
         data = self.controller.navigation_data()
@@ -271,6 +718,8 @@ class DesktopMainWindow(QMainWindow):
         self.drawer.metadata.set_taxonomy(data.tags)
 
     def _refresh_navigation(self, *_: object) -> None:
+        self._search_generation += 1
+        self.navigation.set_search_loading(False)
         try:
             view = self.navigation.current_view()
             result = self.controller.navigation_result(
@@ -281,6 +730,48 @@ class DesktopMainWindow(QMainWindow):
         except (QBankError, ValueError) as exc:
             self.statusBar().showMessage(f"筛选条件无效：{exc}", 6000)
             return
+        self._apply_navigation_result(result)
+
+    def _start_navigation_search(self, _text: str) -> None:
+        self._search_generation += 1
+        generation = self._search_generation
+        if not self.navigation.search.text().strip():
+            self.navigation.set_search_loading(False)
+            self._refresh_navigation()
+            return
+        self.navigation.set_search_loading(True)
+        if self._search_thread is None:
+            self._search_thread = threading.Thread(
+                target=_search_loop,
+                args=(self._search_jobs, weakref.ref(self._search_bridge)),
+                name=f"qbank-search-{id(self):x}",
+            )
+            self._search_thread.start()
+        self._search_jobs.put(
+            (
+                generation,
+                self.controller,
+                self.navigation.current_view(),
+                self.navigation.current_filters(),
+            )
+        )
+
+    def _apply_navigation_search(
+        self,
+        generation: int,
+        result: object,
+        error: object,
+    ) -> None:
+        if generation != self._search_generation:
+            return
+        self.navigation.set_search_loading(False)
+        if error is not None:
+            self.statusBar().showMessage(f"搜索暂不可用：{error}", 6000)
+            return
+        if isinstance(result, DesktopQuestionListResult):
+            self._apply_navigation_result(result)
+
+    def _apply_navigation_result(self, result: DesktopQuestionListResult) -> None:
         self.navigation.set_rows(result.rows, self.current_id)
         self.navigation.set_tag_rows(result.tags, result.total)
 
@@ -335,8 +826,6 @@ class DesktopMainWindow(QMainWindow):
 
     def _bulk_topics(self, adding: bool) -> None:
         question_ids = self.navigation.selected_question_ids()
-        if not question_ids and self.current_id is not None:
-            question_ids = [self.current_id]
         if not question_ids:
             return
         label = "添加" if adding else "移除"
@@ -424,8 +913,7 @@ class DesktopMainWindow(QMainWindow):
     def _apply_overview_filter(self, filters: object) -> None:
         if not isinstance(filters, QueryFilters):
             return
-        self.navigation.select_view("all")
-        self.navigation.set_transient_filters(filters)
+        self.navigation.set_query_state("all", filters)
         self.raise_()
         self.activateWindow()
 
@@ -453,6 +941,7 @@ class DesktopMainWindow(QMainWindow):
             return
         self._switching = True
         self.current_id = question_id
+        self.navigation.set_current_question(question_id)
         self.current_source = document.source
         self.drawer.load_document(document)
         self.workspace.set_source(document.source)
@@ -587,14 +1076,19 @@ class DesktopMainWindow(QMainWindow):
         self._load_question(current)
         self._refresh_navigation_data()
         self._refresh_navigation()
-        self.statusBar().showMessage("题目已保存、校验并更新索引", 5000)
+        self._refresh_project_state()
+        message = "题目已保存、校验并更新索引"
+        if any(warning.code == DiagnosticCode.INDEX_DIRTY for warning in result.warnings):
+            message = "题目已保存；索引更新失败，已标记为需要重建"
+        self.statusBar().showMessage(message, 5000)
         return True
 
     def _show_validation(self, result: PatchQuestionResult) -> None:
         if result.ok:
-            details = f"{len(result.changes)} 个字段将变化"
-            if result.validation_warnings:
-                details += f"，{len(result.validation_warnings)} 个提示"
+            details = (
+                f"{len(result.validation_errors)} 个校验错误，"
+                f"{len(result.validation_warnings)} 个提示"
+            )
             self._message_box("校验通过", details, QMessageBox.Icon.Information)
             return
         messages = "\n".join(item.message for item in result.validation_errors)
@@ -942,7 +1436,8 @@ class DesktopMainWindow(QMainWindow):
     def _update_title(self) -> None:
         marker = " *" if self.dirty else ""
         suffix = f" — {self.current_id}" if self.current_id else ""
-        self.setWindowTitle(f"qbank 题目编辑器{suffix}{marker}")
+        project = self.controller.context.root.name
+        self.setWindowTitle(f"qbank Studio · {project}{suffix}{marker}")
 
     def _show_error(self, error: object) -> None:
         self._message_box("操作失败", str(error), QMessageBox.Icon.Critical)
@@ -980,6 +1475,7 @@ class DesktopMainWindow(QMainWindow):
         self.workspace.set_theme(theme)
         self.drawer.set_theme(theme)
         self.language_mode.set_theme(theme)
+        self.paper_button.setIcon(icon("paper", theme))
         for key, action in self._icon_actions.items():
             action.setIcon(icon(key, theme))
         if self.current_id is not None:
@@ -999,6 +1495,13 @@ class DesktopMainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self._can_leave_current():
+            self._search_generation += 1
+            self.navigation.search_timer.stop()
+            self._search_bridge.active = False
+            if self._search_thread is not None:
+                self._search_jobs.put(None)
+                self._search_thread.join()
+                self._search_thread = None
             event.accept()
         else:
             event.ignore()

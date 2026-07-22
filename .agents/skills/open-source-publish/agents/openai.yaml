@@ -1,0 +1,4 @@
+interface:
+  display_name: "Open Source Publish"
+  short_description: "Orchestrate safe open-source publication"
+  default_prompt: "Use $open-source-publish to orchestrate a safe open-source release."

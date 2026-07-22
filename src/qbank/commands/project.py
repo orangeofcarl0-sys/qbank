@@ -13,6 +13,7 @@ from qbank.cli_support import (
     abort,
     discover_context,
     emit_json,
+    require_output_format,
     stdout_console,
 )
 from qbank.diagnostics import doctor_in_context, project_status_in_context
@@ -34,6 +35,7 @@ def init_command(
 ) -> None:
     """Initialize a qbank project in the current or named directory."""
     try:
+        require_output_format(output_format, "table", "json")
         target = initialize_project(
             (Path.cwd() / directory).resolve(),
             force=force,
@@ -54,6 +56,7 @@ def status_command(
 ) -> None:
     """Summarize question counts and index state."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         result = project_status_in_context(
             context,
@@ -81,6 +84,7 @@ def doctor_command(
 ) -> None:
     """Check Python, project files, FTS5, Pandoc, schemas, and assets."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         result = doctor_in_context(
             context,
@@ -116,8 +120,7 @@ def schema_command(
 ) -> None:
     """Print a public question, paper, or patch JSON Schema."""
     try:
-        if output_format != "json":
-            raise DataValidationError("schema currently supports only --format json")
+        require_output_format(output_format, "json")
         if kind not in {"question", "paper", "patch", "asset", "asset-package"}:
             raise DataValidationError(
                 "invalid_filter: --kind must be question, paper, patch, asset, or asset-package"

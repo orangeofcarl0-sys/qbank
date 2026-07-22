@@ -16,6 +16,7 @@ from qbank.cli_support import (
     emit_warnings,
     print_rows,
     question_rows,
+    require_output_format,
 )
 from qbank.models import QueryFilters, SavedViewMutationResult, TagMutationResult
 
@@ -145,6 +146,7 @@ def _emit_tag_mutation(
     callback: Callable[[TagApplicationService], TagMutationResult], output_format: str
 ) -> None:
     try:
+        require_output_format(output_format, "table", "json")
         result = callback(_services().tags)
         emit_warnings(result, output_format)
         if output_format == "json":
@@ -185,6 +187,7 @@ def view_save_command(
 ) -> None:
     """Save the supplied combination of metadata and tag filters."""
     try:
+        require_output_format(output_format, "table", "json")
         filters = QueryFilters.model_validate(
             {
                 "text": text,
@@ -247,6 +250,7 @@ def _emit_view_mutation(
     callback: Callable[[SavedViewService], SavedViewMutationResult], output_format: str
 ) -> None:
     try:
+        require_output_format(output_format, "table", "json")
         result = callback(_services().views)
         if output_format == "json":
             emit_json(result)

@@ -25,6 +25,8 @@ JSON/JSONL as exchange data, and SQLite as a disposable projection.
 5. Never edit `questions/**/*.md` or `.qbank/index.sqlite` directly by default.
 6. Dry-run every write, inspect errors and warnings, then execute it.
 7. After a write, run `qbank validate --format json`.
+8. Run destructive operations only after an explicit user request.
+9. Do not start blocking interactive commands in unattended work.
 
 ## Route the request
 
@@ -32,6 +34,9 @@ JSON/JSONL as exchange data, and SQLite as a disposable projection.
 - To audit or revise existing questions, follow Workflow B.
 - To search and select candidates, follow Workflow C.
 - To assemble and export a paper, follow Workflow D.
+- To create or revise logical assets, follow Workflow E.
+- To manage tags or saved views, follow Workflow F.
+- To rebuild projections, delete data, or launch an interactive UI, follow Workflow G.
 
 Read [references/workflows.md](references/workflows.md) before performing the
 selected workflow. Read [references/command-reference.md](references/command-reference.md)

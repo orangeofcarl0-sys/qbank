@@ -37,9 +37,9 @@ class QueryFilters(StrictModel):
             raise ValueError("topic filters must not be empty")
         return list(dict.fromkeys(item.strip() for item in value))
 
-    @field_validator("text")
+    @field_validator("subject", "chapter", "language", "text")
     @classmethod
-    def search_text_is_trimmed(cls, value: str | None) -> str | None:
+    def optional_text_is_trimmed(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()
@@ -67,6 +67,16 @@ class QueryFilters(StrictModel):
             timestamp is not None
             and datetime.fromisoformat(timestamp.replace("Z", "+00:00")).year == self.year
         )
+
+    def semantic_values(self) -> dict[str, object]:
+        """Return normalized query meaning without presentation pagination."""
+        values: dict[str, object] = self.model_dump(
+            mode="json",
+            exclude={"limit", "offset"},
+        )
+        values["topics"] = sorted(self.topics)
+        values["excluded_topics"] = sorted(self.excluded_topics)
+        return values
 
 
 class IngestOptions(StrictModel):

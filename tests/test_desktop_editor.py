@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -16,13 +17,14 @@ from qbank.cli import app
 from qbank.context import ProjectContext
 from qbank.desktop.controller import DesktopController
 from qbank.domain import RenderedAsset
-from qbank.errors import DataValidationError
+from qbank.errors import ConflictError, DataValidationError, QuestionNotFoundError
 from qbank.infrastructure.assets import AssetInputAdapter, FileAssetRepository
 from qbank.models import (
     AssetFormat,
     AssetPackage,
     AssetPackageRepresentation,
     AssetStatus,
+    PaperBuildRequest,
     PatchQuestionResult,
     Question,
     QuestionPatch,
@@ -444,6 +446,7 @@ def test_desktop_resources_embed_codemirror_and_closed_asset_actions() -> None:
     assert "bridge.sourceChanged(update.state.doc.toString())" in editor_entry
     assert "window.qbankAssetActionsEnabled = false" in preview
     assert "image.tabIndex = 0" in preview
+    assert "image.focus({preventScroll: true})" in preview
     assert "event.key === 'ContextMenu'" in preview
     assert ".drop-hint { box-sizing: border-box; display: flex" in preview
     assert "@media (max-width: 520px)" in preview
@@ -497,7 +500,8 @@ def test_desktop_navigation_paper_and_asset_actions_use_application_services(
     assert [item.id for item in controller.list_questions(search="michelson")] == [question.id]
     assert controller.list_questions(search="不存在") == []
 
-    paper_ids = controller.load_current_paper()
+    assert controller.load_current_paper() == ()
+    paper_ids = controller.load_current_paper(context.paths.papers / "demo-paper.yaml")
     assert question.id in paper_ids
     assert [item.id for item in controller.list_questions(view="paper")] == [question.id]
 
@@ -516,6 +520,171 @@ def test_desktop_navigation_paper_and_asset_actions_use_application_services(
     )
     assert selected.ok
     assert controller.restore_asset(question.id, "diagram").ok
+
+
+def test_studio_save_persists_source_and_one_unified_history_timeline(
+    project: tuple[Path, Any], question: Question
+) -> None:
+    context = _context(project)
+    add_question(context.root, context.config, question)
+    controller = DesktopController(
+        context,
+        create_project_services(context),
+        RenderService(context),
+    )
+    document = controller.load_question(question.id)
+
+    saved = controller.save_source(
+        question.id,
+        document.source + "\n\nStudio note",
+        {
+            "title": "Updated in Studio",
+            "source": {"type": "book", "reference": "Reference 2025 Q7"},
+            "topics": [*question.topics, "studio-pending"],
+        },
+    )
+
+    assert saved.ok
+    reopened_controller = DesktopController(
+        context,
+        create_project_services(context),
+        RenderService(context),
+    )
+    reopened = reopened_controller.load_question(question.id)
+    assert reopened.question.title == "Updated in Studio"
+    assert reopened.question.source.type == "book"
+    assert reopened.question.source.reference == "Reference 2025 Q7"
+    studio_event = next(event for event in reopened.history if event.operation == "studio_save")
+    assert studio_event.source == "Studio"
+    assert {"title", "source", "topics"}.issubset(studio_event.fields)
+    taxonomy = create_project_services(context).tags.list_tags()
+    pending = next(item for item in taxonomy if item.slug == "studio-pending")
+    assert pending.metadata is not None
+    assert pending.metadata.status.value == "pending"
+    question_path = context.paths.questions / reopened.question.subject / f"{question.id}.md"
+    history_dir = context.root / ".qbank" / "history"
+    before_question = question_path.read_bytes()
+    before_history = {path.name: path.read_bytes() for path in history_dir.glob("*.json")}
+
+    retried = reopened_controller.save_source(question.id, reopened.source)
+
+    assert retried.ok and retried.changes == []
+    assert question_path.read_bytes() == before_question
+    assert {path.name: path.read_bytes() for path in history_dir.glob("*.json")} == before_history
+
+
+def test_studio_save_rolls_back_question_taxonomy_and_history_together(
+    project: tuple[Path, Any],
+    question: Question,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _context(project)
+    add_question(context.root, context.config, question)
+    controller = DesktopController(
+        context,
+        create_project_services(context),
+        RenderService(context),
+    )
+    document = controller.load_question(question.id)
+    question_path = context.paths.questions / question.subject / f"{question.id}.md"
+    taxonomy_path = context.root / "taxonomy.yaml"
+    before_question = question_path.read_bytes()
+    before_taxonomy = taxonomy_path.read_bytes()
+    history_dir = context.root / ".qbank" / "history"
+    before_history = {path.name: path.read_bytes() for path in history_dir.glob("*.json")}
+    from qbank import transaction
+
+    original = transaction.atomic_write_text
+
+    def fail_taxonomy(path: Path, text: str) -> None:
+        if path == taxonomy_path:
+            raise OSError("taxonomy unavailable")
+        original(path, text)
+
+    monkeypatch.setattr(transaction, "atomic_write_text", fail_taxonomy)
+    with pytest.raises(OSError, match="taxonomy unavailable"):
+        controller.save_source(
+            question.id,
+            document.source + "\n\nunsaved",
+            {"topics": [*question.topics, "will-rollback"]},
+        )
+
+    assert question_path.read_bytes() == before_question
+    assert taxonomy_path.read_bytes() == before_taxonomy
+    assert {path.name: path.read_bytes() for path in history_dir.glob("*.json")} == before_history
+
+
+def test_explicit_question_and_paper_workflows_refuse_implicit_overwrite(
+    project: tuple[Path, Any], question: Question
+) -> None:
+    context = _context(project)
+    add_question(context.root, context.config, question)
+    controller = DesktopController(
+        context,
+        create_project_services(context),
+        RenderService(context),
+    )
+
+    assert controller.load_current_paper() == ()
+    assert controller.project_status().questions == 1
+    created = controller.create_question("OPT-NEW-0001", "New question", dry_run=True)
+    assert created.dry_run
+    controller.create_question("OPT-NEW-0001", "New question", dry_run=False)
+    assert controller.load_question("OPT-NEW-0001").question.status.value == "draft"
+    controller.copy_question(question.id, "OPT-COPY-0001", dry_run=True)
+    controller.copy_question(question.id, "OPT-COPY-0001", dry_run=False)
+    copied = controller.load_question("OPT-COPY-0001").question
+    assert copied.status.value == "draft"
+    assert copied.created_at is not None
+    import_path = context.root / "build" / "ai" / "studio-import.json"
+    import_path.parent.mkdir(parents=True, exist_ok=True)
+    imported = Question.model_validate(
+        {
+            **question.model_dump(mode="json"),
+            "id": "OPT-IMPORT-0001",
+            "created_at": None,
+            "updated_at": None,
+        }
+    )
+    import_path.write_text(
+        json.dumps(imported.model_dump(mode="json"), ensure_ascii=False),
+        encoding="utf-8-sig",
+    )
+    assert controller.import_questions(import_path, dry_run=True).dry_run
+    controller.import_questions(import_path, dry_run=False)
+    assert controller.load_question("OPT-IMPORT-0001").question.id == "OPT-IMPORT-0001"
+    assert controller.delete_question("OPT-NEW-0001", dry_run=True).dry_run
+    controller.delete_question("OPT-NEW-0001", dry_run=False)
+    with pytest.raises(QuestionNotFoundError):
+        controller.load_question("OPT-NEW-0001")
+    paper_path = context.paths.papers / "generated" / "studio-paper.yaml"
+    controller.create_paper(
+        paper_path,
+        "Studio paper",
+        [question.id],
+        dry_run=True,
+    )
+    controller.create_paper(
+        paper_path,
+        "Studio paper",
+        [question.id],
+        dry_run=False,
+    )
+    assert controller.paper_context.path == paper_path.resolve()
+    assert paper_path in controller.list_papers()
+    controller.add_to_current_paper(["OPT-COPY-0001"], dry_run=True)
+    controller.add_to_current_paper(["OPT-COPY-0001"], dry_run=False)
+    assert set(controller.paper_context.question_ids) == {question.id, "OPT-COPY-0001"}
+    assert controller.validate_current_paper().ok
+    built = controller.build_current_paper(
+        PaperBuildRequest(
+            output_format="md",
+            output=context.paths.exports / "studio-paper.md",
+        )
+    )
+    assert (context.root / built.output).is_file()
+    with pytest.raises(ConflictError, match="already exists"):
+        controller.create_paper(paper_path, "Replacement", [question.id], dry_run=True)
 
 
 def test_desktop_controller_metadata_collisions_and_invalid_inputs(

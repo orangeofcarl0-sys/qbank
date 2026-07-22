@@ -19,6 +19,7 @@ from qbank.cli_support import (
     emit_json,
     emit_warnings,
     read_utf8,
+    require_output_format,
     resolve_project_path,
 )
 from qbank.errors import DataValidationError, ExitCode
@@ -40,6 +41,7 @@ def asset_list_command(
 ) -> None:
     """List logical assets registered for one question."""
     try:
+        require_output_format(output_format, "table", "json")
         services = _services_for_question(question_id)
         result = services.assets.list_assets(question_id)
         if output_format == "json":
@@ -63,6 +65,7 @@ def asset_show_command(
 ) -> None:
     """Show one logical asset and all representations."""
     try:
+        require_output_format(output_format, "table", "json")
         services = _services_for_question(question_id)
         result = services.assets.show_asset(question_id, asset_id)
         if output_format == "json":
@@ -91,6 +94,7 @@ def asset_ingest_command(
 ) -> None:
     """Ingest one asset-package JSON without discarding source representations."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         path = resolve_project_path(context, package_file)
@@ -130,6 +134,7 @@ def asset_add_command(
 ) -> None:
     """Add a file, Base64/data URI, TikZ, Ipe, PDF region, or URL."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         _require_question(services, question_id)
@@ -200,6 +205,7 @@ def asset_render_command(
 ) -> None:
     """Render a registered Ipe source to immutable PDF/SVG/PNG versions."""
     try:
+        require_output_format(output_format, "table", "json")
         services = _services_for_question(question_id)
         formats = _render_formats(render_format)
         result = services.assets.render_asset(
@@ -228,6 +234,7 @@ def asset_replace_command(
 ) -> None:
     """Add and select a replacement version while retaining every prior file."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         _require_question(services, question_id)
@@ -296,6 +303,7 @@ def asset_finalize_command(
 ) -> None:
     """Mark an asset final after validating its preferred render."""
     try:
+        require_output_format(output_format, "table", "json")
         services = _services_for_question(question_id)
         result = services.assets.finalize(question_id, asset_id, dry_run=dry_run)
         _emit_mutation(result, output_format)
@@ -311,6 +319,7 @@ def asset_normalize_command(
 ) -> None:
     """Migrate preserved legacy path references to stable logical asset IDs."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         _require_question(services, question_id)
@@ -343,6 +352,7 @@ def asset_validate_command(
 ) -> None:
     """Validate every asset manifest, owner, file, hash, and lifecycle state."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         services = create_project_services(context)
         snapshot = services.repository.scan()
@@ -497,6 +507,7 @@ def _asset_command(
     output_format: str,
 ) -> None:
     try:
+        require_output_format(output_format, "table", "json")
         service = _services_for_question(question_id).assets
         result = (
             service.open_asset(question_id, asset_id, dry_run=dry_run)
@@ -523,6 +534,7 @@ def _set_preference(
     output_format: str,
 ) -> None:
     try:
+        require_output_format(output_format, "table", "json")
         service = _services_for_question(question_id).assets
         result = service.set_preference(
             question_id,

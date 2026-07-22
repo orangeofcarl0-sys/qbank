@@ -24,7 +24,7 @@ from qbank.bootstrap import create_project_services
 from qbank.cli import app
 from qbank.commands import assets as asset_commands
 from qbank.context import ProjectContext
-from qbank.domain import RenderedAsset, select_asset_representation
+from qbank.domain import RenderedAsset, asset_legacy_references, select_asset_representation
 from qbank.errors import (
     AssetCommandError,
     AssetConflictError,
@@ -505,6 +505,84 @@ def test_target_selection_prefers_pdf_for_pdf_and_svg_for_html() -> None:
     )
     assert select_asset_representation(manifest, "pdf").representation_id == "pdf"
     assert select_asset_representation(manifest, "html").representation_id == "svg"
+
+
+def test_target_selection_covers_preferred_stale_and_incompatible_paths() -> None:
+    fresh_preferred = AssetManifest(
+        schema_version="1.0",
+        question_id="OPT-INT-0001",
+        asset_id="fresh-preferred",
+        role="diagram",
+        status=AssetStatus.FINAL,
+        preferred_render="svg",
+        representations=[
+            AssetRepresentation(
+                representation_id="svg",
+                format=AssetFormat.SVG,
+                path="image.svg",
+                purpose="render",
+                content_hash="3" * 64,
+            )
+        ],
+    )
+    assert select_asset_representation(fresh_preferred, "html").representation_id == "svg"
+    assert select_asset_representation(fresh_preferred, "preview", requested="missing") is None
+
+    incompatible = AssetManifest(
+        schema_version="1.0",
+        question_id="OPT-INT-0001",
+        asset_id="incompatible",
+        role="diagram",
+        status=AssetStatus.RAW,
+        representations=[
+            AssetRepresentation(
+                representation_id="pdf",
+                format=AssetFormat.PDF,
+                path="image.pdf",
+                purpose="render",
+                content_hash="4" * 64,
+            )
+        ],
+    )
+    assert select_asset_representation(incompatible, "preview") is None
+
+    stale_preferred = AssetManifest(
+        schema_version="1.0",
+        question_id="OPT-INT-0001",
+        asset_id="stale-preferred",
+        role="diagram",
+        status=AssetStatus.NEEDS_REDRAW,
+        preferred_render="svg",
+        representations=[
+            AssetRepresentation(
+                representation_id="pdf",
+                format=AssetFormat.PDF,
+                path="image.pdf",
+                purpose="render",
+                stale=True,
+                content_hash="5" * 64,
+            ),
+            AssetRepresentation(
+                representation_id="svg",
+                format=AssetFormat.SVG,
+                path="image.svg",
+                purpose="render",
+                stale=True,
+                content_hash="6" * 64,
+            ),
+        ],
+    )
+    assert select_asset_representation(stale_preferred, "pdf").representation_id == "svg"
+
+
+def test_asset_legacy_references_accepts_only_explicit_strings() -> None:
+    assert asset_legacy_references(
+        {
+            "legacy_reference": "assets/legacy.svg",
+            "original_asset_path": 42,
+            "legacy_references": ["assets/one.png", None, "assets/two.pdf"],
+        }
+    ) == {"assets/legacy.svg", "assets/one.png", "assets/two.pdf"}
 
 
 def test_needs_redraw_warning_is_emitted_for_paper_projection(

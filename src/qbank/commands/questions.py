@@ -21,6 +21,7 @@ from qbank.cli_support import (
     question_rows,
     read_stdin,
     read_utf8,
+    require_output_format,
     resolve_project_path,
     stdout_console,
 )
@@ -50,6 +51,7 @@ def add_command(
 ) -> None:
     """Add one complete AI exchange JSON object."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         if stdin == (file is not None):
             raise DataValidationError("provide exactly one of a JSON file or --stdin")
@@ -88,6 +90,7 @@ def ingest_command(
 ) -> None:
     """Validate then batch-import one JSON object per line."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         input_path = resolve_project_path(context, file)
         records = parse_json_lines(read_utf8(input_path, label="JSONL"))
@@ -131,6 +134,7 @@ def validate_command(
 ) -> None:
     """Validate one question, changed questions, or the whole bank."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         report = create_question_service(context).validate_repository(
             question_id=question_id,
@@ -185,6 +189,7 @@ def list_command(
 ) -> None:
     """List question summaries."""
     try:
+        require_output_format(output_format, "table", "json", "jsonl")
         questions = questions_for_filters(_filters(limit=limit))
         print_rows(question_rows(questions), output_format)
     except Exception as exc:
@@ -200,6 +205,7 @@ def get_command(
 ) -> None:
     """Read complete question objects by ID."""
     try:
+        require_output_format(output_format, "table", "json", "jsonl")
         context = discover_context()
         questions = create_question_service(context).get_questions(question_ids)
         if output_format == "json":
@@ -251,6 +257,7 @@ def query_command(
 ) -> None:
     """Filter questions by metadata and topic membership."""
     try:
+        require_output_format(output_format, "table", "json", "jsonl")
         questions = questions_for_filters(
             _filters(
                 subject=subject,
@@ -288,6 +295,7 @@ def search_command(
 ) -> None:
     """Search title, stem, answer, solution, topics, and chapter."""
     try:
+        require_output_format(output_format, "table", "json", "jsonl")
         context = discover_context()
         rows = create_question_service(context).search_questions(text, limit=limit)
         print_rows(rows, output_format)
@@ -304,6 +312,7 @@ def patch_command(
 ) -> None:
     """Apply a structured JSON patch to one question."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         if stdin == (file is not None):
             raise DataValidationError("provide exactly one of --stdin or --file")
@@ -343,6 +352,7 @@ def delete_command(
 ) -> None:
     """Delete a question source file while retaining assets."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         if not dry_run and not yes and not typer.confirm(f"Delete {question_id}?"):
             raise typer.Abort()
@@ -370,6 +380,7 @@ def index_rebuild_command(
 ) -> None:
     """Rebuild the SQLite FTS5 index from Markdown."""
     try:
+        require_output_format(output_format, "table", "json")
         context = discover_context()
         count = create_question_service(context).rebuild_index()
         result = {"ok": True, "indexed": count}

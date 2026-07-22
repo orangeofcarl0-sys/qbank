@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("PySide6")
+pytest.importorskip("PySide6.QtCore")
 pytest.importorskip("pytestqt")
 
 from PySide6.QtCore import QSettings, Qt
@@ -33,6 +33,12 @@ from qbank.desktop.main_window import (
     preview_result_is_current,
     snapshot_is_dirty,
 )
+from qbank.desktop.preferences_dialog import (
+    StudioPreferences,
+    StudioPreferencesForm,
+    load_studio_preferences,
+    save_studio_preferences,
+)
 from qbank.desktop.widgets import (
     AssetCard,
     DetailDrawer,
@@ -40,6 +46,7 @@ from qbank.desktop.widgets import (
     LegacyAssetCard,
     MetadataPanel,
     NavigationPane,
+    PreviewWebView,
     WebWorkspace,
 )
 from qbank.models import (
@@ -114,6 +121,46 @@ def test_qt_theme_keeps_a_valid_scalable_point_size(qtbot: QtBot) -> None:
     assert "font-size: 9pt" in stylesheet
 
 
+def test_studio_preferences_form_and_native_settings_round_trip(qtbot: QtBot) -> None:
+    settings = QSettings("qbank", "qbank")
+    keys = (
+        "studio/theme",
+        "studio/defaultWorkspaceMode",
+        "studio/showDetailDrawer",
+        "studio/showProjectPath",
+    )
+    original = {key: settings.value(key) for key in keys}
+    try:
+        preferences = StudioPreferences(
+            theme="dark",
+            workspace_mode="preview",
+            show_detail_drawer=False,
+            show_project_path=True,
+        )
+        form = StudioPreferencesForm(preferences, "dark")
+        qtbot.addWidget(form)
+
+        assert form.preferences() == preferences
+        assert form.theme.accessibleName() == "界面主题"
+        assert form.workspace_mode.accessibleName() == "默认编辑视图"
+        with qtbot.waitSignal(form.changed, timeout=1000):
+            form.show_project_path.setChecked(False)
+
+        save_studio_preferences(preferences)
+        assert load_studio_preferences() == preferences
+        settings.setValue("studio/theme", "unknown")
+        settings.setValue("studio/defaultWorkspaceMode", "unknown")
+        assert load_studio_preferences("light").theme == "light"
+        assert load_studio_preferences().workspace_mode == "split"
+    finally:
+        for key, value in original.items():
+            if value is None:
+                settings.remove(key)
+            else:
+                settings.setValue(key, value)
+        settings.sync()
+
+
 def test_metadata_panel_uses_dense_accessible_inspector_fields(qtbot: QtBot) -> None:
     panel = MetadataPanel()
     qtbot.addWidget(panel)
@@ -124,7 +171,7 @@ def test_metadata_panel_uses_dense_accessible_inspector_fields(qtbot: QtBot) -> 
         (panel.title, "标题"),
         (panel.subject, "学科"),
         (panel.chapter, "章节"),
-        (panel.topics, "主题"),
+        (panel.topics, "标签"),
         (panel.question_type, "题型"),
         (panel.status, "状态"),
         (panel.difficulty, "难度"),
@@ -287,7 +334,8 @@ def test_asset_source_history_and_empty_states_are_actionable(qtbot: QtBot) -> N
     )
     qtbot.mouseClick(toggle, Qt.MouseButton.LeftButton)
     assert not card.representations.isHidden()
-    assert drawer.source.fields["type"].text() == "人工录入"
+    assert drawer.source.inputs["type"].text() == "manual"
+    assert drawer.source.inputs["reference"].text() == "实验讲义 2025 第 3 题"
     assert drawer.source.fields["year"].text() == "2025"
     assert drawer.source.fields["number"].text() == "3"
     assert drawer.source.raw.isHidden()
@@ -609,6 +657,23 @@ def test_codemirror_load_resets_history_and_undo_returns_to_saved_source(qtbot: 
         workspace.undo()
     assert undone.args == [saved]
     assert not snapshot_is_dirty(str(undone.args[0]), {}, saved, {})
+
+
+def test_preview_webview_routes_shift_f10_to_focused_image_menu(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    preview = PreviewWebView()
+    qtbot.addWidget(preview)
+    scripts: list[str] = []
+    monkeypatch.setattr(preview.page(), "runJavaScript", scripts.append)
+    assert preview._context_menu_shortcut.key().toString() == "Shift+F10"
+    assert preview._context_menu_shortcut.context() == Qt.ShortcutContext.WidgetWithChildrenShortcut
+    preview._context_menu_shortcut.activated.emit()
+
+    assert len(scripts) == 1
+    assert "KeyboardEvent('keydown'" in scripts[0]
+    assert 'key: "F10"' in scripts[0]
+    assert "shiftKey: true" in scripts[0]
 
 
 def test_codemirror_theme_switch_replaces_live_web_theme(qtbot: QtBot) -> None:

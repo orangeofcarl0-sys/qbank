@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Publish"
+  short_description: "Publish an approved release with strict gates"
+  default_prompt: "Use $github-publish to prepare an approved GitHub publication plan."

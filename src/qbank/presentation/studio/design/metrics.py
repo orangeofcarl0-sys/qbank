@@ -16,7 +16,7 @@ class Metrics:
     radius_small: int = 4
     radius_medium: int = 6
     control_height: int = 30
-    toolbar_height: int = 38
+    toolbar_height: int = 36
     nav_width: int = 246
     icon_small: int = 14
     icon_normal: int = 16
