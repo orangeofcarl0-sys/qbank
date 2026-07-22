@@ -1,5 +1,9 @@
 # qbank workflows
 
+Before selecting a workflow, complete the context handshake in
+`context-handoff.md`. In cross-project work, keep the source project read-only and
+run every qbank command with the target qbank root as the working directory.
+
 ## A. Organize and import questions
 
 1. Run `qbank doctor --format json`.

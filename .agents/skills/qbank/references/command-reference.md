@@ -13,12 +13,24 @@ qbank codex check --format json
 qbank codex instructions --format json
 qbank codex install-skill --user --dry-run --format json
 qbank codex install-skill --project --update --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --project --update --dry-run --format json
 ```
 
 `codex check` reports repository and Codex CLI readiness separately. Skill differences
 are warnings until an explicit `install-skill --update` is confirmed. Project updates
 back up the current Skill under `.qbank/codex-skill-backups/`; user updates use
 `$HOME/.agents/.qbank-backups/skills/qbank/`.
+
+`--skill qbank` is the backward-compatible default. Select `qbank-digitize` only
+for the independent PDF digitization guide; it hands approved execution back to
+the qbank communication and mutation workflow.
+
+When the source task is in another repository, set the execution working directory to
+the target qbank root before running these commands. Do not depend on a prior shell
+location or write temporary exchange files into the source repository. The JSON from
+`codex instructions` includes `context_protocol`, which defines the required handoff
+fields, authorization modes, bootstrap commands, and completion record.
 
 ## Read and search
 

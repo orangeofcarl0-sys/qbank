@@ -226,6 +226,9 @@ def test_package_resources_match_mirrors_and_init_output(tmp_path: Path) -> None
         "AGENTS.md": "AGENTS.md",
         ".agents/skills/qbank/SKILL.md": ".agents/skills/qbank/SKILL.md",
         ".agents/skills/qbank/agents/openai.yaml": (".agents/skills/qbank/agents/openai.yaml"),
+        ".agents/skills/qbank/references/context-handoff.md": (
+            ".agents/skills/qbank/references/context-handoff.md"
+        ),
         ".agents/skills/qbank/references/workflows.md": (
             ".agents/skills/qbank/references/workflows.md"
         ),
@@ -234,6 +237,25 @@ def test_package_resources_match_mirrors_and_init_output(tmp_path: Path) -> None
         ),
         ".agents/skills/qbank/references/examples.md": (
             ".agents/skills/qbank/references/examples.md"
+        ),
+        ".agents/skills/qbank-digitize/SKILL.md": (".agents/skills/qbank-digitize/SKILL.md"),
+        ".agents/skills/qbank-digitize/agents/openai.yaml": (
+            ".agents/skills/qbank-digitize/agents/openai.yaml"
+        ),
+        ".agents/skills/qbank-digitize/assets/classification-map.csv": (
+            ".agents/skills/qbank-digitize/assets/classification-map.csv"
+        ),
+        ".agents/skills/qbank-digitize/assets/digitization-profile.yaml": (
+            ".agents/skills/qbank-digitize/assets/digitization-profile.yaml"
+        ),
+        ".agents/skills/qbank-digitize/references/intake.md": (
+            ".agents/skills/qbank-digitize/references/intake.md"
+        ),
+        ".agents/skills/qbank-digitize/references/field-policy.md": (
+            ".agents/skills/qbank-digitize/references/field-policy.md"
+        ),
+        ".agents/skills/qbank-digitize/references/calibration.md": (
+            ".agents/skills/qbank-digitize/references/calibration.md"
         ),
         "templates/paper.md.j2": "templates/paper.md.j2",
         "templates/paper.html.j2": "templates/paper.html.j2",

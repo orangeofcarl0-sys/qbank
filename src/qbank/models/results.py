@@ -647,6 +647,18 @@ class CodexWorkflow(ResultModel):
     steps: list[CodexWorkflowStep]
 
 
+class CodexContextProtocol(ResultModel):
+    """Minimum context required to run qbank reliably across repositories."""
+
+    target_project_root: str = ""
+    execution_working_directory: str = ""
+    required_handoff_fields: list[str] = Field(default_factory=list)
+    authorization_modes: list[str] = Field(default_factory=list)
+    foreign_project_policy: str = ""
+    bootstrap_commands: list[str] = Field(default_factory=list)
+    completion_handoff_fields: list[str] = Field(default_factory=list)
+
+
 def _codex_workflow_list() -> list[CodexWorkflow]:
     return []
 
@@ -660,6 +672,7 @@ class CodexInstructionsResult(ResultModel):
     command_sequences: dict[str, list[str]]
     paths: dict[str, str]
     integration_revision: int = 1
+    context_protocol: CodexContextProtocol = Field(default_factory=CodexContextProtocol)
     workflows: list[CodexWorkflow] = Field(default_factory=_codex_workflow_list)
 
 

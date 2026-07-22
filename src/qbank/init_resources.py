@@ -42,6 +42,10 @@ STATIC_INIT_RESOURCES = (
         PurePosixPath("init/codex/skill/agents/openai.yaml"),
     ),
     ManagedResource(
+        PurePosixPath(".agents/skills/qbank/references/context-handoff.md"),
+        PurePosixPath("init/codex/skill/references/context-handoff.md"),
+    ),
+    ManagedResource(
         PurePosixPath(".agents/skills/qbank/references/workflows.md"),
         PurePosixPath("init/codex/skill/references/workflows.md"),
     ),
@@ -52,6 +56,34 @@ STATIC_INIT_RESOURCES = (
     ManagedResource(
         PurePosixPath(".agents/skills/qbank/references/examples.md"),
         PurePosixPath("init/codex/skill/references/examples.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/SKILL.md"),
+        PurePosixPath("init/codex/qbank-digitize/SKILL.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/agents/openai.yaml"),
+        PurePosixPath("init/codex/qbank-digitize/agents/openai.yaml"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/references/intake.md"),
+        PurePosixPath("init/codex/qbank-digitize/references/intake.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/references/field-policy.md"),
+        PurePosixPath("init/codex/qbank-digitize/references/field-policy.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/references/calibration.md"),
+        PurePosixPath("init/codex/qbank-digitize/references/calibration.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/assets/digitization-profile.yaml"),
+        PurePosixPath("init/codex/qbank-digitize/assets/digitization-profile.yaml"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/assets/classification-map.csv"),
+        PurePosixPath("init/codex/qbank-digitize/assets/classification-map.csv"),
     ),
     ManagedResource(
         PurePosixPath("qbank.yaml"),

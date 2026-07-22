@@ -4,7 +4,42 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-INTEGRATION_REVISION = 1
+INTEGRATION_REVISION = 2
+
+CONTEXT_REQUIRED_FIELDS = (
+    "objective",
+    "target_project_root",
+    "source_locations",
+    "workflow",
+    "authorization",
+    "acceptance_criteria",
+    "unresolved_questions",
+)
+
+CONTEXT_AUTHORIZATION_MODES = (
+    "read_only",
+    "dry_run_only",
+    "write_authorized",
+)
+
+COMPLETION_HANDOFF_FIELDS = (
+    "integration_revision",
+    "target_project_root",
+    "source_locations",
+    "workflow",
+    "authorization",
+    "commands_executed",
+    "writes",
+    "validation",
+    "outputs",
+    "warnings",
+    "next_step",
+)
+
+FOREIGN_PROJECT_POLICY = (
+    "Treat every non-qbank source project as read-only unless the user explicitly "
+    "authorizes writes there."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +86,8 @@ INTERACTIVE = StepBehavior(explicit_authorization=True, interactive=True)
 
 
 CODEX_RULES = (
+    "Establish the target qbank root, source locations, and authorization before acting.",
+    FOREIGN_PROJECT_POLICY,
     "Markdown under questions/ is authoritative question data.",
     "JSON and JSONL are AI exchange formats; SQLite is only a rebuildable index.",
     "Read the question Schema before creating exchange data.",
@@ -391,7 +428,18 @@ REQUIRED_COMMANDS = tuple(
 SKILL_FILES = (
     "SKILL.md",
     "agents/openai.yaml",
+    "references/context-handoff.md",
     "references/workflows.md",
     "references/command-reference.md",
     "references/examples.md",
+)
+
+DIGITIZE_SKILL_FILES = (
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/classification-map.csv",
+    "assets/digitization-profile.yaml",
+    "references/calibration.md",
+    "references/field-policy.md",
+    "references/intake.md",
 )

@@ -10,6 +10,13 @@
 - [ ] Temporary AI data is written under `build/ai/`.
 - [ ] Final artifacts are written under `exports/`.
 - [ ] Uncertain questions stay `draft` without invented answers or sources.
+- [ ] Cross-project work records the target qbank root, source locations, workflow,
+      authorization, acceptance criteria, and unresolved questions.
+- [ ] qbank commands use the target root as their working directory.
+- [ ] A non-qbank source project remains read-only without separate explicit authorization.
+- [ ] Missing target or write scope causes a focused question before any mutation.
+- [ ] A resumed task verifies the target root and `integration_revision` before writing.
+- [ ] Completion reports commands, writes, validation, outputs, warnings, and one next step.
 
 Record the Codex version, prompt, exit status, observed Skill discovery, commands executed,
 and any deviations for each manual run.

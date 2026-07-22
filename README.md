@@ -194,17 +194,23 @@ DOCX 由系统 Pandoc 生成；Pandoc 不可用时 Markdown 和 HTML 构建不�
 
 ## Codex 接入
 
-每个新题库包含仓库级 `AGENTS.md` 和 `$qbank` Skill。Codex Desktop、IDE 和 CLI 可以依据
-这些规则调用本地 qbank 命令；qbank 本身不需要 OpenAI API key，也不嵌入模型 SDK。
+每个新题库包含仓库级 `AGENTS.md`，以及两个职责独立的 Skill：`$qbank` 定义题库定位、
+授权、CLI 调用、校验和任务交接协议；`$qbank-digitize` 为 PDF、扫描件和分类表项目提供需求
+访谈、字段取舍与代表性样本校准。后者是可选的领域工具，不属于也不替代 `$qbank` 通信层。
+Codex Desktop、IDE 和 CLI 可以依据这些规则调用本地 qbank 命令；qbank 本身不需要 OpenAI
+API key，也不嵌入模型 SDK。
 
 ```powershell
 qbank codex check --format json
 qbank codex instructions --format markdown
-qbank codex install-skill --user --dry-run --format json
+qbank codex install-skill --skill qbank --user --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
 ```
 
-仓库就绪、Codex CLI 可用和用户级 Skill 同步是相互独立的状态。完整检查、安装、更新和备份
-语义见 [Codex 接入指南](docs/codex-integration.md)。
+PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_decision_packet`，再交回
+`$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
+同步是相互独立的状态。完整职责、安装、更新和备份语义见
+[Codex 接入指南](docs/codex-integration.md)。
 
 ## 文档索引
 
@@ -212,7 +218,7 @@ qbank codex install-skill --user --dry-run --format json
 | --- | --- |
 | [用户指南](docs/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
 | [Studio 用户文档](docs/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
-| [Codex 接入指南](docs/codex-integration.md) | 仓库级 Skill、用户级 Skill 和 Codex CLI |
+| [Codex 接入指南](docs/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
 | [兼容性策略](docs/compatibility-policy.md) | 0.1.x 公共行为与变更规则 |
 | [代码审查指南](docs/code_review.md) | 质量门、依赖边界和审查要求 |

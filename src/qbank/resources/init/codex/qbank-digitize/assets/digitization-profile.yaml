@@ -1,0 +1,61 @@
+profile_version: "1.0"
+
+job:
+  name: null
+  objective: null
+  mode: calibrated_batch
+  source_files: []
+  target_qbank_root: null
+  acceptance_criteria: []
+
+record_unit:
+  split_rule: one_numbered_question
+  composite_policy: preserve_as_composite
+  subquestion_policy: preserve_in_stem
+  source_number_policy: preserve_in_source_reference
+
+field_policy:
+  schema_version: {mode: system, value: "1.0"}
+  id: {mode: system, pattern: null}
+  title: {mode: generated_label, rule: concise_source_grounded_summary}
+  type: {mode: classify, fallback: other}
+  subject: {mode: constant, value: null}
+  chapter: {mode: ignore_as_null}
+  topics: {mode: classify, fallback: null}
+  difficulty: {mode: constant, value: 3, semantic: false}
+  status: {mode: constant, value: draft}
+  language: {mode: constant, value: zh-CN}
+  source: {mode: transcribe, require_page_reference: true}
+  assets: {mode: transcribe}
+  stem_md: {mode: transcribe}
+  options_md: {mode: transcribe}
+  answer_md: {mode: transcribe, missing: ignore_as_empty}
+  solution_md: {mode: transcribe, missing: ignore_as_empty}
+  rubric_md: {mode: ignore_as_empty}
+  review_notes_md: {mode: review_required}
+
+classification:
+  authority: user_approved_mapping
+  mapping_file: classification-map.csv
+  version: null
+  unknown_policy: review_required
+
+evidence:
+  preserve_printed_number: true
+  formula_policy: transcribe_and_flag_uncertain
+  figure_policy: extract_only_when_referenced
+  answer_inference_allowed: false
+
+calibration:
+  target_questions: 10
+  cover_all_archetypes: true
+  approval_required: true
+  approved_by: null
+  approved_at: null
+
+execution_handoff:
+  authorization: dry_run_only
+  max_questions_per_batch: 50
+  partial_imports_allowed: false
+
+unresolved_questions: []

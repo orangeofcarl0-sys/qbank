@@ -1,6 +1,9 @@
 # qbank agent rules
 
 - Markdown under `questions/` is the authoritative question data.
+- Before acting across projects, identify the target qbank root, source locations, and
+  authorization; run qbank commands with the target root as the working directory.
+- Treat non-qbank source projects as read-only unless the user explicitly authorizes writes.
 - JSON and JSONL are AI exchange formats. SQLite is only a rebuildable search index.
 - Before creating questions, run `qbank schema --format json`.
 - Do not edit `questions/**/*.md` directly by default.

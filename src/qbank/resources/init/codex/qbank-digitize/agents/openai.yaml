@@ -1,0 +1,4 @@
+interface:
+  display_name: "qbank PDF Digitization"
+  short_description: "Guide PDF-to-qbank project decisions and calibration"
+  default_prompt: "Use $qbank-digitize to clarify this source-digitization project, produce an approved field and classification profile, and calibrate a representative sample before handing execution to $qbank."

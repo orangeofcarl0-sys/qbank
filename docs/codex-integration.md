@@ -8,12 +8,62 @@ SDK，也不要求 OpenAI API key。Codex 负责理解请求和作出语义选�
 
 | 状态 | 作用 |
 | --- | --- |
-| 仓库级 Skill | 随题库保存的 `.agents/skills/qbank/`，定义该项目内的工作流 |
-| 用户级 Skill | `$HOME/.agents/skills/qbank/`，让其他项目发现相同工作流 |
+| 仓库级 Skill | 随题库保存的 `.agents/skills/`，提供通信协议和可选领域工具 |
+| 用户级 Skill | `$HOME/.agents/skills/`，让其他项目分别发现已安装的 Skill |
 | Codex CLI | 可选外部命令；不可用时不影响 Desktop 或 IDE 读取仓库级 Skill |
 
 `codex check` 分别报告 `repository_ready`、`codex_cli_ready` 和 `degraded`。兼容字段 `ok` 只在
 仓库级必要检查失败时变为 `false`，因此 `ok: true` 不等同于外部 Codex CLI 可执行。
+
+## 两个独立 Skill
+
+| Skill | 职责 | 不负责 |
+| --- | --- | --- |
+| `$qbank` | 题库定位、上下文、权限、CLI 协议、写入校验和任务交接 | 具体电子化项目如何取舍字段或制定分类规则 |
+| `$qbank-digitize` | PDF/扫描件项目访谈、字段策略、分类表、样本校准和批次验收 | 直接写题目 Markdown、替代 qbank Schema 或重新实现写入事务 |
+
+`$qbank-digitize` 是额外领域工具，不是 `$qbank` 通信协议的一部分。它先形成
+`digitization_decision_packet`；只有在用户批准字段策略和代表性样本后，才把明确的执行范围
+交回 `$qbank`。新初始化题库同时包含两个 Skill，但可分别安装或更新：
+
+```powershell
+qbank codex install-skill --skill qbank --user --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+```
+
+省略 `--skill` 时继续选择 `qbank`，保持旧行为兼容。
+
+### PDF 电子化使用顺序
+
+1. `$qbank` 确认目标题库、来源位置和授权边界；来源项目默认只读。
+2. `$qbank-digitize` 检查来源样式、分类表和实际 Schema，只询问无法从材料中确认的关键取舍。
+3. 用户批准字段策略、分类映射和覆盖主要版式的代表性样本。
+4. `$qbank-digitize` 输出 `digitization_decision_packet`，其中记录来源范围、配置路径、样本、
+   未解决队列、批次限制、验收条件和有效授权。
+5. `$qbank` 重新接管任务，按既有协议执行 Schema 读取、dry-run、正式写入和验证。
+
+若字段策略或来源版式发生变化，应回到 `$qbank-digitize` 重新校准受影响样本；普通的查询、
+修订、组卷和导出仍直接使用 `$qbank`，无需经过电子化工具。
+
+## 跨项目上下文协议
+
+用户级 Skill 只承载可复用的 qbank 操作方法，不保存具体题库路径、当前任务状态或一次性的
+授权信息。当 Codex 从其他项目处理资料时，必须先建立以下上下文：
+
+- 任务目标与可观察的验收条件；
+- 已验证的目标题库根目录；
+- 明确的来源文件或 URL；
+- 所选工作流；
+- `read_only`、`dry_run_only` 或 `write_authorized` 授权级别；
+- 尚未解决且会影响结果的问题。
+
+qbank 命令始终以目标题库根目录作为工作目录执行。来源项目默认只读，除非用户对该项目
+另行明确授权。若无法确认目标题库或写入范围，Codex 应在执行 mutation 前停止并询问，不能
+根据仓库名称、相邻目录或旧对话自行推断。
+
+`qbank codex instructions --format json` 的 `context_protocol` 提供当前项目根目录、必需字段、
+授权级别、启动命令和完成交接字段。跨任务继续工作时，接收方应重新验证项目根目录及
+`integration_revision`，而不是仅依赖聊天摘要。
 
 ## 检查与工作流说明
 
@@ -27,43 +77,46 @@ qbank codex instructions --format json
 和一次短超时 Codex CLI 版本探测。合法但经过用户修改或落后的 Skill 产生 warning，不会自动
 覆盖。
 
-`codex instructions` 输出结构化工作流、前置条件、写入性质、dry-run 要求、成功条件和恢复
-动作。旧 `command_sequences` 字段继续保留以兼容现有调用方。
+`codex instructions` 输出上下文协议、结构化工作流、前置条件、写入性质、dry-run 要求、
+成功条件和恢复动作。旧 `command_sequences` 字段继续保留以兼容现有调用方。
 
 ## 安装用户级 Skill
 
-默认目标与 `--user` 相同，均为 `$HOME/.agents/skills/qbank/`。用户级安装以当前项目 Skill
-为来源，因此可以把已审查的仓库规则带到其他题库。
+默认目标与 `--user` 相同。`--skill qbank` 安装到 `$HOME/.agents/skills/qbank/`，
+`--skill qbank-digitize` 安装到 `$HOME/.agents/skills/qbank-digitize/`。用户级安装以当前项目
+中所选 Skill 为来源，因此两个工具可以独立安装、更新或保留定制版本。
 
 ```powershell
-qbank codex install-skill --user --dry-run --format json
-qbank codex install-skill --user
+qbank codex install-skill --skill qbank --user --dry-run --format json
+qbank codex install-skill --skill qbank --user
+qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --user
 ```
 
 自动化环境必须显式授权：
 
 ```powershell
-qbank codex install-skill --user --yes --format json
+qbank codex install-skill --skill qbank-digitize --user --yes --format json
 ```
 
 目标已存在且内容不同时，未指定 `--update` 的命令以冲突退出码 5 拒绝覆盖。
 
 ## 更新 Skill
 
-项目范围以安装包内的权威资源为来源，用户范围以当前项目 Skill 为来源。更新前先检查逐文件
-add、modify 和 delete 差异：
+项目范围以安装包内的所选权威 Skill 为来源，用户范围以当前项目中的同名 Skill 为来源。
+更新前先检查逐文件 add、modify 和 delete 差异：
 
 ```powershell
-qbank codex install-skill --project --update --dry-run --format json
-qbank codex install-skill --project --update
-qbank codex install-skill --user --update --dry-run --format json
-qbank codex install-skill --user --update
+qbank codex install-skill --skill qbank --project --update --dry-run --format json
+qbank codex install-skill --skill qbank --project --update
+qbank codex install-skill --skill qbank-digitize --user --update --dry-run --format json
+qbank codex install-skill --skill qbank-digitize --user --update
 ```
 
-正式更新采用同目录暂存和原子切换。项目备份保存到配置 state 目录的
-`codex-skill-backups/`，用户备份保存到
-`$HOME/.agents/.qbank-backups/skills/qbank/`。源、目标或内部文件包含符号链接时，安装会被
-拒绝。
+正式更新采用同目录暂存和原子切换。`$qbank` 的项目备份继续保存到配置 state 目录的
+`codex-skill-backups/`；其他 Skill 使用其下的同名子目录。用户备份保存到
+`$HOME/.agents/.qbank-backups/skills/<skill-name>/`。源、目标或内部文件包含符号链接时，
+安装会被拒绝。
 
 ## 数据操作边界
 
@@ -78,8 +131,9 @@ Codex 使用 qbank 时应遵守以下规则：
 7. 未经明确授权不得执行删除、覆盖或其他破坏性操作。
 8. 无人值守流程不得启动 `qbank preview --serve` 或 `qbank desktop`。
 
-仓库级 `$qbank` Skill 是详细命令工作流的权威来源。Studio 与 Codex 保持模块隔离：两者都是
-应用服务的展示适配器，桌面控制器不依赖 Codex 服务，Codex 服务也不依赖 Qt。
+仓库级 `$qbank` Skill 是详细命令工作流的权威来源；`$qbank-digitize` 只负责电子化决策和
+校准，不直接访问写入事务。Studio 与 Codex 保持模块隔离：两者都是应用服务的展示适配器，
+桌面控制器不依赖 Codex 服务，Codex 服务也不依赖 Qt。
 
 ## 当前边界
 

@@ -16,6 +16,11 @@ from typing import Literal, cast
 
 from qbank.codex_manifest import (
     CODEX_RULES,
+    COMPLETION_HANDOFF_FIELDS,
+    CONTEXT_AUTHORIZATION_MODES,
+    CONTEXT_REQUIRED_FIELDS,
+    DIGITIZE_SKILL_FILES,
+    FOREIGN_PROJECT_POLICY,
     INTEGRATION_REVISION,
     LEGACY_COMMAND_SEQUENCES,
     REQUIRED_COMMANDS,
@@ -26,6 +31,7 @@ from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError
 from qbank.models import (
     CodexCheckReport,
+    CodexContextProtocol,
     CodexInstructionsResult,
     CodexWorkflow,
     DoctorCheck,
@@ -39,6 +45,7 @@ from qbank.yaml_io import load_yaml
 SKILL_DIRECTORY = Path(".agents/skills/qbank")
 REQUIRED_WORKFLOW_COMMANDS = REQUIRED_COMMANDS
 SkillScope = Literal["user", "project"]
+SkillName = Literal["qbank", "qbank-digitize"]
 CommandProbe = Callable[[tuple[str, ...]], bool]
 
 
@@ -48,6 +55,13 @@ class _SkillOutcome:
     action: Literal["plan", "installed", "updated", "already_installed"]
     dry_run: bool
     backup: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _SkillSelection:
+    scope: SkillScope
+    home: Path | None
+    name: SkillName
 
 
 def check_codex_integration(
@@ -132,6 +146,18 @@ def codex_instructions(context: ProjectContext) -> CodexInstructionsResult:
             "index": _relative(context, context.paths.state / "index.sqlite"),
         },
         integration_revision=INTEGRATION_REVISION,
+        context_protocol=CodexContextProtocol(
+            target_project_root=str(context.root),
+            execution_working_directory=str(context.root),
+            required_handoff_fields=list(CONTEXT_REQUIRED_FIELDS),
+            authorization_modes=list(CONTEXT_AUTHORIZATION_MODES),
+            foreign_project_policy=FOREIGN_PROJECT_POLICY,
+            bootstrap_commands=[
+                "qbank codex check --format json",
+                "qbank codex instructions --format json",
+            ],
+            completion_handoff_fields=list(COMPLETION_HANDOFF_FIELDS),
+        ),
         workflows=[
             CodexWorkflow.model_validate(
                 {
@@ -166,6 +192,24 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
         "",
         f"Project root: `{instructions.project_root}`",
         f"Integration revision: `{instructions.integration_revision}`",
+        "",
+        "## Context handshake",
+        "",
+        "Run qbank commands with the target project as the working directory.",
+        "Do not infer a target project or write scope from earlier conversation.",
+        "",
+        "Required task context:",
+        "",
+        *(f"- `{field}`" for field in instructions.context_protocol.required_handoff_fields),
+        "",
+        "Authorization modes: "
+        + ", ".join(f"`{mode}`" for mode in instructions.context_protocol.authorization_modes),
+        "",
+        f"Foreign-project policy: {instructions.context_protocol.foreign_project_policy}",
+        "",
+        "Bootstrap commands:",
+        "",
+        *(f"- `{command}`" for command in instructions.context_protocol.bootstrap_commands),
         "",
         "## Rules",
         "",
@@ -220,7 +264,16 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
 
 def user_skill_destination(home: Path | None = None) -> Path:
     """Return the cross-platform user Skill installation path."""
-    return (home or Path.home()).resolve() / ".agents" / "skills" / "qbank"
+    return user_named_skill_destination("qbank", home=home)
+
+
+def user_named_skill_destination(
+    skill_name: SkillName,
+    *,
+    home: Path | None = None,
+) -> Path:
+    """Return the user installation path for one bundled qbank Skill."""
+    return (home or Path.home()).resolve() / ".agents" / "skills" / skill_name
 
 
 def install_repository_skill(
@@ -230,9 +283,11 @@ def install_repository_skill(
     home: Path | None = None,
     scope: SkillScope = "user",
     update: bool = False,
+    skill_name: SkillName = "qbank",
 ) -> SkillInstallResult:
     """Plan, install, or explicitly update a project or user qbank Skill."""
-    source, source_label, destination = _skill_endpoints(context, scope=scope, home=home)
+    selection = _SkillSelection(scope, home, skill_name)
+    source, source_label, destination = _skill_endpoints(context, selection)
     expected = source if isinstance(source, dict) else _validated_tree(context, source)
     _validate_destination(destination)
     exists = destination.exists()
@@ -263,9 +318,8 @@ def install_repository_skill(
         context,
         destination,
         expected,
-        scope=scope,
-        home=home,
         update=exists,
+        selection=selection,
     )
     return _skill_install_result(
         source_label,
@@ -281,33 +335,35 @@ def install_repository_skill(
     )
 
 
-def canonical_skill_contents() -> dict[str, bytes]:
-    """Read the packaged canonical Skill tree in source and wheel installations."""
-    root = files("qbank.resources").joinpath("init", "codex", "skill")
+def canonical_skill_contents(skill_name: SkillName = "qbank") -> dict[str, bytes]:
+    """Read one packaged canonical Skill tree in source and wheel installations."""
+    directory = "skill" if skill_name == "qbank" else "qbank-digitize"
+    skill_files = SKILL_FILES if skill_name == "qbank" else DIGITIZE_SKILL_FILES
+    root = files("qbank.resources").joinpath("init", "codex", directory)
     return {
         relative: root.joinpath(*PurePosixPath(relative).parts)
         .read_text(encoding="utf-8")
         .encode("utf-8")
-        for relative in SKILL_FILES
+        for relative in skill_files
     }
 
 
 def _skill_endpoints(
     context: ProjectContext,
-    *,
-    scope: SkillScope,
-    home: Path | None,
+    selection: _SkillSelection,
 ) -> tuple[Path | dict[str, bytes], str, Path]:
-    if scope == "user":
-        source = context.root / SKILL_DIRECTORY
-        return source, str(source), user_skill_destination(home)
-    if scope == "project":
+    if selection.scope == "user":
+        source = context.root / ".agents" / "skills" / selection.name
+        destination = user_named_skill_destination(selection.name, home=selection.home)
+        return source, str(source), destination
+    if selection.scope == "project":
         return (
-            canonical_skill_contents(),
-            "package:qbank.resources/init/codex/skill",
-            context.root / SKILL_DIRECTORY,
+            canonical_skill_contents(selection.name),
+            "package:qbank.resources/init/codex/"
+            f"{'skill' if selection.name == 'qbank' else selection.name}",
+            context.root / ".agents" / "skills" / selection.name,
         )
-    raise DataValidationError(f"unsupported Skill scope: {scope}")
+    raise DataValidationError(f"unsupported Skill scope: {selection.scope}")
 
 
 def _validated_tree(context: ProjectContext, source: Path) -> dict[str, bytes]:
@@ -320,9 +376,8 @@ def _replace_skill_tree(
     destination: Path,
     contents: Mapping[str, bytes],
     *,
-    scope: SkillScope,
-    home: Path | None,
     update: bool,
+    selection: _SkillSelection,
 ) -> str | None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_root = Path(tempfile.mkdtemp(prefix=".qbank-skill-", dir=destination.parent))
@@ -332,7 +387,7 @@ def _replace_skill_tree(
     try:
         _write_tree(staged, contents)
         if update:
-            backup = _backup_destination(context, scope=scope, home=home)
+            backup = _backup_destination(context, selection)
             backup.parent.mkdir(parents=True, exist_ok=True)
             os.replace(destination, backup)
             moved_original = True
@@ -354,15 +409,21 @@ def _replace_skill_tree(
 
 def _backup_destination(
     context: ProjectContext,
-    *,
-    scope: SkillScope,
-    home: Path | None,
+    selection: _SkillSelection,
 ) -> Path:
     token = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
-    if scope == "project":
+    if selection.scope == "project":
         root = context.paths.state / "codex-skill-backups"
+        if selection.name != "qbank":
+            root /= selection.name
     else:
-        root = (home or Path.home()).resolve() / ".agents" / ".qbank-backups" / "skills" / "qbank"
+        root = (
+            (selection.home or Path.home()).resolve()
+            / ".agents"
+            / ".qbank-backups"
+            / "skills"
+            / selection.name
+        )
     return root / token
 
 

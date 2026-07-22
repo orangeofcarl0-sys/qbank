@@ -1,5 +1,22 @@
 # qbank examples
 
+## Import from another project with explicit context
+
+Request: "Use `$qbank` to organize `<source-project>/notes.md` into the question bank
+at `<qbank-root>`. Dry-run only; do not modify the source project."
+
+Expected approach:
+
+1. Record `<qbank-root>` as the target, the notes path as the source, Workflow A, and
+   `dry_run_only` authorization.
+2. Verify `qbank.yaml` and run the Codex checks with `<qbank-root>` as working directory.
+3. Read the source without writing beside it.
+4. Put exchange data under `<qbank-root>/build/ai/` and run ingest dry-run only.
+5. Report a completion handoff with the target, source, commands, diagnostics, and next step.
+
+If `<qbank-root>` is missing or ambiguous, ask for it before running qbank. Do not choose
+a nearby repository by name.
+
 ## Convert notes into draft questions
 
 Request: “Use `$qbank` to organize `examples/source-notes.md` as drafts. Dry-run only.”

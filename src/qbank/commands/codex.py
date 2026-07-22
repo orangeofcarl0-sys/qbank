@@ -80,6 +80,10 @@ def codex_instructions_command(
 
 
 def codex_install_skill_command(
+    skill_name: Annotated[
+        str,
+        typer.Option("--skill", metavar="qbank|qbank-digitize", help="Select one Skill."),
+    ] = "qbank",
     user: Annotated[
         bool,
         typer.Option(
@@ -108,14 +112,23 @@ def codex_install_skill_command(
         typer.Option("--format", metavar="table|json"),
     ] = "table",
 ) -> None:
-    """Install or explicitly update the qbank Skill for one selected scope."""
+    """Install or explicitly update one qbank Skill for a selected scope."""
     try:
         require_output_format(output_format, "table", "json")
+        if skill_name not in {"qbank", "qbank-digitize"}:
+            raise DataValidationError("unsupported Skill: expected qbank or qbank-digitize")
         if user and project:
             raise DataValidationError("choose only one of --user or --project")
         scope: Literal["user", "project"] = "project" if project else "user"
         context = discover_context()
-        planned = _install_skill(context, dry_run=True, scope=scope, update=update)
+        selected = cast(Literal["qbank", "qbank-digitize"], skill_name)
+        planned = _install_skill(
+            context,
+            dry_run=True,
+            scope=scope,
+            update=update,
+            skill_name=selected,
+        )
         if dry_run:
             _emit_skill_result(planned, output_format)
             return
@@ -126,9 +139,16 @@ def codex_install_skill_command(
             raise DataValidationError("JSON Skill writes require explicit --yes authorization")
         if output_format == "table":
             _print_skill_plan(planned)
-        if not yes and not typer.confirm(f"Install this Skill for the {scope} scope?"):
+        label = "this Skill" if skill_name == "qbank" else skill_name
+        if not yes and not typer.confirm(f"Install {label} for the {scope} scope?"):
             raise typer.Exit(code=int(ExitCode.GENERAL))
-        result = _install_skill(context, dry_run=False, scope=scope, update=update)
+        result = _install_skill(
+            context,
+            dry_run=False,
+            scope=scope,
+            update=update,
+            skill_name=selected,
+        )
         _emit_skill_result(result, output_format)
     except typer.Exit:
         raise
@@ -161,14 +181,23 @@ def _install_skill(
     dry_run: bool,
     scope: Literal["user", "project"],
     update: bool,
+    skill_name: Literal["qbank", "qbank-digitize"],
 ) -> SkillInstallResult:
-    if scope == "user" and not update:
+    if skill_name == "qbank" and scope == "user" and not update:
         return install_repository_skill(context, dry_run=dry_run)
+    if skill_name == "qbank" and scope == "project":
+        return install_repository_skill(
+            context,
+            dry_run=dry_run,
+            scope=scope,
+            update=update,
+        )
     return install_repository_skill(
         context,
         dry_run=dry_run,
         scope=scope,
         update=update,
+        skill_name=skill_name,
     )
 
 

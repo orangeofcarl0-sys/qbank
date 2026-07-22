@@ -15,6 +15,12 @@
 - Made Codex readiness explicit and fast with in-process command discovery, project/user
   Skill drift checks, structured workflows, and separate repository, CLI, and degraded
   states while preserving the existing `ok`, checks, and command-sequence fields.
+- Added a versioned Codex context and handoff protocol for cross-project work, with an
+  explicit target root, source locations, authorization boundary, acceptance criteria,
+  deterministic bootstrap, and verifiable completion record.
+- Added the separate `$qbank-digitize` domain Skill for research-first PDF project
+  interviews, selective field policies, classification-table normalization, sample
+  calibration, and explicit handoff back to the unchanged `$qbank` execution protocol.
 - Added dry-run-first project and user Skill updates with deterministic file diffs,
   explicit authorization, atomic replacement, retained backups, JSON output, and rollback
   that preserves the original commit error.

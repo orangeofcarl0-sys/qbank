@@ -6,13 +6,22 @@ import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from typer.testing import CliRunner
 
 from qbank.cli import app
-from qbank.codex_manifest import INTEGRATION_REVISION, REQUIRED_COMMANDS, WORKFLOWS
+from qbank.codex_manifest import (
+    COMPLETION_HANDOFF_FIELDS,
+    CONTEXT_AUTHORIZATION_MODES,
+    CONTEXT_REQUIRED_FIELDS,
+    DIGITIZE_SKILL_FILES,
+    INTEGRATION_REVISION,
+    REQUIRED_COMMANDS,
+    SKILL_FILES,
+    WORKFLOWS,
+)
 from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError
 from qbank.models import SkillInstallResult
@@ -31,13 +40,24 @@ def test_repository_contains_required_codex_artifacts() -> None:
     required = [
         "AGENTS.md",
         ".agents/skills/qbank/SKILL.md",
+        ".agents/skills/qbank/references/context-handoff.md",
         ".agents/skills/qbank/references/workflows.md",
         ".agents/skills/qbank/references/command-reference.md",
         ".agents/skills/qbank/references/examples.md",
         ".agents/skills/qbank/agents/openai.yaml",
+        ".agents/skills/qbank-digitize/SKILL.md",
+        ".agents/skills/qbank-digitize/agents/openai.yaml",
+        ".agents/skills/qbank-digitize/assets/digitization-profile.yaml",
+        ".agents/skills/qbank-digitize/assets/classification-map.csv",
+        ".agents/skills/qbank-digitize/references/intake.md",
+        ".agents/skills/qbank-digitize/references/field-policy.md",
+        ".agents/skills/qbank-digitize/references/calibration.md",
         "tests/codex/discovery-prompts.md",
         "tests/codex/expected-workflows.md",
         "tests/codex/manual-test-checklist.md",
+        "tests/codex/digitization-prompts.md",
+        "tests/codex/digitization-expected.md",
+        "tests/codex/digitization-manual-checklist.md",
     ]
     assert all((root / path).is_file() for path in required)
 
@@ -48,6 +68,7 @@ def test_manifest_workflows_are_covered_by_packaged_guidance() -> None:
         (root / relative).read_text(encoding="utf-8")
         for relative in (
             "SKILL.md",
+            "references/context-handoff.md",
             "references/workflows.md",
             "references/command-reference.md",
         )
@@ -58,6 +79,25 @@ def test_manifest_workflows_are_covered_by_packaged_guidance() -> None:
                 assert " ".join(step.command_path) in guidance
     assert "explicit user request" in guidance
     assert "blocking interactive commands" in guidance
+    assert "source project as read-only" in guidance
+    assert "do not infer the target" in guidance.lower()
+
+
+def test_repository_skill_matches_packaged_canonical_tree() -> None:
+    root = Path(__file__).parents[1]
+    repository_skill = root / ".agents/skills/qbank"
+    packaged_skill = root / "src/qbank/resources/init/codex/skill"
+    for relative in SKILL_FILES:
+        assert (repository_skill / relative).read_bytes() == (
+            packaged_skill / relative
+        ).read_bytes()
+
+    repository_digitize = root / ".agents/skills/qbank-digitize"
+    packaged_digitize = root / "src/qbank/resources/init/codex/qbank-digitize"
+    for relative in DIGITIZE_SKILL_FILES:
+        assert (repository_digitize / relative).read_bytes() == (
+            packaged_digitize / relative
+        ).read_bytes()
 
 
 def test_skill_frontmatter_and_openai_metadata_are_discoverable() -> None:
@@ -70,6 +110,38 @@ def test_skill_frontmatter_and_openai_metadata_are_discoverable() -> None:
     assert "PDF" in metadata["description"]
     interface = load_yaml((root / "agents/openai.yaml").read_text(encoding="utf-8"))
     assert isinstance(interface, dict)
+    assert "$qbank" in interface["interface"]["default_prompt"]
+
+
+def test_digitize_skill_is_domain_specific_and_composes_with_qbank() -> None:
+    root = Path(__file__).parents[1] / ".agents/skills"
+    communication = (root / "qbank/SKILL.md").read_text(encoding="utf-8")
+    digitize_root = root / "qbank-digitize"
+    digitize = (digitize_root / "SKILL.md").read_text(encoding="utf-8")
+    _, yaml_text, _ = digitize.split("---", maxsplit=2)
+    metadata = load_yaml(yaml_text)
+    assert isinstance(metadata, dict)
+    assert metadata["name"] == "qbank-digitize"
+    assert "classification-table" in metadata["description"]
+    assert "$qbank" in digitize
+    assert "Do not redefine qbank commands" in digitize
+    assert "$qbank-digitize" in communication
+    assert "field_policy" not in communication
+    assert "calibrated_batch" not in communication
+
+    profile = load_yaml(
+        (digitize_root / "assets/digitization-profile.yaml").read_text(encoding="utf-8")
+    )
+    assert isinstance(profile, dict)
+    assert profile["field_policy"]["chapter"]["mode"] == "ignore_as_null"
+    assert profile["field_policy"]["difficulty"]["semantic"] is False
+    assert profile["classification"]["unknown_policy"] == "review_required"
+    assert profile["calibration"]["approval_required"] is True
+    assert profile["execution_handoff"]["authorization"] == "dry_run_only"
+
+    interface = load_yaml((digitize_root / "agents/openai.yaml").read_text(encoding="utf-8"))
+    assert isinstance(interface, dict)
+    assert "$qbank-digitize" in interface["interface"]["default_prompt"]
     assert "$qbank" in interface["interface"]["default_prompt"]
 
 
@@ -172,6 +244,19 @@ def test_codex_instructions_json_and_markdown(project: tuple[Path, Any]) -> None
     assert result.paths["temporary_ai"] == "build/ai"
     assert result.paths["generated_papers"] == "papers/generated"
     assert result.command_sequences["import"][1] == "qbank schema --format json"
+    assert result.integration_revision == 2
+    assert result.context_protocol.target_project_root == str(root)
+    assert result.context_protocol.execution_working_directory == str(root)
+    assert result.context_protocol.required_handoff_fields == list(CONTEXT_REQUIRED_FIELDS)
+    assert result.context_protocol.authorization_modes == list(CONTEXT_AUTHORIZATION_MODES)
+    assert result.context_protocol.completion_handoff_fields == list(COMPLETION_HANDOFF_FIELDS)
+    assert result.context_protocol.bootstrap_commands == [
+        "qbank codex check --format json",
+        "qbank codex instructions --format json",
+    ]
+    assert "Context handshake" in markdown
+    assert "Do not infer a target project" in markdown
+    assert "non-qbank source project as read-only" in markdown
     assert "Dry-run every write" in markdown
     assert "qbank paper validate" in markdown
 
@@ -200,6 +285,43 @@ def test_skill_install_is_planned_then_atomic_and_conflict_safe(
     (destination / "SKILL.md").write_text("different", encoding="utf-8")
     with pytest.raises(ConflictError):
         install_repository_skill(context, dry_run=True, home=home)
+
+
+def test_digitize_skill_installs_independently_from_communication_skill(
+    project: tuple[Path, Any],
+    tmp_path: Path,
+) -> None:
+    root, config = project
+    context = ProjectContext.from_config(root, config)
+    home = tmp_path / "home"
+    qbank_destination = home / ".agents/skills/qbank"
+    digitize_destination = home / ".agents/skills/qbank-digitize"
+
+    planned = install_repository_skill(
+        context,
+        dry_run=True,
+        home=home,
+        skill_name="qbank-digitize",
+    )
+    assert planned.action == "plan"
+    assert planned.destination == str(digitize_destination)
+    assert planned.files == len(DIGITIZE_SKILL_FILES)
+    assert not qbank_destination.exists()
+    assert not digitize_destination.exists()
+
+    installed = install_repository_skill(
+        context,
+        dry_run=False,
+        home=home,
+        skill_name="qbank-digitize",
+    )
+    assert installed.action == "installed"
+    assert not qbank_destination.exists()
+    assert {
+        path.relative_to(digitize_destination).as_posix(): path.read_bytes()
+        for path in digitize_destination.rglob("*")
+        if path.is_file()
+    } == canonical_skill_contents("qbank-digitize")
 
 
 def test_skill_install_requires_repository_source(
@@ -234,6 +356,12 @@ def test_codex_cli_machine_outputs(
     assert instructions.exit_code == 0
     parsed = json.loads(instructions.stdout)
     assert parsed["paths"]["temporary_ai"] == "build/ai"
+    assert parsed["context_protocol"]["target_project_root"] == str(cli_project)
+    assert parsed["context_protocol"]["authorization_modes"] == [
+        "read_only",
+        "dry_run_only",
+        "write_authorized",
+    ]
     assert parsed["command_sequences"]["import"][1] == "qbank schema --format json"
     assert {workflow["name"] for workflow in parsed["workflows"]} >= {
         "import",
@@ -310,6 +438,59 @@ def test_codex_cli_human_check_and_error_boundaries(
     )
     assert invalid_instructions.exit_code == 3
     assert "expected markdown or json" in invalid_instructions.stderr
+
+    invalid_skill = runner.invoke(
+        app,
+        ["codex", "install-skill", "--skill", "unknown", "--dry-run"],
+    )
+    assert invalid_skill.exit_code == 3
+    assert "expected qbank or qbank-digitize" in invalid_skill.stderr
+
+
+def test_digitize_skill_cli_selects_independent_source(
+    runner: CliRunner,
+    cli_project: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+
+    def install(
+        context: ProjectContext,
+        *,
+        dry_run: bool,
+        scope: str = "user",
+        update: bool = False,
+        skill_name: str = "qbank",
+    ) -> SkillInstallResult:
+        return install_repository_skill(
+            context,
+            dry_run=dry_run,
+            home=home,
+            scope=cast(Any, scope),
+            update=update,
+            skill_name=cast(Any, skill_name),
+        )
+
+    monkeypatch.setattr("qbank.commands.codex.install_repository_skill", install)
+    result = runner.invoke(
+        app,
+        [
+            "codex",
+            "install-skill",
+            "--skill",
+            "qbank-digitize",
+            "--user",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    payload = json.loads(result.stdout)
+    assert result.exit_code == 0
+    assert Path(payload["destination"]).name == "qbank-digitize"
+    assert payload["files"] == len(DIGITIZE_SKILL_FILES)
+    assert not home.exists()
 
 
 def test_install_skill_yes_executes_confirmed_plan(
