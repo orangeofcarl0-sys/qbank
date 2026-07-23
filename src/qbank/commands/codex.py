@@ -17,13 +17,116 @@ from qbank.cli_support import (
 )
 from qbank.context import ProjectContext
 from qbank.errors import DataValidationError, ExitCode
-from qbank.models import SkillInstallResult
+from qbank.models import McpConfigChange, SkillInstallResult
 from qbank.services.codex import (
     check_codex_integration,
     codex_instructions,
     install_repository_skill,
     instructions_markdown,
 )
+from qbank.services.mcp_config import (
+    install_project_mcp,
+    mcp_integration_status,
+    uninstall_project_mcp,
+)
+
+
+def codex_mcp_check_command(
+    output_format: Annotated[str, typer.Option("--format", metavar="table|json")] = "table",
+) -> None:
+    """Check optional MCP runtime and this project's exact registration."""
+    try:
+        require_output_format(output_format, "table", "json")
+        result = mcp_integration_status(discover_context())
+        if output_format == "json":
+            emit_json(result)
+        else:
+            typer.echo("READY" if result.ok else "DEGRADED")
+            typer.echo(result.message)
+            typer.echo(f"Configuration: {result.configuration}")
+        if not result.ok:
+            raise typer.Exit(code=int(ExitCode.GENERAL))
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        abort(exc, output_format=output_format)
+
+
+def codex_integration_status_command(
+    output_format: Annotated[str, typer.Option("--format", metavar="table|json")] = "table",
+) -> None:
+    """Report MCP readiness without treating an absent Codex CLI as qbank failure."""
+    try:
+        require_output_format(output_format, "table", "json")
+        result = mcp_integration_status(discover_context())
+        if output_format == "json":
+            emit_json(result)
+        else:
+            typer.echo("READY" if not result.degraded else "DEGRADED")
+            typer.echo(result.message)
+    except Exception as exc:
+        abort(exc, output_format=output_format)
+
+
+def codex_install_mcp_command(
+    project: Annotated[
+        bool, typer.Option("--project", help="Write only .codex/config.toml here.")
+    ] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Inspect without writing.")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Confirm the project write.")] = False,
+    output_format: Annotated[str, typer.Option("--format", metavar="table|json")] = "table",
+) -> None:
+    """Install the repository-bound qbank MCP registration for this project."""
+    _mcp_config_command(project, dry_run, yes, output_format, uninstall=False)
+
+
+def codex_uninstall_mcp_command(
+    project: Annotated[bool, typer.Option("--project", help="Modify only this project.")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Inspect without writing.")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Confirm the project write.")] = False,
+    output_format: Annotated[str, typer.Option("--format", metavar="table|json")] = "table",
+) -> None:
+    """Remove only qbank's managed MCP block from this project."""
+    _mcp_config_command(project, dry_run, yes, output_format, uninstall=True)
+
+
+def _mcp_config_command(
+    project: bool,
+    dry_run: bool,
+    yes: bool,
+    output_format: str,
+    *,
+    uninstall: bool,
+) -> None:
+    try:
+        require_output_format(output_format, "table", "json")
+        if not project:
+            raise DataValidationError("MCP registration requires explicit --project")
+        context = discover_context()
+        operation = uninstall_project_mcp if uninstall else install_project_mcp
+        planned = operation(context, dry_run=True)
+        if dry_run or not planned.changed:
+            _emit_mcp_change(planned, output_format)
+            return
+        if output_format == "json" and not yes:
+            raise DataValidationError("JSON MCP writes require explicit --yes authorization")
+        if not yes and not typer.confirm(f"{planned.action.title()} qbank MCP in this project?"):
+            raise typer.Exit(code=int(ExitCode.GENERAL))
+        _emit_mcp_change(operation(context, dry_run=False), output_format)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        abort(exc, output_format=output_format)
+
+
+def _emit_mcp_change(result: McpConfigChange, output_format: str) -> None:
+    if output_format == "json":
+        emit_json(result)
+        return
+    typer.echo(f"{result.action}: {result.configuration}")
+    typer.echo(f"Repository: {result.repository}")
+    if result.backup:
+        typer.echo(f"Backup: {result.backup}")
 
 
 def codex_check_command(

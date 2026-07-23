@@ -77,6 +77,19 @@ class StepBehavior:
     interactive: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class IntegrationCapability:
+    """One authoritative mapping across workflows, CLI, MCP, and resources."""
+
+    name: str
+    workflow: str
+    cli_command: tuple[str, ...] | None
+    mcp_tool: str | None
+    resource: str | None
+    access: str
+    schema_version: str = "1.0"
+
+
 READ_ONLY = StepBehavior()
 WRITES = StepBehavior(writes=True)
 DRY_RUN = StepBehavior(dry_run_required=True)
@@ -382,6 +395,159 @@ WORKFLOWS = (
 )
 
 WORKFLOW_BY_NAME = {workflow.name: workflow for workflow in WORKFLOWS}
+
+INTEGRATION_CAPABILITIES = (
+    IntegrationCapability(
+        "repository_status",
+        "maintenance",
+        ("status",),
+        "repository_status",
+        "qbank://repository/info",
+        "read",
+    ),
+    IntegrationCapability(
+        "schema",
+        "import",
+        ("schema",),
+        "schema_get",
+        "qbank://schema/question",
+        "read",
+    ),
+    IntegrationCapability(
+        "question_search",
+        "select",
+        ("search",),
+        "question_search",
+        None,
+        "read",
+    ),
+    IntegrationCapability(
+        "question_get",
+        "select",
+        ("get",),
+        "question_get",
+        "qbank://question/{id}",
+        "read",
+    ),
+    IntegrationCapability(
+        "question_validate",
+        "maintenance",
+        ("validate",),
+        "question_validate",
+        None,
+        "read",
+    ),
+    IntegrationCapability(
+        "taxonomy",
+        "taxonomy",
+        ("tag", "list"),
+        "taxonomy_get",
+        "qbank://taxonomy",
+        "read",
+    ),
+    IntegrationCapability(
+        "asset",
+        "assets",
+        ("asset", "show"),
+        "asset_get",
+        None,
+        "read",
+    ),
+    IntegrationCapability(
+        "paper_get",
+        "paper",
+        ("paper", "validate"),
+        "paper_get",
+        "qbank://paper/{id}",
+        "read",
+    ),
+    IntegrationCapability(
+        "ingest_prepare",
+        "import",
+        ("ingest",),
+        "ingest_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "patch_prepare",
+        "revise",
+        ("patch",),
+        "patch_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "tag_change_prepare",
+        "taxonomy",
+        ("tag",),
+        "tag_change_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "paper_prepare",
+        "paper",
+        ("paper",),
+        "paper_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "operation_commit",
+        "maintenance",
+        None,
+        "operation_commit",
+        None,
+        "write",
+    ),
+    IntegrationCapability(
+        "operation_cancel",
+        "maintenance",
+        None,
+        "operation_cancel",
+        None,
+        "write",
+    ),
+    IntegrationCapability(
+        "asset_schema",
+        "assets",
+        ("schema",),
+        None,
+        "qbank://schema/asset",
+        "read",
+    ),
+    IntegrationCapability(
+        "paper_schema",
+        "paper",
+        ("schema",),
+        None,
+        "qbank://schema/paper",
+        "read",
+    ),
+    IntegrationCapability(
+        "question_history",
+        "revise",
+        None,
+        None,
+        "qbank://history/{id}",
+        "read",
+    ),
+)
+
+MCP_CAPABILITY_BY_TOOL = {
+    capability.mcp_tool: capability
+    for capability in INTEGRATION_CAPABILITIES
+    if capability.mcp_tool is not None
+}
+MCP_TOOL_NAMES = tuple(MCP_CAPABILITY_BY_TOOL)
+MCP_RESOURCE_URIS = tuple(
+    dict.fromkeys(
+        capability.resource
+        for capability in INTEGRATION_CAPABILITIES
+        if capability.resource is not None
+    )
+)
 
 # Preserve the original four machine-facing keys, commands, and list shape.
 LEGACY_COMMAND_SEQUENCES = {

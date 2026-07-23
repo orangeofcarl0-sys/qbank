@@ -15,6 +15,9 @@
 - Made Codex readiness explicit and fast with in-process command discovery, project/user
   Skill drift checks, structured workflows, and separate repository, CLI, and degraded
   states while preserving the existing `ok`, checks, and command-sequence fields.
+- Added an optional repository-bound STDIO MCP Server with typed read tools and resources,
+  revision-checked prepare/commit mutations, idempotent commits, and dry-run-first project
+  registration that leaves CLI and Studio usable without the MCP SDK.
 - Added a versioned Codex context and handoff protocol for cross-project work, with an
   explicit target root, source locations, authorization boundary, acceptance criteria,
   deterministic bootstrap, and verifiable completion record.

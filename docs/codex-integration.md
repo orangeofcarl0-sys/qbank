@@ -135,7 +135,22 @@ Codex 使用 qbank 时应遵守以下规则：
 校准，不直接访问写入事务。Studio 与 Codex 保持模块隔离：两者都是应用服务的展示适配器，
 桌面控制器不依赖 Codex 服务，Codex 服务也不依赖 Qt。
 
-## 当前边界
+## 可选本地 MCP
 
-qbank 0.1.0 不提供 MCP Server、Studio 内嵌聊天或模型 API 封装。未来的自动化适配器应直接
-调用类型化应用服务，不应解析 CLI 输出或绕过 Markdown、历史、校验和索引事务。
+qbank 0.1.0 提供可选的本地 STDIO MCP Server。它与 CLI、Studio 并列调用同一组类型化应用
+服务，不解析 CLI 输出，也不让 Studio 依赖 Codex。安装与项目注册均为显式操作：
+
+```powershell
+pip install "qbank[mcp]"
+qbank codex install-mcp --project --dry-run --format json
+qbank codex install-mcp --project --yes --format json
+qbank codex mcp-check --format json
+```
+
+项目配置只写入当前题库的 `.codex/config.toml` 受管区块，并以绝对 `--repository` 参数绑定该
+题库。所有写操作强制分为 prepare 与 commit 两阶段；prepare 返回字段差异、诊断、过期时间和
+`repository_revision`，仓库变化后 commit 会拒绝执行。重复 commit 返回首次结果，不重复写入。
+未安装 SDK、未注册 MCP 或 Codex CLI 不可用时，CLI、Studio 与 Skill 仍可独立工作，并由
+`integration-status` 报告 `DEGRADED`。
+
+当前仍不提供 Studio 内嵌聊天、模型 API 封装、资源订阅或复杂 Prompt 模板。

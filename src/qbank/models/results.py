@@ -659,7 +659,23 @@ class CodexContextProtocol(ResultModel):
     completion_handoff_fields: list[str] = Field(default_factory=list)
 
 
+class CodexCapability(ResultModel):
+    """One manifest-derived CLI/MCP/resource capability mapping."""
+
+    name: str
+    workflow: str
+    cli_command: list[str] | None = None
+    mcp_tool: str | None = None
+    resource: str | None = None
+    access: Literal["read", "prepare", "write"]
+    schema_version: str
+
+
 def _codex_workflow_list() -> list[CodexWorkflow]:
+    return []
+
+
+def _codex_capability_list() -> list[CodexCapability]:
     return []
 
 
@@ -674,6 +690,7 @@ class CodexInstructionsResult(ResultModel):
     integration_revision: int = 1
     context_protocol: CodexContextProtocol = Field(default_factory=CodexContextProtocol)
     workflows: list[CodexWorkflow] = Field(default_factory=_codex_workflow_list)
+    capabilities: list[CodexCapability] = Field(default_factory=_codex_capability_list)
 
 
 class SkillFileChange(ResultModel):

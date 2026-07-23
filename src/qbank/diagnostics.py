@@ -6,7 +6,6 @@ import json
 import os
 import shutil
 import sqlite3
-import subprocess
 import sys
 from collections import Counter
 from contextlib import closing
@@ -93,17 +92,8 @@ def project_status(root: Path, config: ProjectConfig) -> StatusResult:
 
 
 def _is_git_repository(root: Path) -> bool:
-    try:
-        git = subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError:
-        return False
-    return git.returncode == 0 and git.stdout.strip() == "true"
+    """Detect a normal repository or worktree without spawning an external process."""
+    return any((candidate / ".git").exists() for candidate in (root, *root.parents))
 
 
 def _check(

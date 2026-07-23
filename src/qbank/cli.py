@@ -28,10 +28,15 @@ from qbank.commands.assets import (
 )
 from qbank.commands.codex import (
     codex_check_command,
+    codex_install_mcp_command,
     codex_install_skill_command,
     codex_instructions_command,
+    codex_integration_status_command,
+    codex_mcp_check_command,
+    codex_uninstall_mcp_command,
 )
 from qbank.commands.desktop import desktop_command
+from qbank.commands.mcp import mcp_command
 from qbank.commands.project import (
     doctor_command,
     init_command,
@@ -100,6 +105,7 @@ app.command("search")(search_command)
 app.command("patch")(patch_command)
 app.command("delete")(delete_command)
 app.command("desktop")(desktop_command)
+app.command("mcp")(mcp_command)
 index_app.command("rebuild")(index_rebuild_command)
 app.command("preview")(preview_command)
 app.command("export")(export_command)
@@ -108,6 +114,10 @@ paper_app.command("build")(paper_build_command)
 codex_app.command("check")(codex_check_command)
 codex_app.command("instructions")(codex_instructions_command)
 codex_app.command("install-skill")(codex_install_skill_command)
+codex_app.command("mcp-check")(codex_mcp_check_command)
+codex_app.command("install-mcp")(codex_install_mcp_command)
+codex_app.command("uninstall-mcp")(codex_uninstall_mcp_command)
+codex_app.command("integration-status")(codex_integration_status_command)
 asset_app.command("list")(asset_list_command)
 asset_app.command("show")(asset_show_command)
 asset_app.command("ingest")(asset_ingest_command)

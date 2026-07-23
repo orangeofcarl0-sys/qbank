@@ -19,6 +19,9 @@
 - If a question, answer, or source cannot be confirmed, keep it `draft`; do not invent facts.
 - Run destructive operations only after an explicit user request.
 - Do not launch `qbank preview --serve` or `qbank desktop` in unattended automation.
+- When the project MCP server is available, broad reads use `question_search` before
+  `question_get`; every write must use a `*_prepare` tool followed by `operation_commit`.
+- Never commit an MCP operation after its `repository_revision` changes. Prepare it again.
 
 Use the repository-scoped `$qbank` Skill for detailed workflows and command guidance.
 

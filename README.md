@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | Studio | 日常浏览、编辑、标签整理、资源管理和组卷 | `qbank desktop` |
 | CLI | 批量导入、校验、查询、导出和自动化 | `qbank --help` |
-| Codex Skill | 让 Codex 在相同数据边界内协作 | `qbank codex check --format json` |
+| Codex Skill / MCP | 让 Codex 在相同数据边界内协作 | `qbank codex integration-status --format json` |
 
 ## 项目定位
 
@@ -34,7 +34,7 @@ qbank 面向希望将题目长期保存在普通文件中，同时让桌面编�
 - 管理本地图片、外部引用和带多种表示的逻辑资产；
 - 构建学生版、答案版和解析版试卷；
 - 导出 Markdown、HTML、JSON、JSONL、纯文本和 DOCX；
-- 通过 Studio、CLI 与 Codex Skill 复用同一应用服务和事务边界。
+- 通过 Studio、CLI、Codex Skill 与可选 MCP 复用同一应用服务和事务边界。
 
 ## Studio 桌面编辑器
 
@@ -197,20 +197,23 @@ DOCX 由系统 Pandoc 生成；Pandoc 不可用时 Markdown 和 HTML 构建不�
 每个新题库包含仓库级 `AGENTS.md`，以及两个职责独立的 Skill：`$qbank` 定义题库定位、
 授权、CLI 调用、校验和任务交接协议；`$qbank-digitize` 为 PDF、扫描件和分类表项目提供需求
 访谈、字段取舍与代表性样本校准。后者是可选的领域工具，不属于也不替代 `$qbank` 通信层。
-Codex Desktop、IDE 和 CLI 可以依据这些规则调用本地 qbank 命令；qbank 本身不需要 OpenAI
-API key，也不嵌入模型 SDK。
+Codex Desktop、IDE 和 CLI 可以依据这些规则调用本地 qbank 命令，或通过可选的本地 STDIO
+MCP 直接调用同一应用服务；qbank 本身不需要 OpenAI API key，也不嵌入模型 SDK。
 
 ```powershell
 qbank codex check --format json
 qbank codex instructions --format markdown
 qbank codex install-skill --skill qbank --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-mcp --project --dry-run --format json
+qbank codex integration-status --format json
 ```
 
 PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_decision_packet`，再交回
 `$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
 同步是相互独立的状态。完整职责、安装、更新和备份语义见
-[Codex 接入指南](docs/codex-integration.md)。
+[Codex 接入指南](docs/codex-integration.md)。MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不
+影响 CLI、Studio 或 Skill。
 
 ## 文档索引
 
@@ -234,7 +237,8 @@ PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_dec
 - LaTeX 只执行轻量结构检查，不进行 TeX 编译。
 - HTML 预览使用 MathJax CDN；完全离线时公式显示 TeX 源文本。
 - `--changed` 依赖可用的 Git 工作区，否则安全回退为全量校验。
-- qbank 不实现 MCP Server、在线考试服务、OCR 或自动选题算法。
+- qbank 不实现在线考试服务、OCR、自动选题算法、Studio 内嵌聊天或模型 API 封装；可选 MCP
+  仅提供本地题库工具与资源协议。
 
 ## 许可证
 

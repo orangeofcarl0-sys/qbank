@@ -69,7 +69,7 @@ def test_status_does_not_require_git_executable(
     def missing_git(*args: Any, **kwargs: Any) -> Any:
         raise FileNotFoundError("git")
 
-    monkeypatch.setattr("qbank.diagnostics.subprocess.run", missing_git)
+    monkeypatch.setattr("subprocess.run", missing_git)
     assert project_status(root, config)["git_repository"] is False
 
 

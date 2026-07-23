@@ -15,6 +15,9 @@ qbank codex install-skill --user --dry-run --format json
 qbank codex install-skill --project --update --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --project --update --dry-run --format json
+qbank codex integration-status --format json
+qbank codex mcp-check --format json
+qbank codex install-mcp --project --dry-run --format json
 ```
 
 `codex check` reports repository and Codex CLI readiness separately. Skill differences
@@ -31,6 +34,23 @@ the target qbank root before running these commands. Do not depend on a prior sh
 location or write temporary exchange files into the source repository. The JSON from
 `codex instructions` includes `context_protocol`, which defines the required handoff
 fields, authorization modes, bootstrap commands, and completion record.
+
+## Optional local MCP
+
+Install the optional SDK with `pip install "qbank[mcp]"`. Project registration is
+explicit, repository-bound, and dry-run-first:
+
+```powershell
+qbank codex install-mcp --project --dry-run --format json
+qbank codex install-mcp --project --yes --format json
+qbank codex mcp-check --format json
+```
+
+The managed server command is `qbank mcp --repository <absolute-qbank-root>`. Do not
+start it manually in unattended shell automation; Codex owns its STDIO lifecycle.
+Read tools never write. Mutations require a prepare result and a revision-matched
+`operation_commit`; `operation_cancel` is safe to repeat. Remove only the managed block
+with `qbank codex uninstall-mcp --project --dry-run` followed by a confirmed write.
 
 ## Read and search
 

@@ -33,6 +33,13 @@ JSON/JSONL as exchange data, and SQLite as a disposable projection.
 10. Run destructive operations only after an explicit user request.
 11. Do not start blocking interactive commands in unattended work.
 
+If `qbank codex integration-status --format json` reports a registered MCP server,
+prefer its typed tools for bounded automation. Search before fetching full questions.
+All MCP mutations require `*_prepare`, inspection of the field diff and diagnostics,
+then `operation_commit` with the returned `repository_revision`. If that revision has
+changed, discard the operation and prepare again. The CLI workflow remains the fallback
+when MCP is absent or degraded.
+
 Read [references/context-handoff.md](references/context-handoff.md) before acting
 from another project, resuming handed-off work, or proceeding with incomplete
 conversation context. Do not guess the target repository or write authorization.

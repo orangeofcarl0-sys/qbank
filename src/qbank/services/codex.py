@@ -21,6 +21,7 @@ from qbank.codex_manifest import (
     CONTEXT_REQUIRED_FIELDS,
     DIGITIZE_SKILL_FILES,
     FOREIGN_PROJECT_POLICY,
+    INTEGRATION_CAPABILITIES,
     INTEGRATION_REVISION,
     LEGACY_COMMAND_SEQUENCES,
     REQUIRED_COMMANDS,
@@ -30,6 +31,7 @@ from qbank.codex_manifest import (
 from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError
 from qbank.models import (
+    CodexCapability,
     CodexCheckReport,
     CodexContextProtocol,
     CodexInstructionsResult,
@@ -182,6 +184,20 @@ def codex_instructions(context: ProjectContext) -> CodexInstructionsResult:
             )
             for workflow in WORKFLOWS
         ],
+        capabilities=[
+            CodexCapability(
+                name=capability.name,
+                workflow=capability.workflow,
+                cli_command=(
+                    list(capability.cli_command) if capability.cli_command is not None else None
+                ),
+                mcp_tool=capability.mcp_tool,
+                resource=capability.resource,
+                access=cast(Literal["read", "prepare", "write"], capability.access),
+                schema_version=capability.schema_version,
+            )
+            for capability in INTEGRATION_CAPABILITIES
+        ],
     )
 
 
@@ -244,6 +260,7 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
             if step.expected:
                 lines.append(f"   Expected: {step.expected}")
         lines.append("")
+    lines.extend(_capability_lines(instructions.capabilities))
     lines.extend(
         (
             "## Placeholders and recovery",
@@ -260,6 +277,24 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
     )
     lines.extend(f"- `{name}`: `{path}`" for name, path in instructions.paths.items())
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _capability_lines(capabilities: list[CodexCapability]) -> list[str]:
+    lines = ["## Interface capabilities", ""]
+    for capability in capabilities:
+        interfaces: list[str] = []
+        if capability.cli_command:
+            interfaces.append(f"CLI: qbank {' '.join(capability.cli_command)}")
+        if capability.mcp_tool:
+            interfaces.append(f"MCP: {capability.mcp_tool}")
+        if capability.resource:
+            interfaces.append(f"resource: {capability.resource}")
+        lines.append(
+            f"- `{capability.name}` [{capability.access}; schema "
+            f"{capability.schema_version}] — {'; '.join(interfaces)}"
+        )
+    lines.append("")
+    return lines
 
 
 def user_skill_destination(home: Path | None = None) -> Path:

@@ -44,7 +44,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLayout,
-    QLayoutItem,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -1339,10 +1338,10 @@ class TopicTagEditor(QWidget):
 
     def _rebuild_tags(self) -> None:
         while self.tags_layout.count():
-            item = cast(QLayoutItem | None, self.tags_layout.takeAt(0))
+            item = self.tags_layout.takeAt(0)
             if item is None:
                 break
-            widget = cast(QWidget | None, item.widget())
+            widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
         for topic in self._topics:
@@ -2462,10 +2461,10 @@ def _parse_timestamp(value: str) -> datetime | None:
 
 def _clear_layout(layout: QLayout) -> None:
     while layout.count():
-        item = cast(QLayoutItem | None, layout.takeAt(0))
+        item = layout.takeAt(0)
         if item is None:
             break
-        widget = cast(QWidget | None, item.widget())
+        widget = item.widget()
         if widget is not None:
             widget.deleteLater()
 
