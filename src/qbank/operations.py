@@ -12,11 +12,17 @@ from typing import Any, Literal, cast
 from pydantic import ValidationError
 
 from qbank.application.exchange import JsonLineRecord
+from qbank.application.locking import RepositoryWriteLockPort
 from qbank.application.ports import (
     HistoryStorePort,
     MutableQuestionRepositoryPort,
     MutableTaxonomyStorePort,
     MutationIndexPort,
+)
+from qbank.application.revision import (
+    planned_question_projection_revision,
+    question_projection_revision,
+    repository_revision,
 )
 from qbank.application.service import question_matches
 from qbank.context import ProjectContext
@@ -25,6 +31,7 @@ from qbank.errors import (
     ConflictError,
     DataValidationError,
     QuestionNotFoundError,
+    RepositoryRevisionChangedError,
     pydantic_error_text,
 )
 from qbank.history import JsonHistoryStore
@@ -96,15 +103,30 @@ class MutationServices:
     repository: MutableQuestionRepositoryPort
     index: MutationIndexPort
     history: HistoryStorePort
+    lock: RepositoryWriteLockPort | None = None
 
 
 def _default_mutation_services(context: ProjectContext) -> MutationServices:
     """Compatibility wiring for callers that predate the composition root."""
+    from qbank.infrastructure.locking import RepositoryWriteLock
+
     return MutationServices(
         repository=MarkdownQuestionRepository(context),
         index=SQLiteSearchIndex(context),
         history=JsonHistoryStore(context),
+        lock=RepositoryWriteLock(context),
     )
+
+
+def _write_lock(
+    context: ProjectContext,
+    services: MutationServices,
+) -> RepositoryWriteLockPort:
+    if services.lock is not None:
+        return services.lock
+    from qbank.infrastructure.locking import RepositoryWriteLock
+
+    return RepositoryWriteLock(context)
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +160,7 @@ class IngestPlanningContext:
     snapshot: RepositorySnapshot
     duplicate_ids: frozenset[str]
     options: IngestOptions
+    repository_revision: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +175,7 @@ class StudioSavePlan:
     changes: tuple[FieldChange, ...]
     taxonomy_before: Taxonomy
     taxonomy_after: Taxonomy
+    repository_revision: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,25 +196,46 @@ def _aggregate_hash(values: dict[str, str]) -> str | None:
 
 
 def _sync_index(
-    config: ProjectConfig,
+    context: ProjectContext,
     index: MutationIndexPort,
     *,
     snapshot: RepositorySnapshot,
     questions: Sequence[Question] = (),
     deleted_ids: Sequence[str] = (),
 ) -> tuple[bool, list[Diagnostic]]:
-    if not config.index.enabled:
+    if not context.config.index.enabled:
         return False, []
     try:
-        index.apply(
-            questions=tuple(questions),
-            deleted_ids=tuple(deleted_ids),
-            topics_by_question=_topics_after(
-                snapshot,
-                questions=questions,
-                deleted_ids=deleted_ids,
-            ),
+        expected_projection = planned_question_projection_revision(
+            context,
+            snapshot,
+            questions=questions,
+            deleted_ids=deleted_ids,
         )
+        if question_projection_revision(context) != expected_projection:
+            raise RepositoryRevisionChangedError(
+                "repository_revision_changed: question sources changed before index sync"
+            )
+        question_values = tuple(questions)
+        deleted_values = tuple(deleted_ids)
+        topic_values = _topics_after(
+            snapshot,
+            questions=questions,
+            deleted_ids=deleted_ids,
+        )
+        if isinstance(index, SQLiteSearchIndex):
+            index.apply(
+                questions=question_values,
+                deleted_ids=deleted_values,
+                topics_by_question=topic_values,
+                source_revision=expected_projection,
+            )
+        else:
+            index.apply(
+                questions=question_values,
+                deleted_ids=deleted_values,
+                topics_by_question=topic_values,
+            )
     except Exception as exc:
         message = f"authoritative files committed, but the index update failed: {exc}"
         try:
@@ -233,6 +278,17 @@ def _history_write(
     transaction.write(path, text)
 
 
+def _require_repository_revision(context: ProjectContext, expected: str | None) -> None:
+    if expected is None:
+        return
+    current = repository_revision(context)
+    if current != expected:
+        raise RepositoryRevisionChangedError(
+            "repository_revision_changed: repository changed before the protected commit",
+            details={"expected": expected, "current": current},
+        )
+
+
 def add_question_in_context(
     context: ProjectContext,
     question: Question,
@@ -246,6 +302,7 @@ def add_question_in_context(
     root, config = context.root, context.config
     services = services or _default_mutation_services(context)
     repository = services.repository
+    expected_revision = repository_revision(context) if not dry_run else None
     snapshot = repository.scan()
     _ensure_sources_are_consistent(snapshot)
     destination = repository.destination(question)
@@ -295,32 +352,34 @@ def add_question_in_context(
     )
     if dry_run:
         return result
-    transaction = MutationTransaction()
-    transaction.write(destination, rendered)
-    if previous_record is not None and previous_record.path != destination:
-        transaction.delete(previous_record.path)
-    _history_write(
-        transaction,
-        services.history,
-        HistoryRecord(
-            operation="upsert" if previous else "add",
-            question_ids=(prepared.id,),
-            command=command,
-            dry_run=False,
-            before_hash=sha256_text(previous_record.text if previous_record else None),
-            after_hash=sha256_text(rendered),
-            changes=tuple(changes),
-        ),
-    )
-    transaction.commit()
-    index_updated, index_warnings = _sync_index(
-        config,
-        services.index,
-        snapshot=snapshot,
-        questions=[prepared],
-    )
-    result.index_updated = index_updated
-    result.warnings.extend(index_warnings)
+    with _write_lock(context, services).hold(command):
+        _require_repository_revision(context, expected_revision)
+        transaction = MutationTransaction.for_context(context)
+        transaction.write(destination, rendered)
+        if previous_record is not None and previous_record.path != destination:
+            transaction.delete(previous_record.path)
+        _history_write(
+            transaction,
+            services.history,
+            HistoryRecord(
+                operation="upsert" if previous else "add",
+                question_ids=(prepared.id,),
+                command=command,
+                dry_run=False,
+                before_hash=sha256_text(previous_record.text if previous_record else None),
+                after_hash=sha256_text(rendered),
+                changes=tuple(changes),
+            ),
+        )
+        transaction.commit()
+        index_updated, index_warnings = _sync_index(
+            context,
+            services.index,
+            snapshot=snapshot,
+            questions=[prepared],
+        )
+        result.index_updated = index_updated
+        result.warnings.extend(index_warnings)
     return result
 
 
@@ -350,12 +409,16 @@ def ingest_questions_in_context(
     services: MutationServices | None = None,
     records: Sequence[JsonLineRecord] | None = None,
     options: IngestOptions | None = None,
+    _verified_revision: str | None = None,
     **legacy_options: object,
 ) -> IngestResult:
     """Validate an entire batch, then commit valid records atomically."""
     options = _ingest_options(options, legacy_options)
     services = services or _default_mutation_services(context)
     repository = services.repository
+    expected_revision = (
+        None if _verified_revision is not None or options.dry_run else repository_revision(context)
+    )
     snapshot = repository.scan()
     _ensure_sources_are_consistent(snapshot)
     entries = _ingest_entries(questions, records)
@@ -373,6 +436,7 @@ def ingest_questions_in_context(
         snapshot=snapshot,
         duplicate_ids=duplicate_ids,
         options=options,
+        repository_revision=expected_revision,
     )
     planned = [_plan_ingest_entry(planning, entry) for entry in entries]
     results = [result for result, _ in planned]
@@ -525,51 +589,53 @@ def _commit_ingest(
     plans: list[QuestionMutationPlan],
     result: IngestResult,
 ) -> None:
-    transaction = MutationTransaction()
-    before: dict[str, str] = {}
-    after: dict[str, str] = {}
-    changes: list[dict[str, Any]] = []
-    prepared_questions: list[Question] = []
-    for plan in plans:
-        transaction.write(plan.destination, plan.rendered)
-        if plan.previous is not None and plan.previous.path != plan.destination:
-            transaction.delete(plan.previous.path)
-        if plan.previous is not None:
-            before[plan.prepared.id] = plan.previous.text
-        after[plan.prepared.id] = plan.rendered
-        prepared_questions.append(plan.prepared)
-        changes.append(
-            {
-                "id": plan.prepared.id,
-                "action": "update" if plan.previous else "create",
-                "path": plan.destination.relative_to(planning.context.root).as_posix(),
-            }
-        )
-    if prepared_questions:
-        ids = sorted(question.id for question in prepared_questions)
-        _history_write(
-            transaction,
-            planning.services.history,
-            HistoryRecord(
-                operation="ingest",
-                question_ids=tuple(ids),
-                command=planning.options.command,
-                dry_run=False,
-                before_hash=_aggregate_hash(before),
-                after_hash=_aggregate_hash(after),
-                changes=tuple(sorted(changes, key=lambda item: item["id"])),
-            ),
-        )
-        transaction.commit()
-        index_updated, index_warnings = _sync_index(
-            planning.context.config,
-            planning.services.index,
-            snapshot=planning.snapshot,
-            questions=prepared_questions,
-        )
-        result.index_updated = index_updated
-        result.warnings.extend(index_warnings)
-    result.written = len(prepared_questions)
+    with _write_lock(planning.context, planning.services).hold(planning.options.command):
+        _require_repository_revision(planning.context, planning.repository_revision)
+        transaction = MutationTransaction.for_context(planning.context)
+        before: dict[str, str] = {}
+        after: dict[str, str] = {}
+        changes: list[dict[str, Any]] = []
+        prepared_questions: list[Question] = []
+        for plan in plans:
+            transaction.write(plan.destination, plan.rendered)
+            if plan.previous is not None and plan.previous.path != plan.destination:
+                transaction.delete(plan.previous.path)
+            if plan.previous is not None:
+                before[plan.prepared.id] = plan.previous.text
+            after[plan.prepared.id] = plan.rendered
+            prepared_questions.append(plan.prepared)
+            changes.append(
+                {
+                    "id": plan.prepared.id,
+                    "action": "update" if plan.previous else "create",
+                    "path": plan.destination.relative_to(planning.context.root).as_posix(),
+                }
+            )
+        if prepared_questions:
+            ids = sorted(question.id for question in prepared_questions)
+            _history_write(
+                transaction,
+                planning.services.history,
+                HistoryRecord(
+                    operation="ingest",
+                    question_ids=tuple(ids),
+                    command=planning.options.command,
+                    dry_run=False,
+                    before_hash=_aggregate_hash(before),
+                    after_hash=_aggregate_hash(after),
+                    changes=tuple(sorted(changes, key=lambda item: item["id"])),
+                ),
+            )
+            transaction.commit()
+            index_updated, index_warnings = _sync_index(
+                planning.context,
+                planning.services.index,
+                snapshot=planning.snapshot,
+                questions=prepared_questions,
+            )
+            result.index_updated = index_updated
+            result.warnings.extend(index_warnings)
+        result.written = len(prepared_questions)
 
 
 def diff_questions(
@@ -612,11 +678,15 @@ def apply_patch_in_context(
     services: MutationServices | None = None,
     dry_run: bool = False,
     command: str = "qbank patch",
+    _verified_revision: str | None = None,
 ) -> PatchQuestionResult:
     """Apply a validated structured patch as one authoritative transaction."""
     root, config = context.root, context.config
     services = services or _default_mutation_services(context)
     repository = services.repository
+    expected_revision = (
+        None if _verified_revision is not None or dry_run else repository_revision(context)
+    )
     snapshot = repository.scan()
     _ensure_sources_are_consistent(snapshot)
     previous_record = snapshot.locate(question_id)
@@ -659,32 +729,36 @@ def apply_patch_in_context(
     before_text = previous_record.text
     destination = repository.destination(prepared)
     rendered = render_question(prepared)
-    transaction = MutationTransaction()
-    transaction.write(destination, rendered)
-    if path != destination:
-        transaction.delete(path)
-    _history_write(
-        transaction,
-        services.history,
-        HistoryRecord(
-            operation="patch",
-            question_ids=(question_id,),
-            command=command,
-            dry_run=False,
-            before_hash=sha256_text(before_text),
-            after_hash=sha256_text(rendered),
-            changes=tuple(change.model_dump(mode="json", exclude_none=True) for change in changes),
-        ),
-    )
-    transaction.commit()
-    index_updated, index_warnings = _sync_index(
-        config,
-        services.index,
-        snapshot=snapshot,
-        questions=[prepared],
-    )
-    result.index_updated = index_updated
-    result.warnings.extend(index_warnings)
+    with _write_lock(context, services).hold(command):
+        _require_repository_revision(context, expected_revision)
+        transaction = MutationTransaction.for_context(context)
+        transaction.write(destination, rendered)
+        if path != destination:
+            transaction.delete(path)
+        _history_write(
+            transaction,
+            services.history,
+            HistoryRecord(
+                operation="patch",
+                question_ids=(question_id,),
+                command=command,
+                dry_run=False,
+                before_hash=sha256_text(before_text),
+                after_hash=sha256_text(rendered),
+                changes=tuple(
+                    change.model_dump(mode="json", exclude_none=True) for change in changes
+                ),
+            ),
+        )
+        transaction.commit()
+        index_updated, index_warnings = _sync_index(
+            context,
+            services.index,
+            snapshot=snapshot,
+            questions=[prepared],
+        )
+        result.index_updated = index_updated
+        result.warnings.extend(index_warnings)
     return result
 
 
@@ -719,6 +793,7 @@ def _plan_studio_save(
     taxonomy: MutableTaxonomyStorePort,
     dry_run: bool,
 ) -> tuple[PatchQuestionResult, StudioSavePlan | None]:
+    expected_revision = repository_revision(context)
     snapshot = services.repository.scan()
     _ensure_sources_are_consistent(snapshot)
     previous = snapshot.locate(question_id)
@@ -750,6 +825,7 @@ def _plan_studio_save(
         changes=changes,
         taxonomy_before=taxonomy_before,
         taxonomy_after=taxonomy_after,
+        repository_revision=expected_revision,
     )
     return _patch_result(question_id, dry_run, changes, (), warnings), plan
 
@@ -793,26 +869,28 @@ def _commit_studio_save(
     taxonomy: MutableTaxonomyStorePort,
     command: str,
 ) -> None:
-    if plan.previous.path.read_text(encoding="utf-8") != plan.previous.text:
-        raise ConflictError(f"question changed during Studio save: {plan.prepared.id}")
-    if taxonomy.load() != plan.taxonomy_before:
-        raise ConflictError("taxonomy.yaml changed during Studio save")
-    transaction = MutationTransaction()
-    transaction.write(plan.destination, plan.rendered)
-    if plan.previous.path != plan.destination:
-        transaction.delete(plan.previous.path)
-    taxonomy_changed = plan.taxonomy_before != plan.taxonomy_after
-    if taxonomy_changed:
-        transaction.write(taxonomy.path, taxonomy.text(plan.taxonomy_after))
-    _history_write(transaction, services.history, _studio_history(plan, taxonomy, command))
-    transaction.commit()
-    result.index_updated, index_warnings = _sync_index(
-        context.config,
-        services.index,
-        snapshot=plan.snapshot,
-        questions=[plan.prepared],
-    )
-    result.warnings.extend(index_warnings)
+    with _write_lock(context, services).hold(command):
+        _require_repository_revision(context, plan.repository_revision)
+        if plan.previous.path.read_text(encoding="utf-8") != plan.previous.text:
+            raise ConflictError(f"question changed during Studio save: {plan.prepared.id}")
+        if taxonomy.load() != plan.taxonomy_before:
+            raise ConflictError("taxonomy.yaml changed during Studio save")
+        transaction = MutationTransaction.for_context(context)
+        transaction.write(plan.destination, plan.rendered)
+        if plan.previous.path != plan.destination:
+            transaction.delete(plan.previous.path)
+        taxonomy_changed = plan.taxonomy_before != plan.taxonomy_after
+        if taxonomy_changed:
+            transaction.write(taxonomy.path, taxonomy.text(plan.taxonomy_after))
+        _history_write(transaction, services.history, _studio_history(plan, taxonomy, command))
+        transaction.commit()
+        result.index_updated, index_warnings = _sync_index(
+            context,
+            services.index,
+            snapshot=plan.snapshot,
+            questions=[plan.prepared],
+        )
+        result.warnings.extend(index_warnings)
 
 
 def _studio_history(
@@ -872,9 +950,10 @@ def delete_question_in_context(
     command: str = "qbank delete",
 ) -> DeleteQuestionResult:
     """Delete one source and write history in a rollback-capable transaction."""
-    root, config = context.root, context.config
+    root = context.root
     services = services or _default_mutation_services(context)
     repository = services.repository
+    expected_revision = repository_revision(context) if not dry_run else None
     snapshot = repository.scan()
     matches = list(snapshot.source_paths_for_id(question_id))
     if not matches:
@@ -894,36 +973,38 @@ def delete_question_in_context(
     )
     if dry_run:
         return result
-    transaction = MutationTransaction()
-    transaction.delete(path)
-    _history_write(
-        transaction,
-        services.history,
-        HistoryRecord(
-            operation="delete",
-            question_ids=(question_id,),
-            command=command,
-            dry_run=False,
-            before_hash=sha256_text(before_text),
-            after_hash=None,
-            changes=(
-                {
-                    "field": "*",
-                    "old": "present",
-                    "new": "deleted",
-                },
+    with _write_lock(context, services).hold(command):
+        _require_repository_revision(context, expected_revision)
+        transaction = MutationTransaction.for_context(context)
+        transaction.delete(path)
+        _history_write(
+            transaction,
+            services.history,
+            HistoryRecord(
+                operation="delete",
+                question_ids=(question_id,),
+                command=command,
+                dry_run=False,
+                before_hash=sha256_text(before_text),
+                after_hash=None,
+                changes=(
+                    {
+                        "field": "*",
+                        "old": "present",
+                        "new": "deleted",
+                    },
+                ),
             ),
-        ),
-    )
-    transaction.commit()
-    index_updated, index_warnings = _sync_index(
-        config,
-        services.index,
-        snapshot=snapshot,
-        deleted_ids=[question_id],
-    )
-    result.index_updated = index_updated
-    result.warnings.extend(index_warnings)
+        )
+        transaction.commit()
+        index_updated, index_warnings = _sync_index(
+            context,
+            services.index,
+            snapshot=snapshot,
+            deleted_ids=[question_id],
+        )
+        result.index_updated = index_updated
+        result.warnings.extend(index_warnings)
     return result
 
 

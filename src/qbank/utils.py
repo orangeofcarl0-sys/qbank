@@ -75,3 +75,27 @@ def is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def is_reparse_point(path: Path) -> bool:
+    """Return whether an existing path is a symlink or Windows reparse point."""
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
+        return False
+    return path.is_symlink() or bool(attributes & 0x400)
+
+
+def reject_reparse_points(path: Path, *, boundary: Path) -> None:
+    """Reject existing reparse components below a trusted resolved boundary."""
+    base = boundary.resolve()
+    candidate = path.absolute()
+    try:
+        relative = candidate.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(f"path escapes boundary: {path}") from exc
+    current = base
+    for part in relative.parts:
+        current /= part
+        if is_reparse_point(current):
+            raise ValueError(f"reparse point is not supported: {current}")

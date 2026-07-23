@@ -11,6 +11,7 @@ from qbank.application.tags import TagMutationPlan
 from qbank.context import ProjectContext
 from qbank.domain import HistoryRecord, RepositorySnapshot
 from qbank.errors import ConflictError, DataValidationError, QuestionNotFoundError
+from qbank.infrastructure.locking import RepositoryWriteLock
 from qbank.models import (
     Diagnostic,
     DiagnosticCode,
@@ -43,13 +44,11 @@ class AtomicTagMutationExecutor:
         self.context = context
         self.services = services
         self.taxonomy = YamlTaxonomyStore(context)
+        self.lock = services.lock or RepositoryWriteLock(context)
 
     def commit(self, plan: TagMutationPlan) -> TagMutationResult:
         """Validate the complete plan, then commit or return its dry-run diff."""
         plan.snapshot.require_consistent()
-        current_taxonomy = self.taxonomy.load()
-        if current_taxonomy != plan.taxonomy_before:
-            raise ConflictError("taxonomy.yaml changed while the tag operation was being planned")
         prepared = self._prepare_questions(plan)
         result = TagMutationResult(
             ok=True,
@@ -64,17 +63,35 @@ class AtomicTagMutationExecutor:
             index_updated=False,
         )
         if plan.dry_run:
+            self._require_current(plan)
             return result
+        with self.lock.hold(plan.command):
+            self._require_current(plan)
+            self._commit_prepared(plan, prepared, result)
+        return result
+
+    def _require_current(self, plan: TagMutationPlan) -> None:
+        if self.taxonomy.load() != plan.taxonomy_before:
+            raise ConflictError("taxonomy.yaml changed while the tag operation was being planned")
+        for question in plan.questions:
+            record = plan.snapshot.locate(question.id)
+            if record.path.read_text(encoding="utf-8") != record.text:
+                raise ConflictError(f"question changed during tag operation: {question.id}")
+
+    def _commit_prepared(
+        self,
+        plan: TagMutationPlan,
+        prepared: list[Question],
+        result: TagMutationResult,
+    ) -> None:
         taxonomy_changed = plan.taxonomy_before != plan.taxonomy_after
         if not prepared and not taxonomy_changed:
-            return result
-        transaction = MutationTransaction()
+            return
+        transaction = MutationTransaction.for_context(self.context)
         before: dict[str, str] = {}
         after: dict[str, str] = {}
         for question in prepared:
             record = plan.snapshot.locate(question.id)
-            if record.path.read_text(encoding="utf-8") != record.text:
-                raise ConflictError(f"question changed during tag operation: {question.id}")
             rendered = render_question(question)
             transaction.write(record.path, rendered)
             before[question.id] = record.text
@@ -113,7 +130,6 @@ class AtomicTagMutationExecutor:
                 prepared,
                 plan.snapshot,
             )
-        return result
 
     def undo(self, token: str, *, dry_run: bool, command: str) -> TagMutationResult:
         """Build and apply an inverse plan from one durable tag history event."""

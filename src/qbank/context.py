@@ -7,6 +7,7 @@ from pathlib import Path
 
 from qbank.errors import DataValidationError, ProjectNotFoundError
 from qbank.models import ProjectConfig
+from qbank.utils import reject_reparse_points
 from qbank.yaml_io import load_yaml
 
 
@@ -116,7 +117,12 @@ def find_project_root(start: Path | None = None) -> Path:
 def resolve_project_path(root: Path, relative: str, *, label: str) -> Path:
     """Resolve a configured path and reject symlink or traversal escape."""
     resolved_root = root.resolve()
-    candidate = (resolved_root / relative).resolve()
+    lexical = resolved_root / relative
+    try:
+        reject_reparse_points(lexical, boundary=resolved_root)
+    except ValueError as exc:
+        raise DataValidationError(f"{label} contains an unsupported reparse point") from exc
+    candidate = lexical.resolve()
     try:
         candidate.relative_to(resolved_root)
     except ValueError as exc:

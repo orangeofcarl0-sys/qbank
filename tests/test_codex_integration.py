@@ -184,6 +184,41 @@ def test_codex_check_warns_when_path_entry_cannot_execute(
     assert "cannot be executed" in codex_check.message
 
 
+def test_codex_probe_selects_runnable_npm_candidate_after_denied_store_entry(
+    project: tuple[Path, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = project
+    monkeypatch.chdir(root)
+    store = r"C:\Program Files\WindowsApps\OpenAI.Codex\codex.exe"
+    npm = r"C:\Users\tester\AppData\Roaming\npm\codex.cmd"
+    monkeypatch.setattr(
+        "qbank.services.codex._codex_cli_candidates",
+        lambda _context: [(store, "windows-store"), (npm, "npm-user")],
+    )
+
+    def probe(command: list[str], **_kwargs: Any) -> Any:
+        if any(store in value for value in command):
+            raise PermissionError("access denied")
+        return SimpleNamespace(returncode=0, stdout="codex-cli 0.145.0\n", stderr="")
+
+    monkeypatch.setattr("qbank.services.codex.subprocess.run", probe)
+    result = check_codex_integration(
+        ProjectContext.from_config(root, config),
+        command_probe=lambda _parts: True,
+        user_skill=tmp_path / "missing-user-skill",
+    )
+
+    assert result.codex_cli_ready
+    assert not result.degraded
+    assert [(item.status, item.selected) for item in result.codex_cli_candidates] == [
+        ("denied", False),
+        ("ready", True),
+    ]
+    assert result.codex_cli_candidates[1].version == "codex-cli 0.145.0"
+
+
 def test_codex_check_reports_missing_workflow_command(
     project: tuple[Path, Any],
     monkeypatch: pytest.MonkeyPatch,
@@ -244,7 +279,7 @@ def test_codex_instructions_json_and_markdown(project: tuple[Path, Any]) -> None
     assert result.paths["temporary_ai"] == "build/ai"
     assert result.paths["generated_papers"] == "papers/generated"
     assert result.command_sequences["import"][1] == "qbank schema --format json"
-    assert result.integration_revision == 2
+    assert result.integration_revision == 3
     assert result.context_protocol.target_project_root == str(root)
     assert result.context_protocol.execution_working_directory == str(root)
     assert result.context_protocol.required_handoff_fields == list(CONTEXT_REQUIRED_FIELDS)

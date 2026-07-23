@@ -11,10 +11,13 @@ from qbank.application.revision import repository_revision
 from qbank.composition import CoreProjectServices, create_core_project_services
 from qbank.context import ProjectContext
 from qbank.diagnostics import project_status_in_context
-from qbank.errors import ConflictError, DataValidationError, QuestionNotFoundError
+from qbank.errors import DataValidationError, QuestionNotFoundError
 from qbank.mcp.operations import OperationStore, PreparedOperation
 from qbank.models import (
+    AssetIngestPrepareRequest,
+    AssetPreferredPrepareRequest,
     AssetShowResult,
+    AssetStatusPrepareRequest,
     Diagnostic,
     IngestOptions,
     IngestPrepareRequest,
@@ -25,21 +28,20 @@ from qbank.models import (
     McpPrepareResult,
     McpQuestionSearchResult,
     Paper,
+    PaperHistoryEntry,
     PaperPrepareRequest,
     PatchPrepareRequest,
     QueryFilters,
     Question,
-    SearchHit,
     TagChangePrepareRequest,
     TagMutationResult,
     Taxonomy,
     ValidationReport,
 )
-from qbank.operations import ingest_questions_in_context
-from qbank.papers import load_paper, validate_paper_in_context
+from qbank.operations import apply_patch_in_context, ingest_questions_in_context
+from qbank.papers import load_paper
 from qbank.schemas import SchemaKind, schema_for
-from qbank.transaction import MutationTransaction
-from qbank.yaml_io import dump_yaml
+from qbank.utils import reject_reparse_points
 
 
 class QbankMcpAdapter:
@@ -52,7 +54,12 @@ class QbankMcpAdapter:
     ) -> None:
         self.context = context
         self.services = services or create_core_project_services(context)
-        self.operations = OperationStore(self.revision, self._commit)
+        self.operations = OperationStore(
+            self.revision,
+            self._commit,
+            directory=context.paths.state / "mcp-operations",
+            lock=self.services.lock,
+        )
 
     @classmethod
     def from_repository(cls, repository: Path) -> QbankMcpAdapter:
@@ -83,15 +90,13 @@ class QbankMcpAdapter:
         if text and filters is not None:
             raise DataValidationError("use text search or structured filters, not both")
         if text:
-            search_items: list[Question | SearchHit] = []
-            search_items.extend(self.services.questions.search_questions(text, limit=limit))
+            search_items = self.services.questions.search_questions(text, limit=limit)
             return McpQuestionSearchResult(
                 mode="search",
                 items=search_items,
             )
         active = (filters or QueryFilters()).model_copy(update={"limit": limit})
-        query_items: list[Question | SearchHit] = []
-        query_items.extend(self.services.questions.query_questions(active))
+        query_items = self.services.questions.query_summaries(active)
         return McpQuestionSearchResult(
             mode="query",
             items=query_items,
@@ -110,7 +115,7 @@ class QbankMcpAdapter:
         return self.services.assets.show_asset(question_id, asset_id)
 
     def paper_get(self, paper_id: str) -> McpPaperDocument:
-        path = self._find_paper(paper_id)
+        path = self.services.papers.find(paper_id)
         return McpPaperDocument(
             id=path.stem,
             path=path.relative_to(self.context.root).as_posix(),
@@ -124,6 +129,9 @@ class QbankMcpAdapter:
         if not events and not question_events:
             self.services.questions.get_question(question_id)
         return [cast(dict[str, JsonValue], item.model_dump(mode="json")) for item in events]
+
+    def paper_history_get(self, paper_id: str) -> list[PaperHistoryEntry]:
+        return self.services.papers.history(paper_id)
 
     def ingest_prepare(self, request: IngestPrepareRequest) -> McpPrepareResult:
         revision = self.revision()
@@ -219,11 +227,7 @@ class QbankMcpAdapter:
         revision = self.revision()
         path = self._paper_path(request.path)
         previous = load_paper(path) if path.is_file() else None
-        report = validate_paper_in_context(
-            self.context,
-            request.paper,
-            assets=self.services.assets,
-        )
+        report = self.services.papers.validate(request.paper)
         diff = self._paper_diff(path.stem, previous, request.paper)
         preview = self._preview(
             "paper",
@@ -242,6 +246,103 @@ class QbankMcpAdapter:
         )
         return self._store(request, preview)
 
+    def asset_ingest_prepare(self, request: AssetIngestPrepareRequest) -> McpPrepareResult:
+        revision = self.revision()
+        package_root = self._package_root(request.package_root)
+        result = self.services.assets.ingest_package(
+            request.package,
+            package_root,
+            dry_run=True,
+            download=request.download,
+        )
+        preview = self._preview(
+            "asset_ingest",
+            revision,
+            [
+                McpAffectedObject(
+                    kind="asset",
+                    id=f"{request.package.question_id}/{request.package.asset_id}",
+                    action=result.action,
+                    path=result.manifest_path,
+                )
+            ],
+            [],
+            result.warnings,
+            result.ok,
+        )
+        return self._store(request, preview)
+
+    def asset_status_prepare(self, request: AssetStatusPrepareRequest) -> McpPrepareResult:
+        revision = self.revision()
+        current = self.services.assets.show_asset(request.question_id, request.asset_id).asset
+        result = self.services.assets.set_status(
+            request.question_id,
+            request.asset_id,
+            request.status,
+            dry_run=True,
+        )
+        preview = self._preview(
+            "asset_status",
+            revision,
+            [
+                McpAffectedObject(
+                    kind="asset",
+                    id=f"{request.question_id}/{request.asset_id}",
+                    action="set_status",
+                    path=result.manifest_path,
+                )
+            ],
+            [
+                McpFieldDiff(
+                    object_id=request.asset_id,
+                    field="status",
+                    before=current.status.value,
+                    after=request.status.value,
+                )
+            ],
+            result.warnings,
+            result.ok,
+        )
+        return self._store(request, preview)
+
+    def asset_preferred_prepare(
+        self,
+        request: AssetPreferredPrepareRequest,
+    ) -> McpPrepareResult:
+        revision = self.revision()
+        current = self.services.assets.show_asset(request.question_id, request.asset_id).asset
+        result = self.services.assets.set_preference(
+            request.question_id,
+            request.asset_id,
+            request.representation_id,
+            kind=request.kind,
+            dry_run=True,
+        )
+        field = "preferred_editor" if request.kind == "editor" else "preferred_render"
+        preview = self._preview(
+            "asset_preferred",
+            revision,
+            [
+                McpAffectedObject(
+                    kind="asset",
+                    id=f"{request.question_id}/{request.asset_id}",
+                    action=f"set_{request.kind}",
+                    path=result.manifest_path,
+                )
+            ],
+            [
+                McpFieldDiff(
+                    object_id=request.asset_id,
+                    field=field,
+                    before=getattr(current, field),
+                    after=request.representation_id,
+                )
+            ],
+            result.warnings,
+            result.ok,
+        )
+        return self._store(request, preview)
+
     def operation_commit(
         self,
         operation_id: str,
@@ -249,11 +350,17 @@ class QbankMcpAdapter:
     ) -> McpOperationResult:
         return self.operations.commit(operation_id, repository_revision)
 
+    def operation_get(self, operation_id: str) -> McpOperationResult:
+        return self.operations.get(operation_id)
+
     def operation_cancel(self, operation_id: str) -> McpOperationResult:
         return self.operations.cancel(operation_id)
 
     def _commit(self, operation: PreparedOperation) -> JsonValue:
         payload = operation.payload
+        verified_revision = operation.verified_revision
+        if verified_revision is None:
+            raise RuntimeError("MCP commit requires a verified repository revision")
         if isinstance(payload, IngestPrepareRequest):
             ingest_result = ingest_questions_in_context(
                 self.context,
@@ -263,27 +370,69 @@ class QbankMcpAdapter:
                     upsert=payload.upsert,
                     command="qbank mcp operation_commit",
                 ),
+                _verified_revision=verified_revision,
             )
             return cast(JsonValue, ingest_result.model_dump(mode="json", exclude_none=True))
         if isinstance(payload, PatchPrepareRequest):
-            patch_result = self.services.questions.patch_question(
+            patch_result = apply_patch_in_context(
+                self.context,
                 payload.question_id,
                 payload.patch,
+                services=self.services.mutations,
                 dry_run=False,
                 command="qbank mcp operation_commit",
+                _verified_revision=verified_revision,
             )
             return cast(JsonValue, patch_result.model_dump(mode="json", exclude_none=True))
         if isinstance(payload, TagChangePrepareRequest):
             tag_result = self._tag_change(payload, dry_run=False)
             return cast(JsonValue, tag_result.model_dump(mode="json", exclude_none=True))
-        path = self._paper_path(payload.path)
-        transaction = MutationTransaction()
-        transaction.write(
-            path,
-            dump_yaml(payload.paper.model_dump(mode="json", exclude_none=True)) + "\n",
+        if isinstance(
+            payload,
+            AssetIngestPrepareRequest | AssetStatusPrepareRequest | AssetPreferredPrepareRequest,
+        ):
+            return self._commit_asset(payload)
+        self.services.papers.save(
+            payload.path,
+            payload.paper,
+            dry_run=False,
+            command="qbank mcp operation_commit",
+            _verified_revision=verified_revision,
         )
-        transaction.commit()
-        return cast(JsonValue, self.paper_get(path.stem).model_dump(mode="json"))
+        return cast(
+            JsonValue, self.paper_get(self._paper_path(payload.path).stem).model_dump(mode="json")
+        )
+
+    def _commit_asset(
+        self,
+        payload: (
+            AssetIngestPrepareRequest | AssetStatusPrepareRequest | AssetPreferredPrepareRequest
+        ),
+    ) -> JsonValue:
+        if isinstance(payload, AssetIngestPrepareRequest):
+            asset_result = self.services.assets.ingest_package(
+                payload.package,
+                self._package_root(payload.package_root),
+                dry_run=False,
+                download=payload.download,
+            )
+            return cast(JsonValue, asset_result.model_dump(mode="json", exclude_none=True))
+        if isinstance(payload, AssetStatusPrepareRequest):
+            status_result = self.services.assets.set_status(
+                payload.question_id,
+                payload.asset_id,
+                payload.status,
+                dry_run=False,
+            )
+            return cast(JsonValue, status_result.model_dump(mode="json", exclude_none=True))
+        preferred_result = self.services.assets.set_preference(
+            payload.question_id,
+            payload.asset_id,
+            payload.representation_id,
+            kind=payload.kind,
+            dry_run=False,
+        )
+        return cast(JsonValue, preferred_result.model_dump(mode="json", exclude_none=True))
 
     def _tag_change(
         self,
@@ -313,8 +462,6 @@ class QbankMcpAdapter:
         diagnostics: list[Diagnostic],
         committable: bool,
     ) -> McpPrepareResult:
-        if self.revision() != revision:
-            raise ConflictError("repository changed while the operation was being prepared")
         operation_id, expires_at = self.operations.identity()
         return McpPrepareResult.model_validate(
             {
@@ -337,10 +484,29 @@ class QbankMcpAdapter:
             | PatchPrepareRequest
             | TagChangePrepareRequest
             | PaperPrepareRequest
+            | AssetIngestPrepareRequest
+            | AssetStatusPrepareRequest
+            | AssetPreferredPrepareRequest
         ),
         preview: McpPrepareResult,
     ) -> McpPrepareResult:
         return self.operations.add(request, preview)
+
+    def _package_root(self, value: str) -> Path:
+        pure = PurePosixPath(value.replace("\\", "/"))
+        if PureWindowsPath(value).is_absolute() or pure.is_absolute() or ".." in pure.parts:
+            raise DataValidationError("asset package root must be a contained relative path")
+        lexical = self.context.root.joinpath(*pure.parts)
+        try:
+            reject_reparse_points(lexical, boundary=self.context.root)
+        except ValueError as exc:
+            raise DataValidationError("asset package root contains a reparse point") from exc
+        candidate = lexical.resolve()
+        if not candidate.is_relative_to(self.context.root.resolve()):
+            raise DataValidationError("asset package root escapes the repository")
+        if not candidate.is_dir():
+            raise DataValidationError(f"asset package root does not exist: {value}")
+        return candidate
 
     def _ingest_diff(self, request: IngestPrepareRequest) -> list[McpFieldDiff]:
         snapshot = self.services.repository.scan()
@@ -396,21 +562,3 @@ class QbankMcpAdapter:
         if resolved.suffix.casefold() not in {".yaml", ".yml"}:
             raise DataValidationError("paper path must use .yaml or .yml")
         return resolved
-
-    def _find_paper(self, paper_id: str) -> Path:
-        if any(character in paper_id for character in ("/", "\\")):
-            path = self._paper_path(paper_id)
-            if path.is_file():
-                return path
-            raise QuestionNotFoundError(f"paper not found: {paper_id}")
-        matches = [
-            path
-            for pattern in ("*.yaml", "*.yml")
-            for path in self.context.paths.papers.rglob(pattern)
-            if path.stem == paper_id
-        ]
-        if not matches:
-            raise QuestionNotFoundError(f"paper not found: {paper_id}")
-        if len(matches) > 1:
-            raise DataValidationError(f"ambiguous paper id: {paper_id}")
-        return matches[0]

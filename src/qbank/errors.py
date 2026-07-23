@@ -1,6 +1,9 @@
 """Domain errors and stable process exit codes."""
 
+from __future__ import annotations
+
 from enum import IntEnum
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -26,6 +29,10 @@ class QBankError(Exception):
     exit_code = ExitCode.GENERAL
     code = DiagnosticCode.GENERAL_ERROR
 
+    def __init__(self, message: str, *, details: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.details = details or {}
+
 
 class ProjectNotFoundError(QBankError):
     """Raised when no qbank project can be found."""
@@ -47,11 +54,47 @@ class ConflictError(QBankError):
     code = DiagnosticCode.CONFLICT
 
 
+class RepositoryLockedError(ConflictError):
+    """Raised when another process owns the repository write lock."""
+
+    code = DiagnosticCode.REPOSITORY_LOCKED
+
+
+class RepositoryRevisionChangedError(ConflictError):
+    """Raised when optimistic state changed before a protected commit."""
+
+    code = DiagnosticCode.REPOSITORY_REVISION_CHANGED
+
+
+class OperationExpiredError(ConflictError):
+    """Raised when a prepared MCP operation exceeded its lifetime."""
+
+    code = DiagnosticCode.OPERATION_EXPIRED
+
+
+class OperationCancelledError(ConflictError):
+    """Raised when commit is requested for a cancelled MCP operation."""
+
+    code = DiagnosticCode.OPERATION_CANCELLED
+
+
+class OperationAlreadyCommittedError(ConflictError):
+    """Raised when a caller requests a non-idempotent committed transition."""
+
+    code = DiagnosticCode.OPERATION_ALREADY_COMMITTED
+
+
 class DataValidationError(QBankError):
     """Raised for invalid question, patch, or paper input."""
 
     exit_code = ExitCode.VALIDATION
     code = DiagnosticCode.DATA_VALIDATION
+
+
+class SchemaValidationFailedError(DataValidationError):
+    """Raised when an exchange payload cannot satisfy its declared Schema."""
+
+    code = DiagnosticCode.SCHEMA_VALIDATION_FAILED
 
 
 class MarkdownParseError(DataValidationError):

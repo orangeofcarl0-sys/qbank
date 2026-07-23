@@ -94,6 +94,7 @@ def create_project_services(context: ProjectContext) -> ProjectServices:
             store=YamlSavedViewStore(context),
             special=ProjectSpecialViews(context),
             taxonomy=taxonomy,
+            lock=core.lock,
         ),
         history=core.history,
         studio=StudioQuestionService(
@@ -106,6 +107,7 @@ def create_project_services(context: ProjectContext) -> ProjectServices:
             diagnostics=core.diagnostics,
             renderer=renderer,
             assets=core.assets,
+            papers=core.papers,
         ),
     )
 

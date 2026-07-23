@@ -221,14 +221,18 @@ def _default_registry(context: ProjectContext) -> AssetApplicationService:
         AssetInputAdapter,
         FileAssetRepository,
         IpeRenderAdapter,
+        RepositoryWriteLock,
         SafeAssetLauncher,
     )
+
+    lock = RepositoryWriteLock(context)
 
     return AssetApplicationService(
         repository=FileAssetRepository(context),
         inputs=AssetInputAdapter(context),
         renderer=IpeRenderAdapter(context),
         launcher=SafeAssetLauncher(context),
+        lock=lock,
     )
 
 

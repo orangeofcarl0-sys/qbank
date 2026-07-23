@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import shutil
 import sqlite3
 import sys
 from collections import Counter
+from collections.abc import Callable
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from qbank.application.ports import (
     IndexHealthPort,
@@ -173,6 +175,7 @@ def _environment_checks(context: ProjectContext) -> list[DoctorCheck]:
         )
     )
     checks.append(_check("path_containment", "PASS", "all configured paths contained"))
+    checks.append(_filesystem_semantics_check(context.root))
     for name in ("questions", "assets"):
         path = context.path(name)
         checks.append(_check(name, "PASS" if path.is_dir() else "FAIL", str(path)))
@@ -204,6 +207,78 @@ def _environment_checks(context: ProjectContext) -> list[DoctorCheck]:
         )
     )
     return checks
+
+
+def _filesystem_semantics_check(root: Path) -> DoctorCheck:
+    reasons: list[str] = []
+    root_text = str(root.resolve())
+    if root_text.startswith("\\\\"):
+        reasons.append("UNC path")
+    if os.name == "nt" and _windows_drive_type(root) == 4:
+        reasons.append("mapped network drive")
+    for name in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial"):
+        value = os.environ.get(name)
+        if value and _is_within_text(root_text, str(Path(value).resolve())):
+            reasons.append(f"synchronized directory ({name})")
+            break
+    if os.name != "nt" and _network_mount_type(root) is not None:
+        reasons.append(f"network mount ({_network_mount_type(root)})")
+    if reasons:
+        return _check(
+            "filesystem_semantics",
+            "WARN",
+            "; ".join(reasons)
+            + "; qbank 0.2.0 does not guarantee multi-machine or network-share locking",
+        )
+    return _check(
+        "filesystem_semantics",
+        "PASS",
+        f"local filesystem detected on {platform.system()}; multi-machine locking is not promised",
+    )
+
+
+def _windows_drive_type(root: Path) -> int | None:
+    try:
+        import ctypes
+
+        loader = ctypes.windll
+        kernel32 = loader.kernel32
+        get_drive_type = cast(Callable[[str], int], kernel32.GetDriveTypeW)
+        return get_drive_type(root.anchor)
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def _network_mount_type(root: Path) -> str | None:
+    path = Path("/proc/mounts")
+    if not path.is_file():
+        return None
+    network_types = {"cifs", "nfs", "nfs4", "smbfs", "sshfs", "fuse.sshfs"}
+    best: tuple[int, str] | None = None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3 or parts[2] not in network_types:
+            continue
+        mount = Path(parts[1].replace("\\040", " "))
+        try:
+            root.resolve().relative_to(mount.resolve())
+        except ValueError:
+            continue
+        candidate = (len(mount.parts), parts[2])
+        if best is None or candidate[0] > best[0]:
+            best = candidate
+    return best[1] if best is not None else None
+
+
+def _is_within_text(path: str, parent: str) -> bool:
+    try:
+        return os.path.commonpath((path, parent)) == parent
+    except ValueError:
+        return False
 
 
 def _trigram_check() -> DoctorCheck:

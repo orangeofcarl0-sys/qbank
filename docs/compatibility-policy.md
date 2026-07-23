@@ -1,6 +1,6 @@
 # Compatibility policy
 
-qbank is at version 0.1.0 and is not yet released, but the repository treats
+qbank is at version 0.2.0 and is not yet released, but the repository treats
 the documented CLI and data formats as compatibility-sensitive.
 
 ## Preserved interfaces

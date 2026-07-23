@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
+from qbank.application.locking import RepositoryWriteLockPort
 from qbank.application.ports import (
     AssetInputPort,
     AssetLauncherPort,
@@ -57,11 +58,13 @@ class AssetApplicationService:
         inputs: AssetInputPort,
         renderer: AssetRendererPort,
         launcher: AssetLauncherPort,
+        lock: RepositoryWriteLockPort | None = None,
     ):
         self.repository = repository
         self.inputs = inputs
         self.renderer = renderer
         self.launcher = launcher
+        self.lock = lock
 
     def list_assets(self, question_id: str) -> AssetListResult:
         """List all logical assets registered for one question."""
@@ -95,7 +98,11 @@ class AssetApplicationService:
 
     def discard_new_asset(self, question_id: str, asset_id: str) -> None:
         """Compensate a failed question declaration for a newly created asset."""
-        self.repository.discard_new(question_id, asset_id)
+        if self.lock is None:
+            self.repository.discard_new(question_id, asset_id)
+            return
+        with self.lock.hold("asset_discard_new"):
+            self.repository.discard_new(question_id, asset_id)
 
     def ingest_package(
         self,
@@ -129,7 +136,8 @@ class AssetApplicationService:
         )
         if dry_run or action == "unchanged":
             return result
-        self.repository.commit(
+        self._commit_manifest(
+            existing,
             manifest,
             files,
             AssetHistoryEvent(
@@ -167,7 +175,8 @@ class AssetApplicationService:
         )
         result = self._mutation_result(updated, "replace", dry_run=dry_run)
         if not dry_run:
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 _content_files((normalized,)),
                 AssetHistoryEvent(
@@ -214,7 +223,8 @@ class AssetApplicationService:
         )
         result = self._mutation_result(updated, action, dry_run=dry_run)
         if not dry_run:
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 {},
                 AssetHistoryEvent(
@@ -222,6 +232,33 @@ class AssetApplicationService:
                     question_id=question_id,
                     asset_id=asset_id,
                     representation_ids=(representation_id,),
+                ),
+            )
+        return result
+
+    def set_status(
+        self,
+        question_id: str,
+        asset_id: str,
+        status: AssetStatus,
+        *,
+        dry_run: bool,
+    ) -> AssetMutationResult:
+        """Set one lifecycle state without launching an editor or renderer."""
+        manifest = self.repository.get(question_id, asset_id)
+        updated = _updated_manifest(manifest, status=status)
+        result = self._mutation_result(updated, "set_status", dry_run=dry_run)
+        if not dry_run and updated != manifest:
+            self._commit_manifest(
+                manifest,
+                updated,
+                {},
+                AssetHistoryEvent(
+                    operation="asset_set_status",
+                    question_id=question_id,
+                    asset_id=asset_id,
+                    representation_ids=(),
+                    changes=({"before": manifest.status.value, "after": status.value},),
                 ),
             )
         return result
@@ -244,7 +281,8 @@ class AssetApplicationService:
         updated = _updated_manifest(manifest, status=AssetStatus.FINAL)
         result = self._mutation_result(updated, "finalize", dry_run=dry_run)
         if not dry_run:
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 {},
                 AssetHistoryEvent(
@@ -309,7 +347,8 @@ class AssetApplicationService:
         result = self._launch(manifest, representation, "edit", dry_run=dry_run)
         if not dry_run and manifest.status != AssetStatus.EDITING:
             updated = _updated_manifest(manifest, status=AssetStatus.EDITING)
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 {},
                 AssetHistoryEvent(
@@ -341,7 +380,8 @@ class AssetApplicationService:
             return _edit_command_result(manifest, editor, source, command, dry_run=True)
         content = source.read_bytes()
         updated, working = _edit_working_copy(manifest, editor, content)
-        self.repository.commit(
+        self._commit_manifest(
+            manifest,
             updated,
             {working.path or "": content},
             AssetHistoryEvent(
@@ -384,7 +424,8 @@ class AssetApplicationService:
         updated = _reconciled_editor_manifest(manifest, editor, digest)
         result = self._mutation_result(updated, "reconcile", dry_run=dry_run)
         if not dry_run:
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 {},
                 AssetHistoryEvent(
@@ -415,7 +456,8 @@ class AssetApplicationService:
         updated, changes = _restored_manifest(manifest)
         result = self._mutation_result(updated, "restore", dry_run=dry_run)
         if not dry_run:
-            self.repository.commit(
+            self._commit_manifest(
+                manifest,
                 updated,
                 {},
                 AssetHistoryEvent(
@@ -442,7 +484,7 @@ class AssetApplicationService:
         directory = self.repository.location(question_id, asset_id).directory
         command = self.launcher.open_directory(directory, execute=not dry_run)
         if not dry_run:
-            self.repository.record(
+            self._record_event(
                 AssetHistoryEvent(
                     operation="asset_open_directory",
                     question_id=question_id,
@@ -492,7 +534,8 @@ class AssetApplicationService:
                 dry_run=True,
             )
         updated, files, generated = _merge_rendered(manifest, source, rendered)
-        self.repository.commit(
+        self._commit_manifest(
+            manifest,
             updated,
             files,
             AssetHistoryEvent(
@@ -584,6 +627,41 @@ class AssetApplicationService:
         except AssetNotFoundError:
             return None
 
+    def _commit_manifest(
+        self,
+        expected: AssetManifest | None,
+        manifest: AssetManifest,
+        files: dict[str, bytes],
+        event: AssetHistoryEvent,
+    ) -> None:
+        if self.lock is None:
+            self._commit_manifest_unlocked(expected, manifest, files, event)
+            return
+        with self.lock.hold(event.operation):
+            self._commit_manifest_unlocked(expected, manifest, files, event)
+
+    def _commit_manifest_unlocked(
+        self,
+        expected: AssetManifest | None,
+        manifest: AssetManifest,
+        files: dict[str, bytes],
+        event: AssetHistoryEvent,
+    ) -> None:
+        current = self._existing(manifest.question_id, manifest.asset_id)
+        if current != expected:
+            raise AssetConflictError(
+                "asset_conflict: asset changed before the protected commit: "
+                f"{manifest.question_id}/{manifest.asset_id}"
+            )
+        self.repository.commit(manifest, files, event)
+
+    def _record_event(self, event: AssetHistoryEvent) -> None:
+        if self.lock is None:
+            self.repository.record(event)
+            return
+        with self.lock.hold(event.operation):
+            self.repository.record(event)
+
     def _mutation_result(
         self,
         manifest: AssetManifest,
@@ -591,6 +669,7 @@ class AssetApplicationService:
             "replace",
             "set_render",
             "set_editor",
+            "set_status",
             "finalize",
             "normalize",
             "reconcile",
@@ -640,7 +719,7 @@ class AssetApplicationService:
                 f"asset_representation_missing: representation is missing: {representation.path}"
             )
         if not dry_run and action == "open":
-            self.repository.record(
+            self._record_event(
                 AssetHistoryEvent(
                     operation="asset_open",
                     question_id=manifest.question_id,
@@ -665,7 +744,8 @@ class AssetApplicationService:
         source: AssetRepresentation,
     ) -> None:
         failed = _updated_manifest(manifest, status=AssetStatus.FAILED)
-        self.repository.commit(
+        self._commit_manifest(
+            manifest,
             failed,
             {},
             AssetHistoryEvent(

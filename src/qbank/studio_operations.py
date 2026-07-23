@@ -10,7 +10,6 @@ from qbank.application.exchange import load_json_records
 from qbank.application.ports import RenderingPort
 from qbank.context import ProjectContext
 from qbank.diagnostics import DiagnosticServices, project_status_in_context
-from qbank.errors import ConflictError, DataValidationError
 from qbank.models import (
     AddQuestionResult,
     DeleteQuestionResult,
@@ -19,8 +18,6 @@ from qbank.models import (
     Paper,
     PaperBuildRequest,
     PaperBuildResult,
-    PaperQuestion,
-    PaperSection,
     PaperValidationReport,
     Question,
     StatusResult,
@@ -31,9 +28,8 @@ from qbank.operations import (
     delete_question_in_context,
     ingest_questions_in_context,
 )
-from qbank.papers import build_paper_in_context, load_paper, validate_paper_in_context
-from qbank.transaction import MutationTransaction
-from qbank.yaml_io import dump_yaml
+from qbank.paper_service import PaperApplicationService
+from qbank.papers import build_paper_in_context, load_paper
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +42,7 @@ class StudioProjectAdapter:
     diagnostics: DiagnosticServices
     renderer: RenderingPort
     assets: AssetApplicationService
+    papers: PaperApplicationService
 
     def status(self) -> StatusResult:
         return project_status_in_context(self.context, self.diagnostics)
@@ -117,7 +114,7 @@ class StudioProjectAdapter:
         )
 
     def list_papers(self) -> list[Path]:
-        return sorted(self.context.paths.papers.rglob("*.yaml"), key=lambda item: item.as_posix())
+        return self.papers.list()
 
     def paper_ids(self, path: Path) -> tuple[str, ...]:
         paper = load_paper(self._paper_path(path))
@@ -131,46 +128,24 @@ class StudioProjectAdapter:
         *,
         dry_run: bool,
     ) -> Paper:
-        target = self._paper_path(path)
-        if target.exists():
-            raise ConflictError(f"paper file already exists: {target}")
-        paper = Paper(
-            schema_version="1.0",
-            title=title,
-            sections=[
-                PaperSection(
-                    title="题目",
-                    questions=[PaperQuestion(id=value, score=1) for value in question_ids],
-                )
-            ],
+        return self.papers.create(
+            path,
+            title,
+            question_ids,
+            dry_run=dry_run,
+            command="qbank desktop create paper",
         )
-        self._require_valid_paper(paper)
-        if not dry_run:
-            self._write_paper(target, paper)
-        return paper
 
     def add_to_paper(self, path: Path, question_ids: list[str], *, dry_run: bool) -> Paper:
-        target = self._paper_path(path)
-        paper = load_paper(target)
-        known = {item.id for section in paper.sections for item in section.questions}
-        additions = [
-            PaperQuestion(id=value, score=1) for value in question_ids if value not in known
-        ]
-        first = paper.sections[0]
-        sections = [first.model_copy(update={"questions": [*first.questions, *additions]})]
-        sections.extend(paper.sections[1:])
-        updated = paper.model_copy(update={"sections": sections})
-        self._require_valid_paper(updated)
-        if not dry_run:
-            self._write_paper(target, updated)
-        return updated
+        return self.papers.add_questions(
+            path,
+            question_ids,
+            dry_run=dry_run,
+            command="qbank desktop add to paper",
+        )
 
     def validate_paper(self, path: Path) -> PaperValidationReport:
-        return validate_paper_in_context(
-            self.context,
-            load_paper(self._paper_path(path)),
-            assets=self.assets,
-        )
+        return self.papers.validate(load_paper(self._paper_path(path)))
 
     def build_paper(self, path: Path, request: PaperBuildRequest) -> PaperBuildResult:
         return build_paper_in_context(
@@ -182,18 +157,4 @@ class StudioProjectAdapter:
         )
 
     def _paper_path(self, path: Path) -> Path:
-        target = path.resolve()
-        if not target.is_relative_to(self.context.paths.papers.resolve()):
-            raise DataValidationError("paper file must be inside the configured papers directory")
-        return target
-
-    def _require_valid_paper(self, paper: Paper) -> None:
-        report = validate_paper_in_context(self.context, paper, assets=self.assets)
-        if not report.ok:
-            raise DataValidationError(f"paper validation failed: {report.issues}")
-
-    @staticmethod
-    def _write_paper(path: Path, paper: Paper) -> None:
-        transaction = MutationTransaction()
-        transaction.write(path, dump_yaml(paper.model_dump(mode="json", exclude_none=True)) + "\n")
-        transaction.commit()
+        return self.papers.resolve(path)

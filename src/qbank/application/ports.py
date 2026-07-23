@@ -30,6 +30,7 @@ from qbank.models import (
     PaperBuildResult,
     PaperValidationReport,
     PatchQuestionResult,
+    QueryFilters,
     Question,
     QuestionPatch,
     SearchHit,
@@ -56,7 +57,11 @@ class QuestionIndexPort(Protocol):
 
     def ensure_searchable(self, snapshot: RepositorySnapshot) -> None: ...
 
+    def ensure_revision(self, revision: str) -> None: ...
+
     def search(self, text: str, *, limit: int = 20) -> list[SearchHit]: ...
+
+    def query(self, filters: QueryFilters) -> list[SearchHit]: ...
 
     def rebuild(self, snapshot: RepositorySnapshot) -> int: ...
 
@@ -70,6 +75,7 @@ class MutationIndexPort(Protocol):
         questions: tuple[Question, ...] = (),
         deleted_ids: tuple[str, ...] = (),
         topics_by_question: Mapping[str, tuple[str, ...]] | None = None,
+        source_revision: str | None = None,
     ) -> None: ...
 
     def mark_dirty(self, reason: str) -> None: ...

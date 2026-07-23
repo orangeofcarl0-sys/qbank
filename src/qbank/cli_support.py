@@ -59,14 +59,15 @@ def abort(exc: Exception, *, output_format: str = "table") -> NoReturn:
         code = int(ExitCode.GENERAL)
         diagnostic_code = DiagnosticCode.GENERAL_ERROR
     if output_format == "json":
-        emit_json(
-            {
-                "ok": False,
-                "code": diagnostic_code,
-                "error": str(exc),
-                "exit_code": code,
-            }
-        )
+        payload: dict[str, Any] = {
+            "ok": False,
+            "code": diagnostic_code,
+            "error": str(exc),
+            "exit_code": code,
+        }
+        if isinstance(exc, QBankError) and exc.details:
+            payload["details"] = exc.details
+        emit_json(payload)
     else:
         typer.echo(f"Error: {exc}", err=True)
     raise typer.Exit(code=code)

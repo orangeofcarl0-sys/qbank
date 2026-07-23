@@ -137,7 +137,7 @@ Codex 使用 qbank 时应遵守以下规则：
 
 ## 可选本地 MCP
 
-qbank 0.1.0 提供可选的本地 STDIO MCP Server。它与 CLI、Studio 并列调用同一组类型化应用
+qbank 0.2.0 提供可选的本地 STDIO MCP Server。它与 CLI、Studio 并列调用同一组类型化应用
 服务，不解析 CLI 输出，也不让 Studio 依赖 Codex。安装与项目注册均为显式操作：
 
 ```powershell
@@ -149,7 +149,25 @@ qbank codex mcp-check --format json
 
 项目配置只写入当前题库的 `.codex/config.toml` 受管区块，并以绝对 `--repository` 参数绑定该
 题库。所有写操作强制分为 prepare 与 commit 两阶段；prepare 返回字段差异、诊断、过期时间和
-`repository_revision`，仓库变化后 commit 会拒绝执行。重复 commit 返回首次结果，不重复写入。
+`repository_revision`，仓库变化后 commit 会拒绝执行。operation 状态保存在
+`.qbank/mcp-operations/`，支持 `prepared`、`committing`、`committed`、`cancelled` 与
+`expired`；重复 commit 返回首次结果，不重复写入。
+
+首批写工具覆盖题目导入与 patch、标签变更、paper 保存、资产包导入、资产状态和 preferred
+representation。资产工具不会启动 Ipe、浏览器或其他本地程序。`operation_get` 可在 STDIO
+服务重启后读取持久化状态，`paper_history_get` 返回 paper 专用历史。
+
+Codex 会根据 MCP tool annotations 对 `operation_commit` 等写工具请求确认。交互使用应保留
+确认；已由外层自动化明确授权的隔离任务，可用 Codex 官方的逐工具设置精确批准 commit，而
+不关闭其他工具的保护：
+
+```powershell
+codex exec `
+  -c 'mcp_servers.qbank.tools.operation_commit.approval_mode="approve"' `
+  "执行已经审阅的 qbank operation"
+```
+
+该设置属于 Codex 调用方策略，qbank 不会写入或默认启用它。
 未安装 SDK、未注册 MCP 或 Codex CLI 不可用时，CLI、Studio 与 Skill 仍可独立工作，并由
 `integration-status` 报告 `DEGRADED`。
 

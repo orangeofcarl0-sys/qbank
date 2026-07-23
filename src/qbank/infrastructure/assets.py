@@ -42,7 +42,7 @@ from qbank.models import (
     DiagnosticCode,
 )
 from qbank.transaction import MutationTransaction
-from qbank.utils import is_relative_to, utc_now
+from qbank.utils import is_relative_to, reject_reparse_points, utc_now
 from qbank.yaml_io import dump_yaml, load_yaml
 
 _DATA_URI = re.compile(r"^data:([^;,]*)(;base64)?,(.*)$", re.DOTALL)
@@ -118,7 +118,14 @@ class FileAssetRepository:
         _validate_identifier(question_id, "question_id")
         _validate_identifier(asset_id, "asset_id")
         assets_root = self.context.paths.assets.resolve()
-        directory = (assets_root / question_id / asset_id).resolve()
+        lexical = assets_root / question_id / asset_id
+        try:
+            reject_reparse_points(lexical, boundary=assets_root)
+        except ValueError as exc:
+            raise DataValidationError(
+                "asset_path_escape: asset path contains a reparse point"
+            ) from exc
+        directory = lexical.resolve()
         if not is_relative_to(directory, assets_root):
             raise DataValidationError("asset_path_escape: asset directory escapes assets root")
         manifest = directory / "asset.yaml"
@@ -137,7 +144,14 @@ class FileAssetRepository:
         if representation.path is None:
             return None
         location = self.location(manifest.question_id, manifest.asset_id)
-        candidate = (location.directory / representation.path).resolve()
+        lexical = location.directory / representation.path
+        try:
+            reject_reparse_points(lexical, boundary=location.directory)
+        except ValueError as exc:
+            raise DataValidationError(
+                "asset_path_escape: representation contains a reparse point"
+            ) from exc
+        candidate = lexical.resolve()
         if not is_relative_to(candidate, location.directory):
             raise DataValidationError(
                 "asset_path_escape: representation path escapes its asset directory"
@@ -152,7 +166,7 @@ class FileAssetRepository:
     ) -> None:
         location = self.location(manifest.question_id, manifest.asset_id)
         expected = {item.path for item in manifest.representations if item.path is not None}
-        transaction = MutationTransaction()
+        transaction = MutationTransaction.for_context(self.context)
         for relative, content in sorted(files.items()):
             if relative not in expected:
                 raise DataValidationError(
@@ -172,7 +186,7 @@ class FileAssetRepository:
 
     def record(self, event: AssetHistoryEvent) -> None:
         path, text = self._history(event)
-        transaction = MutationTransaction()
+        transaction = MutationTransaction.for_context(self.context)
         transaction.write(path, text)
         transaction.commit()
 
@@ -350,7 +364,14 @@ class AssetInputAdapter:
         package_root: Path,
     ) -> tuple[bytes, AssetFormat, str]:
         root = package_root.resolve()
-        source = (root / cast(str, representation.path)).resolve()
+        lexical = root / cast(str, representation.path)
+        try:
+            reject_reparse_points(lexical, boundary=root)
+        except ValueError as exc:
+            raise DataValidationError(
+                "asset_path_escape: package path contains a reparse point"
+            ) from exc
+        source = lexical.resolve()
         if not is_relative_to(source, root):
             raise DataValidationError("asset_path_escape: package path escapes package root")
         try:
@@ -365,7 +386,7 @@ class AssetInputAdapter:
         representation: AssetPackageRepresentation,
     ) -> tuple[bytes, AssetFormat, str]:
         url = cast(str, representation.url)
-        request = urllib.request.Request(url, headers={"User-Agent": "qbank/0.1.0"})
+        request = urllib.request.Request(url, headers={"User-Agent": "qbank/0.2.0"})
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 content = response.read(self.max_bytes + 1)
@@ -436,7 +457,16 @@ def _representation(
 
 def _contained_file(directory: Path, relative: str) -> Path:
     normalized = PurePosixPath(relative.replace("\\", "/"))
-    candidate = (directory / Path(*normalized.parts)).resolve()
+    if normalized.is_absolute() or ".." in normalized.parts:
+        raise DataValidationError("asset_path_escape: invalid representation path")
+    lexical = directory / Path(*normalized.parts)
+    try:
+        reject_reparse_points(lexical, boundary=directory)
+    except ValueError as exc:
+        raise DataValidationError(
+            "asset_path_escape: representation contains a reparse point"
+        ) from exc
+    candidate = lexical.resolve()
     if not is_relative_to(candidate, directory):
         raise DataValidationError("asset_path_escape: representation escapes asset directory")
     return candidate

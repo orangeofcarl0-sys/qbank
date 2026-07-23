@@ -11,6 +11,7 @@ from qbank.application import (
     TagApplicationService,
 )
 from qbank.application.ports import MutableQuestionRepositoryPort
+from qbank.application.revision import question_projection_revision
 from qbank.context import ProjectContext
 from qbank.diagnostics import DiagnosticServices
 from qbank.history import JsonHistoryStore
@@ -19,10 +20,12 @@ from qbank.infrastructure import (
     FileAssetRepository,
     IpeRenderAdapter,
     RepositoryValidationAdapter,
+    RepositoryWriteLock,
     SafeAssetLauncher,
 )
 from qbank.models import PatchQuestionResult, QuestionPatch
 from qbank.operations import MutationServices, apply_patch_in_context
+from qbank.paper_service import PaperApplicationService
 from qbank.repository import MarkdownQuestionRepository
 from qbank.search_index import SQLiteSearchIndex
 from qbank.tagging import AtomicTagMutationExecutor
@@ -40,6 +43,8 @@ class CoreProjectServices:
     assets: AssetApplicationService
     tags: TagApplicationService
     history: QuestionHistoryService
+    lock: RepositoryWriteLock
+    papers: PaperApplicationService
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,19 +78,28 @@ def create_core_project_services(context: ProjectContext) -> CoreProjectServices
     index = SQLiteSearchIndex(context)
     validator = RepositoryValidationAdapter(context)
     history_store = JsonHistoryStore(context)
-    mutations = MutationServices(repository=repository, index=index, history=history_store)
+    lock = RepositoryWriteLock(context)
+    mutations = MutationServices(
+        repository=repository,
+        index=index,
+        history=history_store,
+        lock=lock,
+    )
     taxonomy = YamlTaxonomyStore(context)
     questions = QuestionService(
         repository=repository,
         validator=validator,
         index=index,
         mutations=QuestionMutationAdapter(context, mutations),
+        lock=lock,
+        projection_revision=lambda: question_projection_revision(context),
     )
     assets = AssetApplicationService(
         repository=FileAssetRepository(context),
         inputs=AssetInputAdapter(context),
         renderer=IpeRenderAdapter(context),
         launcher=SafeAssetLauncher(context),
+        lock=lock,
     )
     return CoreProjectServices(
         repository=repository,
@@ -99,4 +113,6 @@ def create_core_project_services(context: ProjectContext) -> CoreProjectServices
             mutations=AtomicTagMutationExecutor(context, mutations),
         ),
         history=QuestionHistoryService(history_store),
+        lock=lock,
+        papers=PaperApplicationService(context, assets, lock),
     )

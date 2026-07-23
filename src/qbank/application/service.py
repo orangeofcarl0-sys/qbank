@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from qbank.application.locking import RepositoryWriteLockPort
 from qbank.application.ports import (
     QuestionIndexPort,
     QuestionMutationPort,
@@ -29,6 +30,8 @@ class QuestionService:
     validator: RepositoryValidatorPort
     index: QuestionIndexPort
     mutations: QuestionMutationPort | None = None
+    lock: RepositoryWriteLockPort | None = None
+    projection_revision: Callable[[], str] | None = None
 
     def query_questions(self, filters: QueryFilters | None = None) -> list[Question]:
         """Return deterministically filtered authoritative questions."""
@@ -68,20 +71,38 @@ class QuestionService:
 
     def search_questions(self, text: str, *, limit: int = 20) -> list[SearchHit]:
         """Search through the injected projection without knowing its backend."""
-        snapshot = self.repository.scan()
-        snapshot.require_consistent()
-        self.index.ensure_searchable(snapshot)
+        if self.projection_revision is not None:
+            self.index.ensure_revision(self.projection_revision())
+        else:
+            snapshot = self.repository.scan()
+            snapshot.require_consistent()
+            self.index.ensure_searchable(snapshot)
         return self.index.search(text, limit=limit)
 
     def search_projection(self, text: str, *, limit: int = 20) -> list[SearchHit]:
         """Search the maintained projection without rescanning Markdown."""
         return self.index.search(text, limit=limit)
 
+    def query_summaries(self, filters: QueryFilters) -> list[SearchHit]:
+        """Query the healthy index projection and return summaries, never full questions."""
+        if self.projection_revision is not None:
+            self.index.ensure_revision(self.projection_revision())
+        else:
+            snapshot = self.repository.scan()
+            snapshot.require_consistent()
+            self.index.ensure_searchable(snapshot)
+        return self.index.query(filters)
+
     def rebuild_index(self) -> int:
         """Rebuild the projection from one consistent repository snapshot."""
         snapshot = self.repository.scan()
         snapshot.require_consistent()
-        return self.index.rebuild(snapshot)
+        if self.lock is None:
+            return self.index.rebuild(snapshot)
+        with self.lock.hold("index_rebuild"):
+            latest = self.repository.scan()
+            latest.require_consistent()
+            return self.index.rebuild(latest)
 
     def patch_question(
         self,

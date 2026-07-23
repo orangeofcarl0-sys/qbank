@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from qbank.context import ProjectContext
+from qbank.domain import RepositorySnapshot
 from qbank.errors import DataValidationError
+from qbank.markdown_codec import render_question
+from qbank.models import Question
+from qbank.utils import is_reparse_point
 
 
 def repository_revision(context: ProjectContext) -> str:
@@ -22,12 +26,50 @@ def repository_revision(context: ProjectContext) -> str:
         context.root / "taxonomy.yaml",
         context.root / "views.yaml",
     )
-    digest = hashlib.sha256()
     files = _fixed_files(context.root, fixed)
     files.extend(_contained_files(context.root, roots))
-    for path in sorted(set(files), key=lambda item: item.relative_to(context.root).as_posix()):
-        relative = path.relative_to(context.root).as_posix().encode("utf-8")
-        content = path.read_bytes()
+    return _content_revision(context.root, {path: path.read_bytes() for path in files})
+
+
+def question_projection_revision(context: ProjectContext) -> str:
+    """Hash question sources without parsing Markdown or trusting file metadata."""
+    files = _contained_files(context.root, (context.paths.questions,))
+    try:
+        markdown = {
+            path: path.read_text(encoding="utf-8").encode("utf-8")
+            for path in files
+            if path.suffix.casefold() == ".md"
+        }
+    except (OSError, UnicodeError) as exc:
+        raise DataValidationError(f"unable to hash question sources: {exc}") from exc
+    return _content_revision(context.root, markdown)
+
+
+def planned_question_projection_revision(
+    context: ProjectContext,
+    snapshot: RepositorySnapshot,
+    *,
+    questions: Sequence[Question] = (),
+    deleted_ids: Sequence[str] = (),
+) -> str:
+    """Hash the deterministic post-commit question projection from an existing snapshot."""
+    removed = set(deleted_ids) | {question.id for question in questions}
+    contents: dict[Path, bytes] = {
+        record.path: record.text.encode("utf-8")
+        for record in snapshot.records
+        if record.question.id not in removed
+    }
+    for question in questions:
+        destination = context.paths.questions / question.subject / f"{question.id}.md"
+        contents[destination] = render_question(question).encode("utf-8")
+    return _content_revision(context.root, contents)
+
+
+def _content_revision(root: Path, contents: Mapping[Path, bytes]) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(contents, key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        content = contents[path]
         digest.update(len(relative).to_bytes(8, "big"))
         digest.update(relative)
         digest.update(len(content).to_bytes(8, "big"))
@@ -38,7 +80,7 @@ def repository_revision(context: ProjectContext) -> str:
 def _fixed_files(root: Path, candidates: Iterable[Path]) -> list[Path]:
     files: list[Path] = []
     for path in candidates:
-        if path.is_symlink():
+        if is_reparse_point(path):
             raise DataValidationError(f"symbolic authoritative file is not supported: {path}")
         if path.is_file():
             try:
@@ -65,9 +107,9 @@ def _contained_files(root: Path, directories: Iterable[Path]) -> list[Path]:
                 raise DataValidationError(
                     f"authoritative path escapes the repository: {candidate}"
                 ) from exc
-            if candidate.is_symlink():
+            if is_reparse_point(candidate):
                 raise DataValidationError(
-                    f"symbolic links are not supported in authoritative MCP data: {candidate}"
+                    f"reparse points are not supported in authoritative data: {candidate}"
                 )
             if candidate.is_file():
                 files.append(candidate)

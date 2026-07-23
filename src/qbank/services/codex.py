@@ -33,6 +33,7 @@ from qbank.errors import ConflictError, DataValidationError
 from qbank.models import (
     CodexCapability,
     CodexCheckReport,
+    CodexCliCandidate,
     CodexContextProtocol,
     CodexInstructionsResult,
     CodexWorkflow,
@@ -83,7 +84,7 @@ def check_codex_integration(
     else:
         executable_ok = command_probe(())
         workflow_check = _workflow_probe_check(command_probe)
-    codex_cli = _codex_cli_check()
+    codex_cli, codex_candidates = _codex_cli_check(context)
     checks = [
         _file_check("agents_md", context.root / "AGENTS.md"),
         _file_check("skill", project_skill / "SKILL.md"),
@@ -119,6 +120,7 @@ def check_codex_integration(
         codex_cli_ready=codex_cli.status == "PASS",
         degraded=failures > 0 or warnings > 0,
         integration_revision=INTEGRATION_REVISION,
+        codex_cli_candidates=codex_candidates,
         summary=DoctorSummary(
             **{
                 "pass": len(checks) - failures - warnings,
@@ -579,47 +581,158 @@ def _working_directory_check(context: ProjectContext) -> DoctorCheck:
     )
 
 
-def _codex_cli_check() -> DoctorCheck:
-    executable = shutil.which("codex")
-    if not executable:
-        return DoctorCheck(
-            name="codex_cli",
-            status="WARN",
-            message="Codex CLI is not on PATH; repository Skill clients remain usable",
-        )
-    try:
-        result = subprocess.run(
-            [executable, "--version"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=3,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        error = type(exc).__name__
-        winerror = getattr(exc, "winerror", None)
-        if isinstance(winerror, int):
-            error += f" (WinError {winerror})"
-        return DoctorCheck(
-            name="codex_cli",
-            status="WARN",
-            message=f"Codex CLI is on PATH but cannot be executed: {error}",
-        )
-    version = (result.stdout or result.stderr).strip()
-    if result.returncode:
-        return DoctorCheck(
-            name="codex_cli",
-            status="WARN",
-            message=(
-                f"Codex CLI is on PATH but returned {result.returncode}"
-                + (f": {version}" if version else "")
+def probe_codex_cli(context: ProjectContext) -> tuple[list[CodexCliCandidate], str | None]:
+    """Probe every distinct local candidate and select the first runnable CLI."""
+    candidates: list[CodexCliCandidate] = []
+    selected: str | None = None
+    for executable, source in _codex_cli_candidates(context):
+        try:
+            result = subprocess.run(
+                _codex_probe_command(executable),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=3,
+            )
+        except PermissionError as exc:
+            candidate = CodexCliCandidate(
+                path=executable,
+                source=source,
+                status="denied",
+                failure_reason=_probe_error(exc),
+            )
+        except subprocess.TimeoutExpired as exc:
+            candidate = CodexCliCandidate(
+                path=executable,
+                source=source,
+                status="timeout",
+                failure_reason=_probe_error(exc),
+            )
+        except OSError as exc:
+            candidate = CodexCliCandidate(
+                path=executable,
+                source=source,
+                status="failed",
+                failure_reason=_probe_error(exc),
+            )
+        else:
+            version = (result.stdout or result.stderr).strip() or None
+            if result.returncode:
+                candidate = CodexCliCandidate(
+                    path=executable,
+                    source=source,
+                    status="failed",
+                    version=version,
+                    failure_reason=f"exit code {result.returncode}",
+                )
+            else:
+                candidate = CodexCliCandidate(
+                    path=executable,
+                    source=source,
+                    status="ready",
+                    version=version,
+                    selected=selected is None,
+                )
+                if selected is None:
+                    selected = executable
+        candidates.append(candidate)
+    return candidates, selected
+
+
+def _codex_cli_check(
+    context: ProjectContext,
+) -> tuple[DoctorCheck, list[CodexCliCandidate]]:
+    candidates, selected = probe_codex_cli(context)
+    if not candidates:
+        return (
+            DoctorCheck(
+                name="codex_cli",
+                status="WARN",
+                message="Codex CLI was not found; repository Skill clients remain usable",
             ),
+            candidates,
         )
-    return DoctorCheck(
-        name="codex_cli",
-        status="PASS",
-        message=f"{executable}" + (f" ({version})" if version else ""),
+    if selected is None:
+        summary = "; ".join(
+            f"{item.path}: {item.failure_reason or item.status}" for item in candidates
+        )
+        return (
+            DoctorCheck(
+                name="codex_cli",
+                status="WARN",
+                message=f"Codex CLI candidates cannot be executed: {summary}",
+            ),
+            candidates,
+        )
+    chosen = next(item for item in candidates if item.selected)
+    return (
+        DoctorCheck(
+            name="codex_cli",
+            status="PASS",
+            message=f"{chosen.path}" + (f" ({chosen.version})" if chosen.version else ""),
+        ),
+        candidates,
     )
+
+
+def _codex_cli_candidates(context: ProjectContext) -> list[tuple[str, str]]:
+    raw: list[tuple[str | None, str]] = [
+        (os.environ.get("CODEX_CLI"), "CODEX_CLI"),
+        (shutil.which("codex"), "PATH:codex"),
+    ]
+    if os.name == "nt":
+        raw.extend(
+            (
+                (shutil.which("codex.cmd"), "PATH:codex.cmd"),
+                (
+                    _existing_candidate(Path(os.environ.get("APPDATA", "")) / "npm/codex.cmd"),
+                    "npm-user",
+                ),
+                (
+                    _existing_candidate(
+                        context.root / "build/codex-cli/node_modules/.bin/codex.cmd"
+                    ),
+                    "npm-workspace",
+                ),
+                (
+                    _existing_candidate(
+                        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/WindowsApps/codex.exe"
+                    ),
+                    "windows-app-alias",
+                ),
+            )
+        )
+    result: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for value, source in raw:
+        if not value:
+            continue
+        key = os.path.normcase(os.path.abspath(value))
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append((value, source))
+    return result
+
+
+def _existing_candidate(path: Path) -> str | None:
+    return str(path) if path.is_file() else None
+
+
+def _codex_probe_command(executable: str) -> list[str]:
+    if os.name == "nt" and Path(executable).suffix.casefold() in {".cmd", ".bat"}:
+        command = os.environ.get("COMSPEC", "cmd.exe")
+        return [command, "/d", "/s", "/c", f'""{executable}" --version"']
+    return [executable, "--version"]
+
+
+def _probe_error(exc: BaseException) -> str:
+    message = type(exc).__name__
+    winerror = getattr(exc, "winerror", None)
+    if isinstance(winerror, int):
+        message += f" (WinError {winerror})"
+    return message
 
 
 def _workflow_inventory_check(available: set[tuple[str, ...]]) -> DoctorCheck:

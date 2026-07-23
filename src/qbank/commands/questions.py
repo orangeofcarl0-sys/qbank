@@ -298,7 +298,14 @@ def search_command(
         require_output_format(output_format, "table", "json", "jsonl")
         context = discover_context()
         rows = create_question_service(context).search_questions(text, limit=limit)
-        print_rows(rows, output_format)
+        if output_format == "table":
+            columns = {"id", "title", "chapter", "topics", "snippet", "rank"}
+            print_rows(
+                [row.model_dump(mode="json", include=columns) for row in rows],
+                output_format,
+            )
+        else:
+            print_rows(rows, output_format)
     except Exception as exc:
         abort(exc, output_format=output_format)
 

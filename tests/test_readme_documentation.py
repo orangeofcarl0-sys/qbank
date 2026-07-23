@@ -9,11 +9,21 @@ import sys
 from pathlib import Path
 from xml.etree import ElementTree
 
+from qbank.codex_manifest import (
+    INTEGRATION_CAPABILITIES,
+    INTEGRATION_REVISION,
+    MCP_RESOURCE_URIS,
+    MCP_TOOL_NAMES,
+)
+from qbank.models import SCHEMA_VERSION, DiagnosticCode
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = (
     ROOT / "README.md",
     ROOT / "docs" / "user-guide.md",
     ROOT / "docs" / "codex-integration.md",
+    ROOT / "docs" / "compatibility-0.2.0.md",
+    ROOT / "docs" / "known-limitations-0.2.0.md",
 )
 README_IMAGES = (
     ROOT / "docs" / "assets" / "readme" / "studio-main-light.png",
@@ -75,6 +85,21 @@ def test_capture_script_exposes_deterministic_asset_state() -> None:
     )
     assert "assets" in completed.stdout
     assert "--scale {1,1.25}" in completed.stdout
+
+
+def test_020_compatibility_document_freezes_runtime_manifests() -> None:
+    text = (ROOT / "docs" / "compatibility-0.2.0.md").read_text(encoding="utf-8")
+    assert SCHEMA_VERSION == "1.0"
+    assert INTEGRATION_REVISION == 3
+    assert len(MCP_TOOL_NAMES) == 19
+    assert len(MCP_RESOURCE_URIS) == 8
+    for value in (
+        *MCP_TOOL_NAMES,
+        *MCP_RESOURCE_URIS,
+        *(item.name for item in INTEGRATION_CAPABILITIES),
+        *(item.value for item in DiagnosticCode),
+    ):
+        assert f"`{value}`" in text or value in text.split("```text", maxsplit=1)[1]
 
 
 def _png_dimensions(path: Path) -> tuple[int, int]:

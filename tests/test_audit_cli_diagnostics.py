@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from qbank.cli import app
-from qbank.diagnostics import doctor, project_status
+from qbank.diagnostics import _filesystem_semantics_check, doctor, project_status
 from qbank.operations import add_question
 from qbank.papers import pandoc_command
 from qbank.search_index import search
@@ -185,3 +185,14 @@ def test_human_mutation_warning_is_written_to_stderr(
     )
     assert result.exit_code == 0
     assert "external_asset" in result.stderr
+
+
+def test_doctor_warns_for_synchronized_repository(
+    project: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _ = project
+    monkeypatch.setenv("OneDrive", str(root.parent))
+    check = _filesystem_semantics_check(root)
+    assert check.status == "WARN"
+    assert "does not guarantee multi-machine" in check.message

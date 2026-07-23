@@ -6,21 +6,28 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
-from pydantic import BaseModel, JsonValue
+from mcp.server.fastmcp.exceptions import ToolError
+from mcp.types import ContentBlock, ToolAnnotations
+from pydantic import BaseModel, JsonValue, ValidationError
 
+from qbank.errors import QBankError, pydantic_error_text
 from qbank.mcp.adapter import QbankMcpAdapter
 from qbank.models import (
+    AssetIngestPrepareRequest,
+    AssetPreferredPrepareRequest,
     AssetShowResult,
+    AssetStatusPrepareRequest,
     IngestPrepareRequest,
     McpOperationResult,
     McpPaperDocument,
     McpPrepareResult,
     McpQuestionSearchResult,
+    PaperHistoryEntry,
     PaperPrepareRequest,
     PatchPrepareRequest,
     QueryFilters,
@@ -65,15 +72,40 @@ CANCEL = ToolAnnotations(
 )
 
 
+class QbankFastMCP(FastMCP[None]):
+    """Preserve typed tool schemas while normalizing stable qbank error codes."""
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> Sequence[ContentBlock] | dict[str, Any]:
+        try:
+            return await super().call_tool(name, arguments)
+        except ToolError as exc:
+            cause = exc.__cause__
+            if isinstance(cause, ValidationError):
+                raise ToolError(
+                    f"schema_validation_failed: {pydantic_error_text(cause)}"
+                ) from cause
+            if isinstance(cause, QBankError):
+                code = cause.code.value
+                message = str(cause)
+                normalized = message if message.startswith(f"{code}:") else f"{code}: {message}"
+                raise ToolError(normalized) from cause
+            raise
+
+
 def create_mcp_server(adapter: QbankMcpAdapter) -> FastMCP[None]:
     """Create a protocol server without starting transport or touching stdout."""
-    server: FastMCP[None] = FastMCP(
+    server: FastMCP[None] = QbankFastMCP(
         "qbank",
         instructions=SERVER_INSTRUCTIONS,
         log_level="ERROR",
     )
 
     _register_read_tools(server, adapter)
+    _register_operation_read_tools(server, adapter)
     _register_write_tools(server, adapter)
     _register_resources(server, adapter)
     return server
@@ -127,6 +159,21 @@ def _register_read_tools(server: FastMCP[None], adapter: QbankMcpAdapter) -> Non
         return adapter.paper_get(paper_id)
 
 
+def _register_operation_read_tools(
+    server: FastMCP[None],
+    adapter: QbankMcpAdapter,
+) -> None:
+    @server.tool(annotations=READ_ONLY, structured_output=True)
+    def operation_get(operation_id: str) -> McpOperationResult:
+        """Return durable prepare/commit state, including after a server restart."""
+        return adapter.operation_get(operation_id)
+
+    @server.tool(annotations=READ_ONLY, structured_output=True)
+    def paper_history_get(paper_id: str) -> list[PaperHistoryEntry]:
+        """Return append-only paper-definition history events."""
+        return adapter.paper_history_get(paper_id)
+
+
 def _register_write_tools(server: FastMCP[None], adapter: QbankMcpAdapter) -> None:
     @server.tool(annotations=PREPARE, structured_output=True)
     def ingest_prepare(request: IngestPrepareRequest) -> McpPrepareResult:
@@ -147,6 +194,21 @@ def _register_write_tools(server: FastMCP[None], adapter: QbankMcpAdapter) -> No
     def paper_prepare(request: PaperPrepareRequest) -> McpPrepareResult:
         """Validate and preview a contained paper creation or replacement."""
         return adapter.paper_prepare(request)
+
+    @server.tool(annotations=PREPARE, structured_output=True)
+    def asset_ingest_prepare(request: AssetIngestPrepareRequest) -> McpPrepareResult:
+        """Dry-run a contained logical asset package without launching local programs."""
+        return adapter.asset_ingest_prepare(request)
+
+    @server.tool(annotations=PREPARE, structured_output=True)
+    def asset_status_prepare(request: AssetStatusPrepareRequest) -> McpPrepareResult:
+        """Dry-run a logical asset lifecycle-state update."""
+        return adapter.asset_status_prepare(request)
+
+    @server.tool(annotations=PREPARE, structured_output=True)
+    def asset_preferred_prepare(request: AssetPreferredPrepareRequest) -> McpPrepareResult:
+        """Dry-run editor or render preference selection without launching it."""
+        return adapter.asset_preferred_prepare(request)
 
     @server.tool(annotations=COMMIT, structured_output=True)
     def operation_commit(

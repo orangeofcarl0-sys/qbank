@@ -5,15 +5,15 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
-import shutil
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError
+from qbank.infrastructure.locking import RepositoryWriteLock
 from qbank.models import McpConfigChange, McpIntegrationStatus
+from qbank.services.codex import probe_codex_cli
 from qbank.transaction import MutationTransaction
 
 _START = "# qbank-mcp: start"
@@ -27,7 +27,13 @@ def mcp_integration_status(context: ProjectContext) -> McpIntegrationStatus:
     text = path.read_text(encoding="utf-8") if path.is_file() else ""
     registered = _managed_block(context) in text
     sdk_available = importlib.util.find_spec("mcp") is not None
-    codex_available, codex_message = _codex_cli_ready()
+    candidates, selected = probe_codex_cli(context)
+    codex_available = selected is not None
+    codex_message = (
+        f"Codex CLI is ready: {selected}"
+        if selected is not None
+        else "Codex CLI is unavailable; Desktop/IDE may still load project config"
+    )
     ok = registered and sdk_available
     missing: list[str] = []
     if not registered:
@@ -45,6 +51,7 @@ def mcp_integration_status(context: ProjectContext) -> McpIntegrationStatus:
         codex_cli_available=codex_available,
         degraded=not (registered and sdk_available and codex_available),
         message="ready" if not missing else "; ".join(missing),
+        codex_cli_candidates=candidates,
     )
 
 
@@ -136,17 +143,21 @@ def _commit_config(
     before: str,
     after: str,
 ) -> str | None:
-    transaction = MutationTransaction()
-    backup: Path | None = None
-    if before:
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-        backup = context.paths.state / "codex-mcp-backups" / f"config-{stamp}.toml"
-        transaction.write(backup, before)
-    if after:
-        transaction.write(path, after)
-    else:
-        transaction.delete(path)
-    transaction.commit()
+    with RepositoryWriteLock(context).hold("codex_mcp_config"):
+        current = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if current != before:
+            raise ConflictError("Codex MCP configuration changed before the protected commit")
+        transaction = MutationTransaction.for_context(context)
+        backup: Path | None = None
+        if before:
+            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+            backup = context.paths.state / "codex-mcp-backups" / f"config-{stamp}.toml"
+            transaction.write(backup, before)
+        if after:
+            transaction.write(path, after)
+        else:
+            transaction.delete(path)
+        transaction.commit()
     return str(backup) if backup is not None else None
 
 
@@ -173,23 +184,3 @@ def _config_result(
 
 def _config_path(context: ProjectContext) -> Path:
     return context.root / ".codex" / "config.toml"
-
-
-def _codex_cli_ready() -> tuple[bool, str]:
-    executable = shutil.which("codex")
-    if executable is None:
-        return False, "Codex CLI is unavailable; Desktop/IDE may still load project config"
-    try:
-        result = subprocess.run(
-            [executable, "--version"],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=3,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"Codex CLI cannot be executed: {type(exc).__name__}"
-    if result.returncode:
-        return False, f"Codex CLI returned exit code {result.returncode}"
-    return True, "Codex CLI is ready"

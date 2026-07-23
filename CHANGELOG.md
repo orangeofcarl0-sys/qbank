@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.2.0 - 2026-07-23
+
+- Added one repository-wide, cross-process write lock shared by CLI, Studio, and MCP
+  mutations, with bounded waits, holder diagnostics, Windows support, and crash recovery.
+- Persisted MCP prepare/commit/cancel state below `.qbank/mcp-operations/` so reviewed
+  operations and their first commit responses survive STDIO server restarts.
+- Added safe MCP asset-package, lifecycle-status, and preferred-representation mutations;
+  no MCP asset operation launches an editor or arbitrary local program.
+- Moved paper persistence into a shared application service with revision checks,
+  transactional paper history, and the same repository lock.
+- Added stable lock, revision, operation-lifecycle, and Schema error codes across CLI and
+  MCP, plus real Codex STDIO and isolated wheel verification helpers.
+- Removed redundant full-repository hashes from MCP prepare/commit while retaining the
+  initial/final revision checks and shared-lock safety boundary.
+- Made healthy search and structured MCP query read summary rows from SQLite, while a
+  content revision detects external Markdown changes and `question_get` remains the only
+  full-question retrieval path.
+- Added recoverable mutation journals around authoritative file/history replacement and
+  hardened Windows containment against UNC, junction, reparse-point, and path-replacement
+  escapes without relying on symbolic-link privileges.
+- Made Codex discovery probe every supported CLI candidate, retain per-candidate version or
+  failure details, and select a runnable npm/PATH entry when a Store alias is denied.
+- Added doctor warnings for network or synchronized filesystems and documented that 0.2.0
+  does not promise multi-machine shared-repository locking.
+- Kept question, asset, paper, taxonomy, and view Schema version `1.0` independent from
+  the Python package version.
+- Frozen the 0.2.0 CLI, 19 MCP tools, 8 MCP resources, operation states, diagnostic codes,
+  and integration-revision-3 capability manifest in dedicated compatibility documentation.
+
 ## 0.1.0 - 2026-07-23
 
 - Frozen the first private release baseline and completed the README with explicit product

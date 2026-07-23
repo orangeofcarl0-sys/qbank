@@ -7,20 +7,25 @@ from typing import Literal
 
 from pydantic import Field, JsonValue, field_validator, model_validator
 
+from qbank.models.asset import AssetPackage, AssetStatus
 from qbank.models.common import ResultModel, StrictModel
 from qbank.models.paper import Paper
 from qbank.models.question import Question, QuestionPatch
-from qbank.models.results import Diagnostic, SearchHit
+from qbank.models.results import CodexCliCandidate, Diagnostic, SearchHit
 
 
 def _diagnostics() -> list[Diagnostic]:
     return []
 
 
+def _codex_cli_candidates() -> list[CodexCliCandidate]:
+    return []
+
+
 class McpAffectedObject(ResultModel):
     """One authoritative object named by a prepared mutation."""
 
-    kind: Literal["question", "tag", "paper"]
+    kind: Literal["question", "tag", "paper", "asset"]
     id: str
     action: str
     path: str | None = None
@@ -47,7 +52,15 @@ class McpPrepareResult(ResultModel):
 
     ok: bool
     operation_id: str
-    operation: Literal["ingest", "patch", "tag_change", "paper"]
+    operation: Literal[
+        "ingest",
+        "patch",
+        "tag_change",
+        "paper",
+        "asset_ingest",
+        "asset_status",
+        "asset_preferred",
+    ]
     affected_objects: list[McpAffectedObject]
     diff: list[McpFieldDiff]
     validation: McpValidation
@@ -61,10 +74,13 @@ class McpOperationResult(ResultModel):
 
     ok: bool
     operation_id: str
-    status: Literal["committed", "cancelled"]
+    status: Literal["prepared", "committing", "committed", "cancelled", "expired"]
     repository_revision: str
     result: JsonValue | None = None
     idempotent_replay: bool = False
+    operation: str | None = None
+    expires_at: datetime | None = None
+    code: str | None = None
 
 
 class IngestPrepareRequest(StrictModel):
@@ -112,12 +128,37 @@ class PaperPrepareRequest(StrictModel):
         return normalized
 
 
+class AssetIngestPrepareRequest(StrictModel):
+    """One contained asset package import retained for a later commit."""
+
+    package: AssetPackage
+    package_root: str = "."
+    download: bool = False
+
+
+class AssetStatusPrepareRequest(StrictModel):
+    """One logical asset lifecycle transition."""
+
+    question_id: str
+    asset_id: str
+    status: AssetStatus
+
+
+class AssetPreferredPrepareRequest(StrictModel):
+    """Select an existing editor or render representation without launching it."""
+
+    question_id: str
+    asset_id: str
+    kind: Literal["editor", "render"]
+    representation_id: str
+
+
 class McpQuestionSearchResult(ResultModel):
     """Search or structured-query results with an explicit mode."""
 
     ok: bool = True
     mode: Literal["search", "query"]
-    items: list[Question | SearchHit]
+    items: list[SearchHit]
 
 
 class McpPaperDocument(ResultModel):
@@ -140,6 +181,7 @@ class McpIntegrationStatus(ResultModel):
     codex_cli_available: bool
     degraded: bool
     message: str
+    codex_cli_candidates: list[CodexCliCandidate] = Field(default_factory=_codex_cli_candidates)
 
 
 class McpConfigChange(ResultModel):

@@ -69,6 +69,12 @@ class DiagnosticCode(StrEnum):
     MULTIPLE_CHOICE_ANSWER_FORMAT = "multiple_choice_answer_format"
     QUESTION_NOT_FOUND = "question_not_found"
     PROJECT_NOT_FOUND = "project_not_found"
+    REPOSITORY_LOCKED = "repository_locked"
+    REPOSITORY_REVISION_CHANGED = "repository_revision_changed"
+    OPERATION_EXPIRED = "operation_expired"
+    OPERATION_CANCELLED = "operation_cancelled"
+    OPERATION_ALREADY_COMMITTED = "operation_already_committed"
+    SCHEMA_VALIDATION_FAILED = "schema_validation_failed"
     SINGLE_CHOICE_ANSWER_MISMATCH = "single_choice_answer_mismatch"
     TOTAL_SCORE_MISMATCH = "total_score_mismatch"
     UNDECLARED_ASSET_REFERENCE = "undeclared_asset_reference"
@@ -285,6 +291,7 @@ class AssetMutationResult(ResultModel):
         "replace",
         "set_render",
         "set_editor",
+        "set_status",
         "finalize",
         "normalize",
         "reconcile",
@@ -346,6 +353,19 @@ class AssetHistoryResult(ResultModel):
     question_id: str
     asset_id: str | None = None
     events: list[AssetHistoryEntry]
+
+
+class PaperHistoryEntry(ResultModel):
+    """One append-only paper-definition mutation event."""
+
+    timestamp: str
+    operation: Literal["paper_create", "paper_update"]
+    paper_id: str
+    path: str
+    command: str
+    before_hash: str | None = None
+    after_hash: str
+    changed_fields: list[str]
 
 
 class DesktopHistoryEntry(ResultModel):
@@ -503,6 +523,21 @@ class DoctorReport(ResultModel):
     checks: list[DoctorCheck]
 
 
+class CodexCliCandidate(ResultModel):
+    """One discovered Codex CLI entry and its bounded probe outcome."""
+
+    path: str
+    source: str
+    status: Literal["ready", "denied", "timeout", "failed"]
+    version: str | None = None
+    failure_reason: str | None = None
+    selected: bool = False
+
+
+def _codex_cli_candidates() -> list[CodexCliCandidate]:
+    return []
+
+
 class CodexCheckReport(DoctorReport):
     """Backward-compatible Codex integration readiness report."""
 
@@ -510,6 +545,7 @@ class CodexCheckReport(DoctorReport):
     codex_cli_ready: bool
     degraded: bool
     integration_revision: int
+    codex_cli_candidates: list[CodexCliCandidate] = Field(default_factory=_codex_cli_candidates)
 
 
 class SearchHit(ResultModel):
@@ -521,6 +557,12 @@ class SearchHit(ResultModel):
     topics: str
     snippet: str
     rank: float
+    subject: str | None = None
+    question_type: str | None = None
+    status: str | None = None
+    difficulty: int | None = None
+    language: str | None = None
+    created_at: str | None = None
 
 
 class TagUsage(ResultModel):
@@ -687,7 +729,7 @@ class CodexInstructionsResult(ResultModel):
     rules: list[str]
     command_sequences: dict[str, list[str]]
     paths: dict[str, str]
-    integration_revision: int = 1
+    integration_revision: int = 3
     context_protocol: CodexContextProtocol = Field(default_factory=CodexContextProtocol)
     workflows: list[CodexWorkflow] = Field(default_factory=_codex_workflow_list)
     capabilities: list[CodexCapability] = Field(default_factory=_codex_capability_list)

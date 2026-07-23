@@ -13,6 +13,7 @@ import anyio
 import pytest
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
 
 import qbank.services.mcp_config as mcp_config
@@ -31,10 +32,16 @@ from qbank.mcp.adapter import QbankMcpAdapter
 from qbank.mcp.operations import OperationStore
 from qbank.mcp.server import create_mcp_server
 from qbank.models import (
+    AssetIngestPrepareRequest,
+    AssetPreferredPrepareRequest,
+    AssetStatusPrepareRequest,
     IngestPrepareRequest,
+    McpPrepareResult,
+    McpValidation,
     Paper,
     PaperPrepareRequest,
     PatchPrepareRequest,
+    QueryFilters,
     TagChangePrepareRequest,
 )
 from qbank.services.mcp_config import (
@@ -142,6 +149,118 @@ def test_prepare_commit_revision_conflict_and_idempotence(
     assert late_replay.repository_revision == committed.repository_revision
 
 
+def test_operation_persists_across_restart_and_replays_first_result(
+    project: tuple[Path, object],
+    question,
+) -> None:
+    root, _ = project
+    first = QbankMcpAdapter(ProjectContext.from_root(root))
+    prepared = first.ingest_prepare(IngestPrepareRequest(questions=[question]))
+    operation_file = root / ".qbank" / "mcp-operations" / f"{prepared.operation_id}.json"
+    assert operation_file.is_file()
+    assert not list((root / "questions").rglob("*.md"))
+
+    restarted = QbankMcpAdapter(ProjectContext.from_root(root))
+    recovered = restarted.operation_get(prepared.operation_id)
+    assert recovered.status == "prepared"
+    committed = restarted.operation_commit(
+        prepared.operation_id,
+        prepared.repository_revision,
+    )
+
+    after_response_loss = QbankMcpAdapter(ProjectContext.from_root(root))
+    replay = after_response_loss.operation_commit(
+        prepared.operation_id,
+        prepared.repository_revision,
+    )
+    assert replay.status == "committed"
+    assert replay.idempotent_replay
+    assert replay.code == "operation_already_committed"
+    assert replay.result == committed.result
+    assert len(list((root / ".qbank" / "history").glob("*.json"))) == 1
+
+
+def test_interrupted_operation_recovers_when_authority_is_unchanged(
+    project: tuple[Path, object],
+    question,
+) -> None:
+    root, _ = project
+    adapter = QbankMcpAdapter(ProjectContext.from_root(root))
+    prepared = adapter.ingest_prepare(IngestPrepareRequest(questions=[question]))
+    operation_file = root / ".qbank" / "mcp-operations" / f"{prepared.operation_id}.json"
+    payload = json.loads(operation_file.read_text(encoding="utf-8"))
+    payload["status"] = "committing"
+    operation_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    restarted = QbankMcpAdapter(ProjectContext.from_root(root))
+    committed = restarted.operation_commit(
+        prepared.operation_id,
+        prepared.repository_revision,
+    )
+    assert committed.status == "committed"
+    assert restarted.question_get(question.id).id == question.id
+
+
+def test_asset_prepare_tools_are_persistent_and_never_launch(
+    project: tuple[Path, object],
+    question,
+) -> None:
+    root, _ = project
+    adapter = QbankMcpAdapter(ProjectContext.from_root(root))
+    ingest = adapter.ingest_prepare(IngestPrepareRequest(questions=[question]))
+    adapter.operation_commit(ingest.operation_id, ingest.repository_revision)
+    package_request = AssetIngestPrepareRequest.model_validate(
+        {
+            "package": {
+                "schema_version": "1.0",
+                "question_id": question.id,
+                "asset_id": "figure-1",
+                "role": "figure",
+                "representations": [
+                    {
+                        "representation_id": "svg",
+                        "format": "svg",
+                        "base64": "PHN2Zy8+",
+                        "purpose": "render",
+                    }
+                ],
+                "suggested_render": "svg",
+                "status": "raw",
+            }
+        }
+    )
+    asset_plan = adapter.asset_ingest_prepare(package_request)
+    assert asset_plan.committable
+    assert not (root / "assets" / question.id / "figure-1" / "asset.yaml").exists()
+
+    restarted = QbankMcpAdapter(ProjectContext.from_root(root))
+    restarted.operation_commit(asset_plan.operation_id, asset_plan.repository_revision)
+    assert restarted.asset_get(question.id, "figure-1").asset.preferred_render == "svg"
+
+    status_plan = restarted.asset_status_prepare(
+        AssetStatusPrepareRequest(
+            question_id=question.id,
+            asset_id="figure-1",
+            status="reviewed",
+        )
+    )
+    restarted.operation_commit(status_plan.operation_id, status_plan.repository_revision)
+    preferred_plan = restarted.asset_preferred_prepare(
+        AssetPreferredPrepareRequest(
+            question_id=question.id,
+            asset_id="figure-1",
+            kind="render",
+            representation_id="svg",
+        )
+    )
+    restarted.operation_commit(preferred_plan.operation_id, preferred_plan.repository_revision)
+    assert restarted.asset_get(question.id, "figure-1").asset.status.value == "reviewed"
+    with pytest.raises(DataValidationError, match="contained relative"):
+        restarted.asset_ingest_prepare(
+            package_request.model_copy(update={"package_root": "../outside"})
+        )
+
+
 def test_adapter_reads_and_all_prepared_mutation_kinds(
     project: tuple[Path, object],
     question,
@@ -200,6 +319,9 @@ def test_adapter_reads_and_all_prepared_mutation_kinds(
     )
     assert paper_result.result["paper"]["title"] == "Prepared paper"
     assert adapter.paper_get("generated/mcp-paper.yaml").paper.title == "Prepared paper"
+    paper_history = adapter.paper_history_get("mcp-paper")
+    assert paper_history[0].operation == "paper_create"
+    assert {"schema_version", "sections", "title"} <= set(paper_history[0].changed_fields)
 
     with pytest.raises(DataValidationError, match="limit"):
         adapter.question_search(limit=0)
@@ -209,6 +331,47 @@ def test_adapter_reads_and_all_prepared_mutation_kinds(
         adapter.paper_get("missing")
     with pytest.raises(AssetNotFoundError, match="asset"):
         adapter.asset_get(question.id, "missing")
+
+
+def test_question_search_uses_verified_projection_and_returns_only_summaries(
+    project: tuple[Path, object],
+    question,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _ = project
+    adapter = QbankMcpAdapter(ProjectContext.from_root(root))
+    prepared = adapter.ingest_prepare(IngestPrepareRequest(questions=[question]))
+    adapter.operation_commit(prepared.operation_id, prepared.repository_revision)
+
+    def unexpected_scan(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("question_search must not parse the Markdown repository")
+
+    monkeypatch.setattr(adapter.services.repository, "scan", unexpected_scan)
+    text_result = adapter.question_search(text="Michelson", limit=3)
+    query_result = adapter.question_search(
+        filters=QueryFilters(subject=question.subject, topics=[question.topics[0]]),
+        limit=3,
+    )
+
+    assert text_result.items[0].id == question.id
+    assert query_result.items[0].id == question.id
+    assert query_result.items[0].subject == question.subject
+    assert "stem_md" not in query_result.items[0].model_dump(mode="json")
+
+
+def test_question_search_rejects_external_source_change(
+    project: tuple[Path, object],
+    question,
+) -> None:
+    root, _ = project
+    adapter = QbankMcpAdapter(ProjectContext.from_root(root))
+    prepared = adapter.ingest_prepare(IngestPrepareRequest(questions=[question]))
+    adapter.operation_commit(prepared.operation_id, prepared.repository_revision)
+    source = next((root / "questions").rglob(f"{question.id}.md"))
+    source.write_text(source.read_text(encoding="utf-8") + "\nexternal change\n", encoding="utf-8")
+
+    with pytest.raises(DataValidationError, match="index_stale"):
+        adapter.question_search(text="Michelson")
 
 
 def test_in_process_server_wrappers_and_resources(
@@ -243,6 +406,21 @@ def test_in_process_server_wrappers_and_resources(
             resource = await server._resource_manager.get_resource(uri)
             assert resource is not None
             assert await resource.read()
+
+    anyio.run(exercise)
+
+
+def test_mcp_error_boundary_preserves_stable_application_codes(
+    project: tuple[Path, object],
+) -> None:
+    root, _ = project
+    server = create_mcp_server(QbankMcpAdapter(ProjectContext.from_root(root)))
+
+    async def exercise() -> None:
+        with pytest.raises(ToolError, match="schema_validation_failed"):
+            await server.call_tool("patch_prepare", {"request": {}})
+        with pytest.raises(ToolError, match="schema_validation_failed"):
+            await server.call_tool("operation_get", {"operation_id": "missing"})
 
     anyio.run(exercise)
 
@@ -288,6 +466,154 @@ def test_cancel_expiry_and_paper_escape(project: tuple[Path, object], question) 
     store.add(IngestPrepareRequest(questions=[question]), preview)
     with pytest.raises(ConflictError, match="expired"):
         store.commit(operation_id, "revision")
+
+
+def test_cancelled_and_expired_operations_survive_restart(
+    project: tuple[Path, object],
+    question,
+) -> None:
+    root, _ = project
+    template = QbankMcpAdapter(ProjectContext.from_root(root)).ingest_prepare(
+        IngestPrepareRequest(questions=[question])
+    )
+    directory = root / ".qbank" / "durable-operation-test"
+    current = [datetime(2026, 1, 1, tzinfo=UTC)]
+
+    def new_store() -> OperationStore:
+        return OperationStore(
+            lambda: "revision",
+            lambda _operation: {"ok": True},
+            directory=directory,
+            ttl=timedelta(seconds=1),
+            now=lambda: current[0],
+        )
+
+    cancelled_id = "a" * 32
+    cancelled_preview = template.model_copy(
+        update={
+            "operation_id": cancelled_id,
+            "repository_revision": "revision",
+            "expires_at": current[0] + timedelta(seconds=1),
+        }
+    )
+    store = new_store()
+    store.add(IngestPrepareRequest(questions=[question]), cancelled_preview)
+    store.cancel(cancelled_id)
+    restarted = new_store()
+    assert restarted.get(cancelled_id).status == "cancelled"
+    with pytest.raises(ConflictError, match="cancelled"):
+        restarted.commit(cancelled_id, "revision")
+
+    expired_id = "b" * 32
+    expired_preview = template.model_copy(
+        update={
+            "operation_id": expired_id,
+            "repository_revision": "revision",
+            "expires_at": current[0] + timedelta(seconds=1),
+        }
+    )
+    restarted.add(IngestPrepareRequest(questions=[question]), expired_preview)
+    current[0] += timedelta(seconds=2)
+    after_expiry = new_store()
+    assert after_expiry.get(expired_id).status == "expired"
+    persisted = json.loads((directory / f"{expired_id}.json").read_text(encoding="utf-8"))
+    assert persisted["status"] == "expired"
+    with pytest.raises(ConflictError, match="expired"):
+        after_expiry.commit(expired_id, "revision")
+
+
+def test_operation_store_rejects_stale_duplicate_and_invalid_states(question) -> None:
+    now = [datetime(2026, 1, 1, tzinfo=UTC)]
+    revision = ["revision"]
+    payload = IngestPrepareRequest(questions=[question])
+    preview = _operation_preview(payload, revision[0], now[0])
+
+    stale = OperationStore(lambda: "changed", lambda _operation: {"ok": True})
+    with pytest.raises(ConflictError, match="while preparing"):
+        stale.add(payload, preview)
+
+    store = OperationStore(
+        lambda: revision[0],
+        lambda _operation: {"ok": True},
+        now=lambda: now[0],
+    )
+    store.add(payload, preview)
+    with pytest.raises(DataValidationError, match="duplicate operation_id"):
+        store.add(payload, preview)
+    with pytest.raises(ConflictError, match="does not match"):
+        store.commit(preview.operation_id, "wrong")
+    with pytest.raises(DataValidationError, match="unknown operation_id"):
+        store.get("missing")
+
+    committed = store.commit(preview.operation_id, revision[0])
+    assert committed.status == "committed"
+    with pytest.raises(ConflictError, match="cannot be cancelled"):
+        store.cancel(preview.operation_id)
+    with pytest.raises(RuntimeError, match="in-memory"):
+        store._path("a" * 32)
+    store._ensure_directory()
+
+    expired_preview = _operation_preview(payload, revision[0], now[0], operation_id="b" * 32)
+    expiring = OperationStore(
+        lambda: revision[0],
+        lambda _operation: {"ok": True},
+        ttl=timedelta(seconds=1),
+        now=lambda: now[0],
+    )
+    expiring.add(payload, expired_preview)
+    now[0] += timedelta(seconds=2)
+    assert expiring.get(expired_preview.operation_id).status == "expired"
+    with pytest.raises(ConflictError, match="has expired"):
+        expiring.cancel(expired_preview.operation_id)
+
+
+def test_operation_store_commit_failure_preserves_recoverable_state(question) -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    revision = ["revision"]
+    payload = IngestPrepareRequest(questions=[question])
+
+    def fail_same(_operation) -> dict[str, bool]:
+        raise RuntimeError("commit failed")
+
+    preview = _operation_preview(payload, revision[0], now, operation_id="c" * 32)
+    store = OperationStore(lambda: revision[0], fail_same, now=lambda: now)
+    store.add(payload, preview)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        store.commit(preview.operation_id, revision[0])
+    assert store.get(preview.operation_id).status == "prepared"
+
+    def fail_changed(_operation) -> dict[str, bool]:
+        revision[0] = "changed"
+        raise RuntimeError("commit changed authority")
+
+    changed_preview = _operation_preview(payload, "revision", now, operation_id="d" * 32)
+    changed = OperationStore(lambda: revision[0], fail_changed, now=lambda: now)
+    revision[0] = "revision"
+    changed.add(payload, changed_preview)
+    with pytest.raises(RuntimeError, match="changed authority"):
+        changed.commit(changed_preview.operation_id, "revision")
+    with pytest.raises(ConflictError, match="requires inspection"):
+        changed.commit(changed_preview.operation_id, "revision")
+
+
+def _operation_preview(
+    payload: IngestPrepareRequest,
+    revision: str,
+    now: datetime,
+    *,
+    operation_id: str = "a" * 32,
+) -> McpPrepareResult:
+    return McpPrepareResult(
+        ok=True,
+        operation_id=operation_id,
+        operation="ingest",
+        affected_objects=[],
+        diff=[],
+        validation=McpValidation(ok=True, diagnostics=[]),
+        repository_revision=revision,
+        committable=True,
+        expires_at=now + timedelta(seconds=1),
+    )
 
 
 def test_revision_rejects_authoritative_symlink(
@@ -349,21 +675,17 @@ def test_integration_status_degrades_when_codex_cannot_execute(
     root, _ = project
     context = ProjectContext.from_root(root)
     install_project_mcp(context, dry_run=False)
-    calls = 0
-
-    def denied(*_args: object, **_kwargs: object) -> object:
-        nonlocal calls
-        calls += 1
-        raise PermissionError("denied")
-
-    monkeypatch.setattr(mcp_config.shutil, "which", lambda _name: "codex")
-    monkeypatch.setattr(mcp_config.subprocess, "run", denied)
+    monkeypatch.setattr(
+        mcp_config,
+        "probe_codex_cli",
+        lambda _context: ([], None),
+    )
     status = mcp_integration_status(context)
 
     assert status.ok
     assert status.codex_cli_available is False
     assert status.degraded
-    assert calls == 1
+    assert status.codex_cli_candidates == []
 
 
 def test_codex_mcp_cli_commands_and_server_entry(
@@ -371,7 +693,11 @@ def test_codex_mcp_cli_commands_and_server_entry(
     runner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(mcp_config, "_codex_cli_ready", lambda: (True, "ready"))
+    monkeypatch.setattr(
+        mcp_config,
+        "probe_codex_cli",
+        lambda _context: ([], "codex"),
+    )
 
     status = runner.invoke(app, ["codex", "integration-status", "--format", "json"])
     assert status.exit_code == 0

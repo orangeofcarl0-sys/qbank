@@ -4,7 +4,7 @@
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **版本状态：** `0.1.0` 是当前冻结的私有基线，要求 Python 3.11 或更高版本。
+> **版本状态：** `0.2.0` 是当前冻结的私有基线，要求 Python 3.11 或更高版本。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
 <picture>
@@ -25,6 +25,8 @@
 qbank 面向希望将题目长期保存在普通文件中，同时让桌面编辑、命令行自动化和 AI 工具共享
 同一套数据边界的个人与小型团队。它不提供在线考试、用户账号、学习记录、自动判题、OCR
 或内置模型服务。
+
+## 核心功能
 
 核心能力包括：
 
@@ -82,8 +84,8 @@ qbank doctor --format json
 从 Release 下载 wheel 时，应先使用同一 Release 中的 `checksums.txt` 核对 SHA-256：
 
 ```powershell
-Get-FileHash .\qbank-0.1.0-py3-none-any.whl -Algorithm SHA256
-pip install .\qbank-0.1.0-py3-none-any.whl
+Get-FileHash .\qbank-0.2.0-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.2.0-py3-none-any.whl
 ```
 
 参与开发时安装完整质量检查和 Studio 测试依赖：
@@ -213,7 +215,9 @@ PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_dec
 `$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
 同步是相互独立的状态。完整职责、安装、更新和备份语义见
 [Codex 接入指南](docs/codex-integration.md)。MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不
-影响 CLI、Studio 或 Skill。
+影响 CLI、Studio 或 Skill。MCP 写入与 CLI、Studio 共用仓库级跨进程锁，并将两阶段
+operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可查询原状态，重复 commit
+只返回首次提交结果，不会重复写入。
 
 ## 文档索引
 
@@ -223,7 +227,9 @@ PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_dec
 | [Studio 用户文档](docs/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
 | [Codex 接入指南](docs/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
-| [兼容性策略](docs/compatibility-policy.md) | 0.1.x 公共行为与变更规则 |
+| [0.2.0 兼容性基线](docs/compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、错误码和 capability manifest |
+| [0.2.0 已知限制](docs/known-limitations-0.2.0.md) | 文件系统、事务、性能、依赖和产品范围边界 |
+| [兼容性策略](docs/compatibility-policy.md) | 公共行为与后续变更规则 |
 | [代码审查指南](docs/code_review.md) | 质量门、依赖边界和审查要求 |
 | [Studio 设计系统](docs/ui/design-system.md) | 主题、控件状态、可访问性和截图验收 |
 
@@ -232,13 +238,17 @@ PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_dec
 
 ## 当前限制
 
-- `0.1.0` 尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和已记录 JSON 字段按
+- `0.2.0` 尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和已记录 JSON 字段按
   兼容性策略维护。
 - LaTeX 只执行轻量结构检查，不进行 TeX 编译。
 - HTML 预览使用 MathJax CDN；完全离线时公式显示 TeX 源文本。
 - `--changed` 依赖可用的 Git 工作区，否则安全回退为全量校验。
+- 0.2.0 主要支持本机常规文件系统；网络盘、同步目录和多机共享写入不在安全承诺内，
+  `qbank doctor` 会对可识别的此类路径给出 warning。
 - qbank 不实现在线考试服务、OCR、自动选题算法、Studio 内嵌聊天或模型 API 封装；可选 MCP
   仅提供本地题库工具与资源协议。
+
+完整边界与性能说明见 [0.2.0 已知限制](docs/known-limitations-0.2.0.md)。
 
 ## 许可证
 

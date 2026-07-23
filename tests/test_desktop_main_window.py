@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QInputDialog,
+    QLineEdit,
     QMessageBox,
     QToolBar,
 )
@@ -228,6 +229,11 @@ def test_real_main_window_asset_capabilities_dispatch_and_reference_safety(  # n
     window, controller = _window(project, question, qtbot)
     errors: list[str] = []
     monkeypatch.setattr(window, "_show_error", lambda error: errors.append(str(error)))
+    monkeypatch.setattr(
+        window,
+        "_message_box",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Ok,
+    )
     monkeypatch.setattr(
         window,
         "_message_box",
@@ -707,3 +713,489 @@ def test_paper_menu_disables_context_actions_until_a_paper_is_selected(
     assert all(
         window._paper_actions[key].isEnabled() for key in ("add", "validate", "build", "export")
     )
+
+
+def test_main_window_project_import_delete_and_paper_failure_paths(  # noqa: PLR0915
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    errors: list[str] = []
+    monkeypatch.setattr(window, "_show_error", lambda error: errors.append(str(error)))
+
+    monkeypatch.setattr(window, "_can_leave_current", lambda: False)
+    window._open_project()
+    monkeypatch.setattr(window, "_can_leave_current", lambda: True)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *_args: "")
+    window._open_project()
+    invalid_project = tmp_path / "not-a-bank"
+    invalid_project.mkdir()
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *_args: str(invalid_project))
+    window._open_project()
+    assert errors
+
+    monkeypatch.setattr(QuestionIdentityDialog, "get_new_question", lambda *_args: None)
+    window._new_question()
+    monkeypatch.setattr(
+        QuestionIdentityDialog,
+        "get_new_question",
+        lambda *_args: QuestionIdentity("BROKEN-NEW-0001", "Broken"),
+    )
+    monkeypatch.setattr(
+        controller,
+        "create_question",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("create failed")),
+    )
+    window._new_question()
+
+    current = window.current_id
+    window.current_id = None
+    window._copy_current_question()
+    window.current_id = current
+    monkeypatch.setattr(
+        controller,
+        "load_question",
+        lambda *_args: (_ for _ in ()).throw(ValueError("load failed")),
+    )
+    window._copy_current_question()
+    monkeypatch.undo()
+    monkeypatch.setattr(window, "_show_error", lambda error: errors.append(str(error)))
+
+    exchange = tmp_path / "questions.json"
+    exchange.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *_args: ("", ""))
+    window._import_questions()
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        lambda *_args: (str(exchange), ""),
+    )
+    monkeypatch.setattr(
+        controller,
+        "import_questions",
+        lambda *_args, **_kwargs: SimpleNamespace(ok=False, would_write=0),
+    )
+    window._import_questions()
+    assert "无效" in errors[-1]
+
+    window.current_id = None
+    window._delete_current_question()
+    window.current_id = question.id
+    monkeypatch.setattr(window, "_can_leave_current", lambda: True)
+    monkeypatch.setattr(
+        controller,
+        "delete_question",
+        lambda *_args, **_kwargs: SimpleNamespace(id=question.id, path="questions/x.md"),
+    )
+    monkeypatch.setattr(
+        window,
+        "_message_box",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+    )
+    window._delete_current_question()
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *_args: ("", ""))
+    window._select_paper()
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        lambda *_args: (str(tmp_path / "missing.yaml"), ""),
+    )
+    window._select_paper()
+    assert errors
+
+    window.current_id = None
+    monkeypatch.setattr(window.navigation, "selected_question_ids", lambda: [])
+    window._new_paper()
+    window._add_to_paper()
+    window.current_id = question.id
+    answers = iter((("", False), ("Paper", True), ("", False)))
+    monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: next(answers))
+    window._new_paper()
+    window._new_paper()
+    monkeypatch.setattr(
+        controller,
+        "add_to_current_paper",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("paper add failed")),
+    )
+    window._add_to_paper()
+
+    monkeypatch.setattr(
+        controller,
+        "validate_current_paper",
+        lambda: (_ for _ in ()).throw(ValueError("paper validate failed")),
+    )
+    window._validate_paper()
+    monkeypatch.setattr(
+        controller,
+        "build_current_paper",
+        lambda *_args: (_ for _ in ()).throw(ValueError("paper build failed")),
+    )
+    window._run_paper_build(tmp_path / "paper.unknown")
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args: ("", ""))
+    window._export_paper()
+    assert any("paper" in item for item in errors)
+
+
+def test_main_window_navigation_view_validation_and_close_edge_paths(  # noqa: PLR0915
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    errors: list[str] = []
+    monkeypatch.setattr(window, "_show_error", lambda error: errors.append(str(error)))
+
+    monkeypatch.setattr(
+        controller,
+        "navigation_result",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("bad filter")),
+    )
+    window._refresh_navigation()
+    window.navigation.search.clear()
+    window._start_navigation_search("")
+    generation = window._search_generation
+    window._apply_navigation_search(generation - 1, None, "stale")
+    window._apply_navigation_search(generation, None, "offline")
+    window._apply_navigation_search(generation, object(), None)
+
+    monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("", False))
+    window._save_current_view()
+    window._rename_view("all")
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+    )
+    window._delete_view("missing")
+    monkeypatch.setattr(window.navigation, "selected_question_ids", lambda: [])
+    window._bulk_topics(True)
+    monkeypatch.setattr(window.navigation, "selected_question_ids", lambda: [question.id])
+    window._bulk_topics(False)
+
+    window._apply_overview_filter(object())
+    window.current_id = question.id
+    monkeypatch.setattr(
+        controller,
+        "load_question",
+        lambda *_args: (_ for _ in ()).throw(ValueError("question unavailable")),
+    )
+    window._load_question(question.id)
+    assert errors[-1] == "question unavailable"
+
+    window.current_id = None
+    window.validate_current()
+    assert window.save_current()
+    window.current_id = question.id
+    monkeypatch.setattr(
+        controller,
+        "validate_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("validation failed")),
+    )
+    window.validate_current()
+    monkeypatch.setattr(
+        controller,
+        "save_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("save failed")),
+    )
+    assert not window.save_current()
+
+    window.dirty = True
+    choices = iter(
+        (
+            QMessageBox.StandardButton.Save,
+            QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Discard,
+        )
+    )
+    monkeypatch.setattr(window, "_message_box", lambda *_args, **_kwargs: next(choices))
+    monkeypatch.setattr(window, "save_current", lambda: False)
+    assert not window._can_leave_current()
+    assert not window._can_leave_current()
+    assert window._can_leave_current()
+
+    close = QCloseEvent()
+    window.dirty = True
+    monkeypatch.setattr(window, "_can_leave_current", lambda: False)
+    window.closeEvent(close)
+    assert not close.isAccepted()
+
+
+def test_main_window_remaining_editor_and_dialog_decisions(  # noqa: PLR0915
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    errors: list[str] = []
+    monkeypatch.setattr(window, "_show_error", lambda error: errors.append(str(error)))
+    monkeypatch.setattr(
+        window,
+        "_message_box",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Ok,
+    )
+
+    window.current_source = ""
+    window._editor_ready()
+    window.current_source = "source"
+    window._editor_ready()
+    window._switching = True
+    window._source_changed("changed")
+    window._metadata_changed()
+    window._switching = False
+    window.current_id = None
+    window._metadata_changed()
+    window._render_scheduled_preview()
+    window.current_id = question.id
+
+    with monkeypatch.context() as patch:
+        patch.setattr(StudioPreferencesDialog, "get_preferences", lambda *_args: None)
+        window._show_preferences()
+        selected = StudioPreferences(
+            theme="dark",
+            workspace_mode="preview",
+            show_detail_drawer=False,
+            show_project_path=True,
+        )
+        patch.setattr(StudioPreferencesDialog, "get_preferences", lambda *_args: selected)
+        patch.setattr("qbank.desktop.main_window.save_studio_preferences", lambda _value: None)
+        window._show_preferences()
+        assert window.theme_name == "dark" and not window.drawer.isVisible()
+
+    exchange = tmp_path / "questions.json"
+    exchange.write_text("[]", encoding="utf-8")
+    import_calls: list[bool] = []
+    with monkeypatch.context() as patch:
+        patch.setattr(QFileDialog, "getOpenFileName", lambda *_args: (str(exchange), ""))
+        patch.setattr(
+            controller,
+            "import_questions",
+            lambda *_args, dry_run, **_kwargs: (
+                import_calls.append(dry_run) or SimpleNamespace(ok=True, would_write=1)
+            ),
+        )
+        patch.setattr(
+            window,
+            "_message_box",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Apply,
+        )
+        patch.setattr(window, "_refresh_after_question_write", lambda _value: None)
+        window._import_questions()
+    assert import_calls == [True, False]
+
+    delete_calls: list[bool] = []
+    with monkeypatch.context() as patch:
+        patch.setattr(window, "_can_leave_current", lambda: True)
+        patch.setattr(
+            controller,
+            "delete_question",
+            lambda *_args, dry_run, **_kwargs: (
+                delete_calls.append(dry_run)
+                or SimpleNamespace(id=question.id, path="questions/q.md")
+            ),
+        )
+        patch.setattr(
+            window,
+            "_message_box",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+        )
+        patch.setattr(window, "_refresh_after_question_write", lambda _value: None)
+        window._delete_current_question()
+    assert delete_calls == [True, False]
+    window.current_id = question.id
+
+    paper_calls: list[bool] = []
+    answers = iter((("Paper", True), ("edge.yaml", True)))
+    with monkeypatch.context() as patch:
+        patch.setattr(window.navigation, "selected_question_ids", lambda: [question.id])
+        patch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: next(answers))
+        patch.setattr(
+            controller,
+            "create_paper",
+            lambda *_args, dry_run, **_kwargs: paper_calls.append(dry_run),
+        )
+        patch.setattr(window, "_refresh_paper_state", lambda: None)
+        patch.setattr(window, "_refresh_navigation", lambda *_args: None)
+        window._new_paper()
+    assert paper_calls == [True, False]
+
+    changes = [SimpleNamespace(id=f"Q-{index}", before=["a"], after=["b"]) for index in range(9)]
+    bulk_calls: list[bool] = []
+    with monkeypatch.context() as patch:
+        patch.setattr(window.navigation, "selected_question_ids", lambda: [question.id])
+        patch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("topic", True))
+        patch.setattr(
+            controller,
+            "bulk_edit_topics",
+            lambda *_args, dry_run, **_kwargs: (
+                bulk_calls.append(dry_run) or SimpleNamespace(changes=changes, affected_questions=9)
+            ),
+        )
+        patch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Apply,
+        )
+        patch.setattr(window, "_refresh_navigation_data", lambda: None)
+        patch.setattr(window, "_refresh_navigation", lambda *_args: None)
+        patch.setattr(window, "_load_question", lambda _value: None)
+        window._bulk_topics(True)
+    assert bulk_calls == [True, False]
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            controller,
+            "possible_tag_synonyms",
+            lambda _slug: [SimpleNamespace(slug="similar")],
+        )
+        discarded: list[str] = []
+        patch.setattr(window.drawer.metadata.topics, "discard_topic", discarded.append)
+        patch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+        )
+        window._pending_topic_created("new-topic")
+        assert discarded == ["new-topic"]
+        patch.setattr(controller, "possible_tag_synonyms", lambda _slug: [])
+        window._pending_topic_created("unique-topic")
+
+    window._show_validation(SimpleNamespace(ok=True, validation_errors=[], validation_warnings=[]))
+    window._show_validation(
+        SimpleNamespace(
+            ok=False,
+            validation_errors=[SimpleNamespace(message="invalid")],
+            validation_warnings=[],
+        )
+    )
+    window.current_id = None
+    window._asset_action("figure", "open")
+    window._legacy_asset_action("assets/a.png", "open")
+    window._add_asset_from_file()
+
+
+def test_main_window_remaining_control_flow_edges(  # noqa: PLR0915
+    project: tuple[Path, Any],
+    question: Question,
+    qtbot: QtBot,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    window, controller = _window(project, question, qtbot)
+    monkeypatch.setattr(window, "_show_error", lambda _error: None)
+    monkeypatch.setattr(
+        window,
+        "_message_box",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Ok,
+    )
+
+    editor = QLineEdit()
+    qtbot.addWidget(editor)
+    editor.show()
+    editor.setFocus()
+    editor.setText("before")
+    editor.insert("-after")
+    QApplication.processEvents()
+    window._undo_current_focus()
+    window._redo_current_focus()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(QuestionIdentityDialog, "get_question_copy", lambda *_args: None)
+        window._copy_current_question()
+
+    exchange = tmp_path / "questions.json"
+    exchange.write_text("[]", encoding="utf-8")
+    with monkeypatch.context() as patch:
+        patch.setattr(QFileDialog, "getOpenFileName", lambda *_args: (str(exchange), ""))
+        patch.setattr(
+            controller,
+            "import_questions",
+            lambda *_args, **_kwargs: SimpleNamespace(ok=True, would_write=1),
+        )
+        patch.setattr(
+            window,
+            "_message_box",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+        )
+        window._import_questions()
+
+    loaded: list[str] = []
+    with monkeypatch.context() as patch:
+        patch.setattr(window, "_refresh_navigation_data", lambda: None)
+        patch.setattr(window, "_refresh_navigation", lambda *_args: None)
+        patch.setattr(window, "_refresh_project_state", lambda: None)
+        patch.setattr(window, "_load_question", loaded.append)
+        window._refresh_after_question_write(None)
+        window._refresh_after_question_write(question.id)
+    assert loaded == [question.id]
+
+    built: list[Path | None] = []
+    with monkeypatch.context() as patch:
+        output = tmp_path / "paper.html"
+        patch.setattr(QFileDialog, "getSaveFileName", lambda *_args: (str(output), ""))
+        patch.setattr(window, "_run_paper_build", lambda output: built.append(output))
+        window._export_paper()
+    assert built == [output]
+
+    changes = [SimpleNamespace(id="Q-1", before=["a"], after=["b"])]
+    with monkeypatch.context() as patch:
+        patch.setattr(window.navigation, "selected_question_ids", lambda: [question.id])
+        patch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("topic", True))
+        patch.setattr(
+            controller,
+            "bulk_edit_topics",
+            lambda *_args, **_kwargs: SimpleNamespace(changes=changes, affected_questions=1),
+        )
+        patch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Cancel,
+        )
+        window._bulk_topics(False)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            controller,
+            "possible_tag_synonyms",
+            lambda _slug: [SimpleNamespace(slug="similar")],
+        )
+        patch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+        )
+        window._pending_topic_created("new-topic")
+
+    window.current_id = None
+    window._tag_metadata_changed()
+    window.current_id = question.id
+    with monkeypatch.context() as patch:
+        patch.setattr(window, "_can_leave_current", lambda: False)
+        refreshed: list[bool] = []
+        patch.setattr(window, "_refresh_navigation", lambda *_args: refreshed.append(True))
+        window._select_question("other")
+        assert refreshed
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            controller,
+            "save_source",
+            lambda *_args, **_kwargs: SimpleNamespace(
+                ok=False,
+                validation_errors=[SimpleNamespace(message="bad")],
+                validation_warnings=[],
+                warnings=[],
+            ),
+        )
+        assert not window.save_current()
+
+    window._preview_loading = True
+    window._asset_action("figure", "open")
+    window._preview_loading = False
+    window._asset_action("figure", "unsupported")

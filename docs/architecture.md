@@ -61,7 +61,7 @@ Infrastructure may depend on application ports and domain types, but not on
 CLI modules. Business invariants remain in domain/application code.
 
 Top-level modules such as `qbank.repository`, `qbank.search_index`, and
-`qbank.storage` are retained as compatibility adapters for version 0.1.0.
+`qbank.storage` are retained as compatibility adapters for the 0.x series.
 New application and CLI code must not import them directly; the composition
 root owns those imports.
 
@@ -119,6 +119,22 @@ Markdown and history are committed as one transaction. Index synchronization
 runs afterward: a failure leaves Markdown committed, writes the dirty marker,
 and reports a warning. Index rebuild uses a temporary database followed by an
 atomic replacement.
+
+Every CLI, Studio, MCP, asset, tag, paper, saved-view, index-rebuild, and Codex
+configuration write uses the same repository-wide lock service. A kernel byte
+lock provides cross-process ownership on Windows and POSIX; a JSON sidecar is
+diagnostic metadata only. The protected interval includes the final repository
+revision check, authoritative transaction, history write, and index update.
+Same-thread nested application services reuse the existing lease.
+
+MCP prepare/commit/cancel operations are durable state machines stored below
+`.qbank/mcp-operations/`. The operation store holds only the typed intent,
+revision, lifecycle state, and first commit result needed for restart recovery;
+it does not duplicate full repository snapshots. A commit verifies expiry and
+the cryptographic repository revision while holding the shared lock. Response
+loss is handled by returning the recorded first result, while an interrupted
+`committing` state with a changed repository is rejected for explicit
+inspection.
 
 Export and paper artifacts use the same rollback-capable commit primitive for
 the primary output and copied local resources. Optional dependencies, output

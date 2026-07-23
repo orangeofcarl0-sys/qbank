@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-INTEGRATION_REVISION = 2
+INTEGRATION_REVISION = 3
 
 CONTEXT_REQUIRED_FIELDS = (
     "objective",
@@ -462,6 +462,22 @@ INTEGRATION_CAPABILITIES = (
         "read",
     ),
     IntegrationCapability(
+        "operation_get",
+        "maintenance",
+        None,
+        "operation_get",
+        None,
+        "read",
+    ),
+    IntegrationCapability(
+        "paper_history_get",
+        "paper",
+        None,
+        "paper_history_get",
+        None,
+        "read",
+    ),
+    IntegrationCapability(
         "ingest_prepare",
         "import",
         ("ingest",),
@@ -490,6 +506,30 @@ INTEGRATION_CAPABILITIES = (
         "paper",
         ("paper",),
         "paper_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "asset_ingest_prepare",
+        "assets",
+        ("asset", "ingest"),
+        "asset_ingest_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "asset_status_prepare",
+        "assets",
+        ("asset", "finalize"),
+        "asset_status_prepare",
+        None,
+        "prepare",
+    ),
+    IntegrationCapability(
+        "asset_preferred_prepare",
+        "assets",
+        ("asset", "set-render"),
+        "asset_preferred_prepare",
         None,
         "prepare",
     ),

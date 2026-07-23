@@ -12,10 +12,21 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
+from qbank.application.revision import (
+    planned_question_projection_revision,
+    question_projection_revision,
+)
 from qbank.context import ProjectContext
 from qbank.domain import RepositorySnapshot
 from qbank.errors import DataValidationError
-from qbank.models import DiagnosticCode, IndexHealth, ProjectConfig, Question, SearchHit
+from qbank.models import (
+    DiagnosticCode,
+    IndexHealth,
+    ProjectConfig,
+    QueryFilters,
+    Question,
+    SearchHit,
+)
 from qbank.repository import MarkdownQuestionRepository
 from qbank.utils import atomic_write_text, utc_now
 
@@ -31,6 +42,12 @@ class IndexDocument:
     solution: str
     topics: str
     chapter: str
+    subject: str
+    question_type: str
+    status: str
+    difficulty: str
+    language: str
+    created_at: str
 
     @classmethod
     def from_question(cls, question: Question) -> IndexDocument:
@@ -43,6 +60,12 @@ class IndexDocument:
             solution=question.solution_md,
             topics=" ".join(question.topics),
             chapter=question.chapter or "",
+            subject=question.subject,
+            question_type=question.type.value,
+            status=question.status.value,
+            difficulty=str(question.difficulty),
+            language=question.language,
+            created_at=question.created_at or "",
         )
 
     @classmethod
@@ -60,13 +83,15 @@ class IndexDocument:
 
 
 INDEX_COLUMNS = IndexDocument.columns()
-SEARCHABLE_COLUMNS = INDEX_COLUMNS[1:]
+SEARCHABLE_COLUMNS = ("title", "stem", "answer", "solution", "topics", "chapter")
+METADATA_COLUMNS = INDEX_COLUMNS[len(SEARCHABLE_COLUMNS) + 1 :]
 COLUMN_SQL = ", ".join(INDEX_COLUMNS)
 PLACEHOLDERS = ", ".join("?" for _ in INDEX_COLUMNS)
 SCHEMA = f"""
 CREATE VIRTUAL TABLE IF NOT EXISTS question_fts USING fts5(
   id UNINDEXED,
   {", ".join(SEARCHABLE_COLUMNS)},
+  {", ".join(f"{column} UNINDEXED" for column in METADATA_COLUMNS)},
   tokenize = 'trigram'
 );
 CREATE TABLE IF NOT EXISTS metadata (
@@ -170,6 +195,7 @@ class SQLiteSearchIndex:
         questions: tuple[Question, ...] = (),
         deleted_ids: tuple[str, ...] = (),
         topics_by_question: Mapping[str, tuple[str, ...]] | None = None,
+        source_revision: str | None = None,
     ) -> None:
         """Apply all incremental changes in one SQLite transaction."""
         if not self.context.config.index.enabled:
@@ -190,10 +216,21 @@ class SQLiteSearchIndex:
                 "INSERT OR REPLACE INTO metadata(key, value) VALUES ('updated_at', ?)",
                 (utc_now(),),
             )
+            if source_revision is not None:
+                connection.execute(
+                    "INSERT OR REPLACE INTO metadata(key, value) VALUES ('question_revision', ?)",
+                    (source_revision,),
+                )
 
     def rebuild(self, snapshot: RepositorySnapshot) -> int:
         """Build a replacement index from a clean repository snapshot."""
         snapshot.require_consistent()
+        source_revision = planned_question_projection_revision(self.context, snapshot)
+        current_revision = question_projection_revision(self.context)
+        if source_revision != current_revision:
+            raise DataValidationError(
+                "repository_revision_changed: question sources changed during index rebuild"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         handle, temporary_name = tempfile.mkstemp(
             prefix=f".{self.path.name}.",
@@ -223,6 +260,10 @@ class SQLiteSearchIndex:
                     "INSERT OR REPLACE INTO metadata(key, value) VALUES ('updated_at', ?)",
                     (utc_now(),),
                 )
+                connection.execute(
+                    "INSERT OR REPLACE INTO metadata(key, value) VALUES ('question_revision', ?)",
+                    (source_revision,),
+                )
             os.replace(temporary, self.path)
         finally:
             temporary.unlink(missing_ok=True)
@@ -248,6 +289,35 @@ class SQLiteSearchIndex:
             )
         return [SearchHit.model_validate(dict(row)) for row in rows]
 
+    def query(self, filters: QueryFilters) -> list[SearchHit]:
+        """Apply structured filters directly to the verified SQLite projection."""
+        if not self.context.config.index.enabled:
+            raise DataValidationError("index_disabled: search index is disabled")
+        if self.is_dirty():
+            raise DataValidationError(
+                "index_dirty: search index requires rebuild; run 'qbank index rebuild'"
+            )
+        clauses, parameters = _query_clauses(filters)
+        where = " AND ".join(clauses) if clauses else "1 = 1"
+        uses_fts = _uses_fts(filters.text)
+        order = "rank, id" if uses_fts else "id"
+        rank = "bm25(question_fts)" if uses_fts else "0.0"
+        with closing(self.open_readonly()) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT id, title, chapter, topics, substr(stem, 1, 240) AS snippet,
+                       {rank} AS rank, subject, question_type, status,
+                       CAST(difficulty AS INTEGER) AS difficulty,
+                       language, NULLIF(created_at, '') AS created_at
+                FROM question_fts
+                WHERE {where}
+                ORDER BY {order}
+                LIMIT ? OFFSET ?
+                """,
+                (*parameters, filters.limit, filters.offset),
+            ).fetchall()
+        return [SearchHit.model_validate(dict(row)) for row in rows]
+
     def ensure_searchable(self, snapshot: RepositorySnapshot) -> None:
         """Reject any projection that is not current with authoritative Markdown."""
         health = self.health(snapshot)
@@ -262,6 +332,25 @@ class SQLiteSearchIndex:
         else:
             code = DiagnosticCode.INDEX_UNAVAILABLE
         raise DataValidationError(f"{code}: {health.message}; run 'qbank index rebuild'")
+
+    def ensure_revision(self, revision: str) -> None:
+        """Verify projection freshness from content hashes without parsing Markdown."""
+        if not self.context.config.index.enabled:
+            raise DataValidationError("index_disabled: search index is disabled")
+        if self.is_dirty():
+            raise DataValidationError(
+                "index_dirty: search index requires rebuild; run 'qbank index rebuild'"
+            )
+        with closing(self.open_readonly()) as connection:
+            row = connection.execute(
+                "SELECT value FROM metadata WHERE key = 'question_revision'"
+            ).fetchone()
+        indexed = str(row["value"]) if row is not None else None
+        if indexed != revision:
+            raise DataValidationError(
+                "index_stale: search index does not match authoritative questions; "
+                "run 'qbank index rebuild'"
+            )
 
     def documents(self) -> dict[str, tuple[str, ...]]:
         """Read all indexed projections without mutating the index."""
@@ -411,7 +500,10 @@ class SQLiteSearchIndex:
             parameters.extend([like] * len(SEARCHABLE_COLUMNS))
         return connection.execute(
             f"""
-            SELECT id, title, chapter, topics, stem AS snippet, 0.0 AS rank
+            SELECT id, title, chapter, topics, stem AS snippet, 0.0 AS rank,
+                   subject, question_type, status,
+                   CAST(difficulty AS INTEGER) AS difficulty,
+                   language, NULLIF(created_at, '') AS created_at
             FROM question_fts
             WHERE {" AND ".join(clauses)}
             ORDER BY id
@@ -430,7 +522,10 @@ class SQLiteSearchIndex:
             """
             SELECT id, title, chapter, topics,
                    snippet(question_fts, 2, '<mark>', '</mark>', ' … ', 18) AS snippet,
-                   bm25(question_fts) AS rank
+                   bm25(question_fts) AS rank,
+                   subject, question_type, status,
+                   CAST(difficulty AS INTEGER) AS difficulty,
+                   language, NULLIF(created_at, '') AS created_at
             FROM question_fts
             WHERE question_fts MATCH ?
             ORDER BY rank
@@ -537,9 +632,7 @@ def search(
     """Compatibility adapter for full-text search."""
     context = _context(root, config)
     index = SQLiteSearchIndex(context)
-    snapshot = MarkdownQuestionRepository(context).scan()
-    snapshot.require_consistent()
-    index.ensure_searchable(snapshot)
+    index.ensure_revision(question_projection_revision(context))
     return index.search(text, limit=limit)
 
 
@@ -570,6 +663,74 @@ def _fts_query(text: str) -> str:
     if not terms:
         return '""'
     return " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
+
+
+def _query_clauses(filters: QueryFilters) -> tuple[list[str], list[object]]:
+    clauses: list[str] = []
+    parameters: list[object] = []
+    equality = {
+        "subject": filters.subject,
+        "chapter": filters.chapter,
+        "question_type": filters.question_type.value if filters.question_type else None,
+        "status": filters.status.value if filters.status else None,
+        "language": filters.language,
+    }
+    for column, value in equality.items():
+        if value is not None:
+            clauses.append(f"{column} = ?")
+            parameters.append(value)
+    if filters.difficulty_min is not None:
+        clauses.append("CAST(difficulty AS INTEGER) >= ?")
+        parameters.append(filters.difficulty_min)
+    if filters.difficulty_max is not None:
+        clauses.append("CAST(difficulty AS INTEGER) <= ?")
+        parameters.append(filters.difficulty_max)
+    if filters.year is not None:
+        clauses.append("substr(created_at, 1, 4) = ?")
+        parameters.append(f"{filters.year:04d}")
+    _topic_clauses(clauses, parameters, filters)
+    _text_clauses(clauses, parameters, filters.text)
+    return clauses, parameters
+
+
+def _topic_clauses(
+    clauses: list[str],
+    parameters: list[object],
+    filters: QueryFilters,
+) -> None:
+    included = ["instr(' ' || topics || ' ', ?) > 0" for _ in filters.topics]
+    if included:
+        operator = " AND " if filters.topic_mode == "and" else " OR "
+        clauses.append("(" + operator.join(included) + ")")
+        parameters.extend(f" {topic} " for topic in filters.topics)
+    for topic in filters.excluded_topics:
+        clauses.append("instr(' ' || topics || ' ', ?) = 0")
+        parameters.append(f" {topic} ")
+
+
+def _text_clauses(
+    clauses: list[str],
+    parameters: list[object],
+    text: str | None,
+) -> None:
+    if not text:
+        return
+    terms = [term for term in text.split() if term]
+    if _uses_fts(text):
+        clauses.append("question_fts MATCH ?")
+        parameters.append(_fts_query(text))
+        return
+    for term in terms:
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        clauses.append(
+            "(" + " OR ".join(f"{column} LIKE ? ESCAPE '\\'" for column in SEARCHABLE_COLUMNS) + ")"
+        )
+        parameters.extend([f"%{escaped}%"] * len(SEARCHABLE_COLUMNS))
+
+
+def _uses_fts(text: str | None) -> bool:
+    terms = [term for term in (text or "").split() if term]
+    return bool(terms) and all(len(term) >= 3 for term in terms)
 
 
 def _topics_from_repository(context: ProjectContext) -> dict[str, tuple[str, ...]]:

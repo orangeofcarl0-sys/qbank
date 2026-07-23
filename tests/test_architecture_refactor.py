@@ -173,7 +173,8 @@ def test_index_document_is_the_shared_projection(
     root, config = project
     add_question(root, config, question)
     context = ProjectContext.from_config(root, config)
-    projection = IndexDocument.from_question(question)
+    stored = MarkdownQuestionRepository(context).scan().locate(question.id).question
+    projection = IndexDocument.from_question(stored)
     index = SQLiteSearchIndex(context)
 
     assert IndexDocument.columns() == INDEX_COLUMNS
