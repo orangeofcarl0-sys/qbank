@@ -29,11 +29,14 @@ from qbank.codex_manifest import (  # noqa: E402
 
 PUBLIC_FILES = (
     "README.md",
+    "README.en.md",
     "LICENSE",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "docs/maintenance-policy.md",
+    "docs/README.md",
+    "docs/localization.md",
     "docs/feature-lifecycle.md",
     "docs/documentation-map.md",
     "docs/compatibility-policy.md",
@@ -41,7 +44,20 @@ PUBLIC_FILES = (
     "docs/features/README.md",
     "docs/features/_template.md",
     "docs/features/capability-matrix.md",
+    "docs/features/bilingual-documentation.md",
 )
+LOCALIZED_DOCUMENTS = (
+    "README.md",
+    "user-guide.md",
+    "cli-reference.md",
+    "desktop-editor.md",
+    "codex-integration.md",
+    "compatibility-0.2.0.md",
+    "compatibility-policy.md",
+    "known-limitations-0.2.0.md",
+)
+LOCALIZED_ROOT_PAIR = ("README.md", "README.en.md")
+LOCALE_ROOTS = {"zh-CN": "docs/zh-CN", "en": "docs/en"}
 FEATURE_HEADINGS = (
     "用户目标",
     "使用入口",
@@ -54,6 +70,7 @@ FEATURE_HEADINGS = (
 )
 PUBLIC_TEXT_ROOTS = (
     "README.md",
+    "README.en.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
@@ -72,7 +89,14 @@ SCHEMA_FILES = {
     "src/qbank/resources/init/qbank.yaml",
 }
 DOC_PREFIXES = ("docs/", ".agents/skills/")
-DOC_FILES = {"README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "AGENTS.md"}
+DOC_FILES = {
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "AGENTS.md",
+}
 PRIVATE_PATTERN = re.compile(
     r"(?i)(?:[A-Z]:[\\/](?:Users|project|Program Files|tools)[\\/][^\s`'\"<>]*|"
     r"\\\\[A-Za-z0-9._-]+\\[A-Za-z0-9$._-]+(?:\\[^\s`'\"<>]+)+|"
@@ -80,6 +104,13 @@ PRIVATE_PATTERN = re.compile(
 )
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*]\(([^)]+)\)")
 QBANK_LINE = re.compile(r"^\s*qbank\s+([a-z0-9-]+)(?:\s+([a-z0-9-]+))?", re.MULTILINE)
+COMMAND_BLOCK = re.compile(r"```(?:powershell|shell|bash|console)?\s*\n(.*?)```", re.DOTALL)
+CJK = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+ENGLISH_WORD = re.compile(r"\b[A-Za-z]{2,}\b")
+FENCED_CODE = re.compile(r"```.*?```", re.DOTALL)
+INLINE_CODE = re.compile(r"`[^`]*`")
+MARKDOWN_LINK_WITH_LABEL = re.compile(r"!?\[[^\]]*]\([^)]+\)")
+HTML_TAG = re.compile(r"<[^>]+>")
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,12 +173,76 @@ def _feature_template(root: Path) -> Check:
     return _check("feature-template", missing, "all required sections present")
 
 
-def _cli_documentation(root: Path, leaves: set[tuple[str, ...]]) -> Check:
-    text = (root / "docs/cli-reference.md").read_text(encoding="utf-8")
-    missing = [
-        "qbank " + " ".join(path) for path in leaves if f"`qbank {' '.join(path)}`" not in text
+def _localized_paths() -> tuple[tuple[str, str], ...]:
+    pairs = [(LOCALIZED_ROOT_PAIR[0], LOCALIZED_ROOT_PAIR[1])]
+    pairs.extend(
+        (
+            f"{LOCALE_ROOTS['zh-CN']}/{name}",
+            f"{LOCALE_ROOTS['en']}/{name}",
+        )
+        for name in LOCALIZED_DOCUMENTS
+        if name != "README.md"
+    )
+    pairs.append(("docs/zh-CN/README.md", "docs/en/README.md"))
+    return tuple(pairs)
+
+
+def _prose_without_markup(text: str) -> str:
+    text = FENCED_CODE.sub("", text)
+    text = INLINE_CODE.sub("", text)
+    text = MARKDOWN_LINK_WITH_LABEL.sub("", text)
+    return HTML_TAG.sub("", text)
+
+
+def _localized_documentation(root: Path) -> list[Check]:
+    missing: list[str] = []
+    navigation: list[str] = []
+    mixed: list[str] = []
+    for zh_relative, en_relative in _localized_paths():
+        zh_path = root / zh_relative
+        en_path = root / en_relative
+        if not zh_path.is_file():
+            missing.append(zh_relative)
+        if not en_path.is_file():
+            missing.append(en_relative)
+        if not zh_path.is_file() or not en_path.is_file():
+            continue
+        zh_text = zh_path.read_text(encoding="utf-8")
+        en_text = en_path.read_text(encoding="utf-8")
+        if Path(en_relative).name not in zh_text and "README.en.md" not in zh_text:
+            navigation.append(f"{zh_relative} -> {en_relative}")
+        if Path(zh_relative).name not in en_text and "README.md" not in en_text:
+            navigation.append(f"{en_relative} -> {zh_relative}")
+        if CJK.search(_prose_without_markup(en_text)):
+            mixed.append(f"{en_relative}: CJK prose in English document")
+        zh_prose = _prose_without_markup(zh_text)
+        for line_number, line in enumerate(zh_prose.splitlines(), start=1):
+            if CJK.search(line) or len(ENGLISH_WORD.findall(line)) < 8:
+                continue
+            mixed.append(f"{zh_relative}:{line_number}: English prose in Chinese document")
+    return [
+        _check(
+            "localized-document-pairs", missing, f"{len(_localized_paths())} locale pairs present"
+        ),
+        _check("localized-navigation", navigation, "all localized pages link across languages"),
+        _check("localized-language-purity", mixed, "localized prose is separated by language"),
     ]
-    return _check("cli-reference", missing, f"{len(leaves)} public commands documented")
+
+
+def _cli_documentation(root: Path, leaves: set[tuple[str, ...]]) -> Check:
+    missing: list[str] = []
+    for locale in LOCALE_ROOTS:
+        text = (root / LOCALE_ROOTS[locale] / "cli-reference.md").read_text(encoding="utf-8")
+        missing.extend(
+            f"{locale}: qbank {' '.join(path)}"
+            for path in leaves
+            if f"`qbank {' '.join(path)}`" not in text
+        )
+    return _check(
+        "cli-reference",
+        missing,
+        f"{len(leaves)} public commands documented in {len(LOCALE_ROOTS)} locales",
+    )
 
 
 def _manifest_consistency(root: Path, nodes: set[tuple[str, ...]]) -> list[Check]:
@@ -243,13 +338,15 @@ def _run(root: Path, args: list[str], cwd: Path) -> subprocess.CompletedProcess[
 
 
 def _readme_examples(root: Path, nodes: set[tuple[str, ...]]) -> Check:
-    readme = (root / "README.md").read_text(encoding="utf-8")
     groups = {path[0] for path in nodes if len(path) > 1}
     invalid: list[str] = []
-    for first, second in QBANK_LINE.findall(readme):
-        path = (first, second) if first in groups and second else (first,)
-        if path not in nodes:
-            invalid.append("qbank " + " ".join(path))
+    for relative in LOCALIZED_ROOT_PAIR:
+        readme = (root / relative).read_text(encoding="utf-8")
+        for block in COMMAND_BLOCK.findall(readme):
+            for first, second in QBANK_LINE.findall(block):
+                path = (first, second) if first in groups and second else (first,)
+                if path not in nodes:
+                    invalid.append(f"{relative}: qbank {' '.join(path)}")
     with tempfile.TemporaryDirectory(prefix="qbank-docs-sync-") as temporary:
         temp_root = Path(temporary)
         bank = temp_root / "demo-bank"
@@ -264,7 +361,7 @@ def _readme_examples(root: Path, nodes: set[tuple[str, ...]]) -> Check:
             result = _run(root, args, cwd)
             if result.returncode != 0:
                 invalid.append(f"{' '.join(args)} -> exit {result.returncode}")
-    return _check("readme-examples", invalid, "documented paths and safe smoke commands pass")
+    return _check("readme-examples", invalid, "bilingual paths and safe smoke commands pass")
 
 
 def _git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -327,6 +424,9 @@ def _delta_policy(root: Path, base: str | None) -> Check:
         and feature_doc_changed
     ):
         failures.append("Schema/config changes require compatibility, feature, and migration notes")
+    for zh_relative, en_relative in _localized_paths():
+        if (zh_relative in changed) != (en_relative in changed):
+            failures.append(f"localized pair must change together: {zh_relative} / {en_relative}")
     return _check("change-documentation-policy", failures, f"{len(changed)} changed files assessed")
 
 
@@ -336,6 +436,7 @@ def run_checks(root: Path, *, base: str | None = None, skip_examples: bool = Fal
         _required_files(root),
         _local_links(root),
         _feature_template(root),
+        *_localized_documentation(root),
         _cli_documentation(root, leaves),
         *_manifest_consistency(root, nodes),
         *_skill_consistency(root),

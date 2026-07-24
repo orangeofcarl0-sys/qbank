@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added separate Simplified Chinese and English README and user-documentation trees, stable
+  language-selection pages for existing links, and a localization policy that prevents mixed prose.
+- Extended the documentation gate to require locale pairs, cross-language navigation, language
+  separation, bilingual CLI coverage, synchronized changes, and executable examples in both READMEs.
 - Established a documentation lifecycle, ownership map, feature template, CLI/capability
   references, contribution guide, security policy, and ADR requirement for changes to
   architecture, authoritative data, transactions, security, or dependencies.

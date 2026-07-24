@@ -8,7 +8,7 @@
 1. 使用 Python 3.11 创建隔离环境。
 2. 安装开发依赖：`pip install -e ".[dev,studio-dev]"`。
 3. 阅读 [维护策略](docs/maintenance-policy.md)、[功能生命周期](docs/feature-lifecycle.md)
-   和 [兼容性策略](docs/compatibility-policy.md)。
+   、[兼容性策略](docs/compatibility-policy.md)和[本地化策略](docs/localization.md)。
 4. 新功能在实现前建立 `docs/features/` 功能文档或可审查的 issue 摘要。
 5. 若变更架构边界、权威数据来源、事务、安全或依赖，先新增 ADR。
 
@@ -20,6 +20,10 @@
 每项用户可见变更都必须评估 README、CHANGELOG、用户指南、CLI、Studio、MCP、
 Codex Skill、配置、Schema、错误码、迁移说明、测试、示例、截图和已知限制。
 完整检查表见 [维护策略](docs/maintenance-policy.md)。
+
+受管用户文档必须同时更新 `docs/zh-CN/` 与 `docs/en/`。不要在同一篇正文中交替使用两种
+解释性语言；命令、字段、Schema 和诊断码保留原技术标识。新增语言前必须完成受管文档覆盖，
+并扩展确定性同步门禁。
 
 功能文档应从 [统一模板](docs/features/_template.md)开始，并准确描述尚不可用的入口；
 不得为了通过门禁而添加空泛或重复文档。

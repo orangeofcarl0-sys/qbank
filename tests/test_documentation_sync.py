@@ -20,7 +20,11 @@ def test_documentation_sync_gate_passes_repository_contract() -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "PASS cli-reference: 53 public commands documented" in result.stdout
+    assert "PASS localized-document-pairs: 9 locale pairs present" in result.stdout
+    assert (
+        "PASS localized-language-purity: localized prose is separated by language" in result.stdout
+    )
+    assert "PASS cli-reference: 53 public commands documented in 2 locales" in result.stdout
     assert "PASS manifest-capability-docs: 22 capabilities documented" in result.stdout
     assert "docs-sync: PASS" in result.stdout
 
@@ -53,3 +57,28 @@ def test_feature_template_contains_required_maintenance_contract() -> None:
     )
 
     assert all(f"## {heading}" in template for heading in headings)
+
+
+def test_localized_user_documentation_has_explicit_language_peers() -> None:
+    root = Path(__file__).parents[1]
+    names = (
+        "README.md",
+        "user-guide.md",
+        "cli-reference.md",
+        "desktop-editor.md",
+        "codex-integration.md",
+        "compatibility-0.2.0.md",
+        "compatibility-policy.md",
+        "known-limitations-0.2.0.md",
+    )
+
+    for name in names:
+        chinese = root / "docs/zh-CN" / name
+        english = root / "docs/en" / name
+        assert chinese.is_file()
+        assert english.is_file()
+        assert f"../en/{name}" in chinese.read_text(encoding="utf-8")
+        assert f"../zh-CN/{name}" in english.read_text(encoding="utf-8")
+
+    assert "README.en.md" in (root / "README.md").read_text(encoding="utf-8")
+    assert "README.md" in (root / "README.en.md").read_text(encoding="utf-8")

@@ -1,5 +1,7 @@
 # qbank
 
+[简体中文](README.md) · [English](README.en.md) · [文档中心](docs/README.md)
+
 `qbank` 是一个本地优先、面向人机协作的结构化题库工具。题目以带 YAML front matter
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
@@ -62,7 +64,7 @@ qbank desktop
 ```
 
 Windows 上建议使用标准 CPython 环境，以避免其他 Python 发行版附带的 Qt DLL 与 PySide6
-冲突。完整交互说明见 [Studio 用户文档](docs/desktop-editor.md)，视觉规范见
+冲突。完整交互说明见 [Studio 用户文档](docs/zh-CN/desktop-editor.md)，视觉规范见
 [Studio 设计系统](docs/ui/design-system.md)。
 
 ## 快速开始
@@ -179,7 +181,7 @@ qbank asset validate --format json
 ```
 
 新 Markdown 使用 `qbank-asset:<asset-id>`，TeX 使用 `\qbankasset{<asset-id>}`。替换和渲染
-采用追加式版本管理，不覆盖旧表示。完整流程见 [用户指南](docs/user-guide.md) 和
+采用追加式版本管理，不覆盖旧表示。完整流程见 [用户指南](docs/zh-CN/user-guide.md) 和
 [逻辑资产文档](docs/logical-asset-management-report.md)。
 
 ### 组卷与导出
@@ -214,7 +216,7 @@ qbank codex integration-status --format json
 PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_decision_packet`，再交回
 `$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
 同步是相互独立的状态。完整职责、安装、更新和备份语义见
-[Codex 接入指南](docs/codex-integration.md)。MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不
+[Codex 接入指南](docs/zh-CN/codex-integration.md)。MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不
 影响 CLI、Studio 或 Skill。MCP 写入与 CLI、Studio 共用仓库级跨进程锁，并将两阶段
 operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可查询原状态，重复 commit
 只返回首次提交结果，不会重复写入。
@@ -223,15 +225,16 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 
 | 文档 | 内容 |
 | --- | --- |
-| [用户指南](docs/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
-| [CLI 命令参考](docs/cli-reference.md) | 公共命令清单、用途和自动化边界 |
-| [Studio 用户文档](docs/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
-| [Codex 接入指南](docs/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
+| [中文文档首页](docs/zh-CN/README.md) | 完整中文用户文档导航 |
+| [用户指南](docs/zh-CN/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
+| [CLI 命令参考](docs/zh-CN/cli-reference.md) | 公共命令清单、用途和自动化边界 |
+| [Studio 用户文档](docs/zh-CN/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
+| [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
 | [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
-| [0.2.0 兼容性基线](docs/compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、错误码和 capability manifest |
-| [0.2.0 已知限制](docs/known-limitations-0.2.0.md) | 文件系统、事务、性能、依赖和产品范围边界 |
-| [兼容性策略](docs/compatibility-policy.md) | 公共行为与后续变更规则 |
+| [0.2.0 兼容性基线](docs/zh-CN/compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、错误码和 capability manifest |
+| [0.2.0 已知限制](docs/zh-CN/known-limitations-0.2.0.md) | 文件系统、事务、性能、依赖和产品范围边界 |
+| [兼容性策略](docs/zh-CN/compatibility-policy.md) | 公共行为与后续变更规则 |
 | [文档地图](docs/documentation-map.md) | 文档受众、权威范围和更新触发条件 |
 | [维护策略](docs/maintenance-policy.md) | 功能变更的文档影响检查与发布门禁 |
 | [功能生命周期](docs/feature-lifecycle.md) | 从提议、ADR、实现到 docs-sync 的完整流程 |
@@ -255,7 +258,7 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 - qbank 不实现在线考试服务、OCR、自动选题算法、Studio 内嵌聊天或模型 API 封装；可选 MCP
   仅提供本地题库工具与资源协议。
 
-完整边界与性能说明见 [0.2.0 已知限制](docs/known-limitations-0.2.0.md)。
+完整边界与性能说明见 [0.2.0 已知限制](docs/zh-CN/known-limitations-0.2.0.md)。
 
 ## 许可证
 

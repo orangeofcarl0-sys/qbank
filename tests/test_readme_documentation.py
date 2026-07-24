@@ -88,7 +88,10 @@ def test_capture_script_exposes_deterministic_asset_state() -> None:
 
 
 def test_020_compatibility_document_freezes_runtime_manifests() -> None:
-    text = (ROOT / "docs" / "compatibility-0.2.0.md").read_text(encoding="utf-8")
+    texts = tuple(
+        (ROOT / "docs" / locale / "compatibility-0.2.0.md").read_text(encoding="utf-8")
+        for locale in ("zh-CN", "en")
+    )
     assert SCHEMA_VERSION == "1.0"
     assert INTEGRATION_REVISION == 3
     assert len(MCP_TOOL_NAMES) == 19
@@ -99,7 +102,7 @@ def test_020_compatibility_document_freezes_runtime_manifests() -> None:
         *(item.name for item in INTEGRATION_CAPABILITIES),
         *(item.value for item in DiagnosticCode),
     ):
-        assert f"`{value}`" in text or value in text.split("```text", maxsplit=1)[1]
+        assert all(value in text for text in texts)
 
 
 def _png_dimensions(path: Path) -> tuple[int, int]:

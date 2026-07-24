@@ -1,0 +1,27 @@
+# qbank documentation
+
+[简体中文](../zh-CN/README.md) · [Language home](../README.md) · [Project home](../../README.en.md)
+
+## User documentation
+
+| Document | Coverage |
+| --- | --- |
+| [User guide](user-guide.md) | Project layout, writes, queries, tags, assets, papers, export, and diagnostics |
+| [CLI reference](cli-reference.md) | Every public command entry point and automation boundary |
+| [Studio desktop editor](desktop-editor.md) | Installation, window model, editing, filters, assets, and failure states |
+| [Codex and MCP integration](codex-integration.md) | Skills, cross-project context, MCP installation, and authorization |
+| [0.2.0 compatibility baseline](compatibility-0.2.0.md) | Frozen CLI, Schema, MCP, diagnostics, and capabilities |
+| [Compatibility policy](compatibility-policy.md) | Stable interfaces, release lines, migration, and deprecation |
+| [0.2.0 known limitations](known-limitations-0.2.0.md) | Frozen-release deployment, transaction, performance, and product boundaries |
+
+## Maintainer material
+
+- [Architecture](../architecture.md) and [architecture decision records](../adr/)
+- [Capability matrix](../features/capability-matrix.md)
+- [Documentation maintenance policy](../maintenance-policy.md),
+  [feature lifecycle](../feature-lifecycle.md), and [documentation map](../documentation-map.md)
+- [Studio design system](../ui/design-system.md) and [code-review guide](../code_review.md)
+
+Maintainer material retains its original working language. User-facing contracts are defined by
+the bilingual pages listed here, CLI `--help`, generated Schemas, and the frozen compatibility
+baseline.

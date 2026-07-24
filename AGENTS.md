@@ -53,5 +53,7 @@ or removed function:
   dependencies change.
 - Run `python scripts/check_docs_sync.py` when the script is present; documentation-sync
   failures block release.
+- Keep managed user documentation in both `docs/zh-CN/` and `docs/en/`; update both members of a
+  locale pair in the same change and do not mix explanatory Chinese and English prose in one page.
 - Keep `v0.2.0` immutable. Put blocking 0.2.x fixes on `release/0.2` for `0.2.1`; put new
   functionality in `0.3.0`. Package and data-Schema versions remain independent.
