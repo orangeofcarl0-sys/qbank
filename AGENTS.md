@@ -39,3 +39,19 @@ For open-source publication, repository sanitization, public README work, or rel
 - Never publish real question banks, historical exam questions or answers, personal paths,
   private configuration, user data, local databases, logs, or unlicensed assets.
 - README files, Skill instructions, and examples must not contain machine-specific absolute paths.
+
+When maintaining the qbank implementation repository (not ordinary question-bank content),
+and the referenced maintenance files are present, apply these rules to every added, changed,
+or removed function:
+
+- Read `docs/maintenance-policy.md`, `docs/feature-lifecycle.md`, and
+  `docs/documentation-map.md`.
+- Create a feature document or equivalent issue summary before implementing new functionality.
+- Update the actual affected README, CHANGELOG, user, CLI, Studio, MCP, Skill, manifest,
+  configuration, Schema, migration, test, example, screenshot, and limitation documentation.
+- Add an ADR when architecture boundaries, authoritative data, transactions, security, or
+  dependencies change.
+- Run `python scripts/check_docs_sync.py` when the script is present; documentation-sync
+  failures block release.
+- Keep `v0.2.0` immutable. Put blocking 0.2.x fixes on `release/0.2` for `0.2.1`; put new
+  functionality in `0.3.0`. Package and data-Schema versions remain independent.

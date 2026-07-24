@@ -4,7 +4,7 @@
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **版本状态：** `0.2.0` 是当前冻结的私有基线，要求 Python 3.11 或更高版本。
+> **版本状态：** `0.2.0` 是当前冻结的发布基线，要求 Python 3.11 或更高版本。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
 <picture>
@@ -224,12 +224,19 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 | 文档 | 内容 |
 | --- | --- |
 | [用户指南](docs/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
+| [CLI 命令参考](docs/cli-reference.md) | 公共命令清单、用途和自动化边界 |
 | [Studio 用户文档](docs/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
 | [Codex 接入指南](docs/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
+| [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
 | [0.2.0 兼容性基线](docs/compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、错误码和 capability manifest |
 | [0.2.0 已知限制](docs/known-limitations-0.2.0.md) | 文件系统、事务、性能、依赖和产品范围边界 |
 | [兼容性策略](docs/compatibility-policy.md) | 公共行为与后续变更规则 |
+| [文档地图](docs/documentation-map.md) | 文档受众、权威范围和更新触发条件 |
+| [维护策略](docs/maintenance-policy.md) | 功能变更的文档影响检查与发布门禁 |
+| [功能生命周期](docs/feature-lifecycle.md) | 从提议、ADR、实现到 docs-sync 的完整流程 |
+| [贡献指南](CONTRIBUTING.md) | 开发环境、提交要求和本地质量检查 |
+| [安全策略](SECURITY.md) | 支持版本、漏洞报告与安全边界 |
 | [代码审查指南](docs/code_review.md) | 质量门、依赖边界和审查要求 |
 | [Studio 设计系统](docs/ui/design-system.md) | 主题、控件状态、可访问性和截图验收 |
 

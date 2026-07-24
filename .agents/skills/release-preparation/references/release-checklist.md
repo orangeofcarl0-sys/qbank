@@ -11,6 +11,18 @@
 Require sections for positioning, features, installation, quick start, Studio, CLI, Codex Skill,
 MCP status, license, and known limitations. Use only synthetic examples and relative paths.
 
+## Documentation synchronization
+
+- Run `python scripts/check_docs_sync.py`.
+- Confirm public CLI commands and MCP tools/resources have user documentation.
+- Confirm the capability manifest, repository Skill, package resources, and documentation agree.
+- Require compatibility and migration conclusions for Schema or configuration changes.
+- Require CHANGELOG coverage for user-visible behavior.
+- Require a feature document or equivalent issue summary before new functionality.
+- Add an ADR for architecture boundaries, authoritative data, transactions, security, or
+  dependency changes.
+- Reject machine paths, private data, real questions, answers, and placeholder-only documents.
+
 ## Build and inspection
 
 - Build wheel and sdist from the current source in a disposable environment.
@@ -21,5 +33,6 @@ MCP status, license, and known limitations. Use only synthetic examples and rela
 
 ## Decision
 
-Return BLOCKED for a dirty tree, non-GREEN OSS audit, failed quality gate, unsafe documentation,
-archive mismatch, missing required artifact, or smoke-test failure. Otherwise return GREEN.
+Return BLOCKED for a dirty tree, non-GREEN OSS audit, failed documentation-sync or quality gate,
+unsafe documentation, archive mismatch, missing required artifact, or smoke-test failure.
+Otherwise return GREEN.

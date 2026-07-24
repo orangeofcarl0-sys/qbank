@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Established a documentation lifecycle, ownership map, feature template, CLI/capability
+  references, contribution guide, security policy, and ADR requirement for changes to
+  architecture, authoritative data, transactions, security, or dependencies.
+- Added a deterministic documentation synchronization gate covering CLI, MCP, Codex Skill,
+  capability manifest, README examples, public-data safety, compatibility notes, and
+  user-facing CHANGELOG coverage.
+- Defined immutable `v0.2.0`, `release/0.2` patch maintenance, and `0.3.0` feature-development
+  rules without changing runtime behavior, data formats, or Schema versions.
+
 ## 0.2.0 - 2026-07-23
 
 - Added one repository-wide, cross-process write lock shared by CLI, Studio, and MCP

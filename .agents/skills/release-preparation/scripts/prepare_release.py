@@ -42,6 +42,7 @@ FORBIDDEN_ARCHIVE_PARTS = (
     "2005-2022",
 )
 QUALITY_GATES = (
+    ("docs-sync", ["python", "scripts/check_docs_sync.py"]),
     ("ruff-format", ["ruff", "format", "--check", "."]),
     ("ruff", ["ruff", "check", "."]),
     ("pyright", ["pyright"]),
