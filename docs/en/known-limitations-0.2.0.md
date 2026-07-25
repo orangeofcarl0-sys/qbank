@@ -59,5 +59,6 @@ untriaged P0/P1 blockers.
   or automatic paper-selection algorithms.
 - `$qbank-digitize` helps define digitization rules and calibration samples, but users remain
   responsible for facts, classification choices, and final authorization.
-- Third-party Python APIs are not frozen. The stable boundary is the CLI, Schema, Markdown, JSON,
-  Skill, and MCP contract in the [compatibility baseline](compatibility-0.2.0.md).
+- Third-party Python APIs do not carry a stability commitment. The stable boundary is the CLI,
+  Schema, Markdown, JSON, Skill, and MCP contract in the
+  [compatibility reference](compatibility-0.2.0.md).

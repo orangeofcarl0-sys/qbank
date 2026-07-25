@@ -13,9 +13,9 @@
 | [Codex and MCP integration](codex-integration.md) | Skills, cross-project context, MCP installation, and authorization |
 | [0.3.0-beta.1 compatibility matrix](compatibility-0.3.0-beta.1.md) | Software, Protocol, Schema, entry points, and migration |
 | [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md) | Unsigned beta, filesystem, and external dependency boundaries |
-| [0.2.0 compatibility baseline](compatibility-0.2.0.md) | Frozen CLI, Schema, MCP, diagnostics, and capabilities |
+| [0.2.0 compatibility reference](compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |
 | [Compatibility policy](compatibility-policy.md) | Stable interfaces, release lines, migration, and deprecation |
-| [0.2.0 known limitations](known-limitations-0.2.0.md) | Frozen-release deployment, transaction, performance, and product boundaries |
+| [0.2.0 known limitations](known-limitations-0.2.0.md) | Deployment, transaction, performance, and product boundaries for that release |
 
 ## Maintainer material
 
@@ -27,5 +27,5 @@
 - [Studio design system](../ui/design-system.md) and [code-review guide](../code_review.md)
 
 Maintainer material retains its original working language. User-facing contracts are defined by
-the bilingual pages listed here, CLI `--help`, generated Schemas, and the frozen compatibility
-baseline.
+the bilingual pages listed here, CLI `--help`, generated Schemas, and the compatibility reference
+for the relevant release.

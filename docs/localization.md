@@ -12,10 +12,10 @@ sentence-by-sentence equivalence is not required.
 ## 受管范围 / Managed scope
 
 以下内容必须成对维护：语言首页、用户指南、CLI 参考、Studio 指南、Codex/MCP 接入、兼容性
-策略、冻结兼容性基线和当前版本已知限制。根目录 `README.md` 与 `README.en.md` 也构成一对。
+策略、版本兼容性参考和当前版本已知限制。根目录 `README.md` 与 `README.en.md` 也构成一对。
 
 The following must be maintained as locale pairs: locale index, user guide, CLI reference, Studio
-guide, Codex/MCP integration, compatibility policy, frozen compatibility baseline, and
+guide, Codex/MCP integration, compatibility policy, release compatibility reference, and
 current-release known limitations. The root `README.md` and `README.en.md` also form a pair.
 Diagrams with explanatory labels use separate Chinese and English SVG files; screenshots may be
 shared when the application state itself is the subject and both pages provide localized
@@ -34,7 +34,7 @@ contract, it must also be reflected in the managed bilingual user documentation.
 2. 文件名、命令、选项、字段、诊断码和 Schema 标识不翻译。
 3. 示例只使用自制公开数据，不包含本机路径、身份、凭据或真实试题。
 4. 面向用户的行为变更在同一变更中更新两种语言；不能用空白模板满足检查。
-5. 翻译存在暂时差异时，以代码、Schema 和兼容性基线为事实来源，并在合并前修正两种语言。
+5. 翻译存在暂时差异时，以代码、Schema 和对应版本的兼容性参考为事实来源，并在合并前修正两种语言。
 
 1. Every localized page provides language switching and a link back to the documentation home.
 2. File names, commands, options, fields, diagnostic codes, and Schema identifiers are not translated.
@@ -42,8 +42,8 @@ contract, it must also be reflected in the managed bilingual user documentation.
    or real examination questions.
 4. A user-visible behavior change updates both languages in the same change; empty boilerplate does
    not satisfy the gate.
-5. If translations temporarily disagree, code, Schema, and the compatibility baseline are the factual
-   sources, and both languages must be reconciled before merge.
+5. If translations temporarily disagree, code, Schema, and the relevant release compatibility
+   reference are the factual sources, and both languages must be reconciled before merge.
 6. Do not place Chinese explanatory diagrams in English user pages or English explanatory diagrams
    in Chinese user pages.
 

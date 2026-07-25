@@ -2,12 +2,23 @@
 
 [简体中文](README.md) · [English](README.en.md) · [文档中心](docs/README.md)
 
+![AI-first：使用 coding agents 完成开发](docs/assets/readme/ai-first-badge.svg)
+
+qbank 源于一个具体需求：现有题库工具很少为 coding agent 提供可审查、可回滚且不锁定数据的
+协作入口。项目因此将普通文件作为数据基础，让人、桌面应用、命令行和 coding agent 在同一套
+Schema、校验与事务规则下工作。
+
+> **AI coding 声明：** 本仓库的代码、测试、文档和界面迭代均通过 coding agent 生成或修改，
+> 由维护者提出需求、确认设计、审查结果并批准发布。该说明用于如实记录项目的开发方式；
+> 安全性和正确性仍以可复现测试、审查记录及发布制品校验为准。
+
 `qbank` 是一个本地优先、面向人机协作的结构化题库工具。题目以带 YAML front matter
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **版本状态：** `v0.2.0` 是不可变发布基线；当前预发布为 `0.3.0-beta.1`
-> （Python 包 `0.3.0b1`）。Question、Asset、Paper Schema 仍为 `1.0`。
+> **当前版本：** 当前预发布为 `0.3.0-beta.1`（Python 包 `0.3.0b1`）。
+> `0.2.x` 作为上一兼容维护线保留，其中 Qt 桌面端已归入 QBank Studio Legacy；
+> `0.1.x` 不再提供支持。Question、Asset、Paper Schema 仍为 `1.0`。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
 > **Unsigned beta：** 本版 Windows 安装器和便携包尚未代码签名，SmartScreen 可能显示
@@ -249,7 +260,7 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 | [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
 | [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
-| [0.2.0 兼容性基线](docs/zh-CN/compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、错误码和 capability manifest |
+| [0.2.0 兼容性参考](docs/zh-CN/compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、错误码和 capability manifest |
 | [0.2.0 已知限制](docs/zh-CN/known-limitations-0.2.0.md) | 文件系统、事务、性能、依赖和产品范围边界 |
 | [兼容性策略](docs/zh-CN/compatibility-policy.md) | 公共行为与后续变更规则 |
 | [文档地图](docs/documentation-map.md) | 文档受众、权威范围和更新触发条件 |
@@ -265,19 +276,44 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 
 ## 当前限制
 
-- `0.2.0` 尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和已记录 JSON 字段按
-  兼容性策略维护。
+- 当前 beta 尚未承诺稳定的第三方 Python API；CLI、Schema、Markdown 和已记录 JSON 字段按
+  当前兼容矩阵与兼容性策略维护。
 - LaTeX 只执行轻量结构检查，不进行 TeX 编译。
-- HTML 预览使用 MathJax CDN；完全离线时公式显示 TeX 源文本。
+- CLI 生成的 HTML 预览使用 MathJax CDN；现代 Studio 的公式资源随应用打包，可离线渲染。
 - `--changed` 依赖可用的 Git 工作区，否则安全回退为全量校验。
-- 0.2.0 主要支持本机常规文件系统；网络盘、同步目录和多机共享写入不在安全承诺内，
+- 当前版本主要支持本机常规文件系统；网络盘、同步目录和多机共享写入不在安全承诺内，
   `qbank doctor` 会对可识别的此类路径给出 warning。
 - qbank 不实现在线考试服务、OCR、自动选题算法、Studio 内嵌聊天或模型 API 封装；可选 MCP
   仅提供本地题库工具与资源协议。
 
-完整边界与性能说明见 [0.2.0 已知限制](docs/zh-CN/known-limitations-0.2.0.md)。
+完整边界与性能说明见
+[0.3.0-beta.1 已知限制](docs/zh-CN/known-limitations-0.3.0-beta.1.md)。
 
 ## 许可证
 
-qbank 以 [MIT License](LICENSE) 发布。Studio 内嵌第三方前端资源及其许可信息列于
-[`THIRD_PARTY_NOTICES.md`](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md)。
+qbank 以 [MIT License](LICENSE) 发布。现代 Studio 与 Legacy 内嵌资源的许可信息分别见
+[Tauri Studio 第三方声明](apps/studio/THIRD_PARTY_NOTICES.md)和
+[Qt Legacy 第三方声明](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md)。
+
+## 开源项目与致谢
+
+qbank 的实现直接使用了以下开源项目；完整版本与传递依赖以锁文件和第三方声明为准。
+
+- [Tauri](https://github.com/tauri-apps/tauri) 提供现代桌面应用外壳与打包能力；
+  [Vditor](https://github.com/Vanessa219/vditor)、[MathJax](https://github.com/mathjax/MathJax)
+  和 [KaTeX](https://github.com/KaTeX/KaTeX) 提供 Markdown/TeX 编辑与公式呈现能力。
+- [markdown-it-py](https://github.com/executablebooks/markdown-it-py)、
+  [Jinja](https://github.com/pallets/jinja)、[Pydantic](https://github.com/pydantic/pydantic)、
+  [Typer](https://github.com/fastapi/typer) 和 [Rich](https://github.com/Textualize/rich)
+  支撑解析、模板、数据契约与 CLI。
+- [SQLite](https://www.sqlite.org/)、[Pandoc](https://github.com/jgm/pandoc) 和
+  [Ipe](https://github.com/otfried/ipe) 分别用于可重建检索、文档转换和可编辑图形工作流。
+- [PySide6 / Qt for Python](https://doc.qt.io/qtforpython-6/)、
+  [CodeMirror](https://github.com/codemirror/dev/) 和
+  [QtAwesome](https://github.com/spyder-ide/qtawesome) 支撑 QBank Studio Legacy。
+
+产品设计也参考了 [Moodle Question Bank](https://github.com/moodle/moodle) 与
+[Open edX](https://github.com/openedx/openedx-platform) 对题目组织、复用和内容编写的公开实践。
+这些项目与 qbank 无隶属或背书关系；此处表示尊重与致谢，不表示复制其代码或数据格式。
+AI 来源标识的呈现方式参考了 [made-by-ai](https://github.com/mefengl/made-by-ai) 和
+[ai-badges](https://github.com/40ants/ai-badges)；本仓库使用自带 SVG，不依赖远程徽章服务。

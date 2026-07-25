@@ -1,14 +1,14 @@
-# qbank 0.2.0 compatibility baseline
+# qbank 0.2.0 compatibility reference
 
 [简体中文](../zh-CN/compatibility-0.2.0.md) · [English documentation](README.md)
 
-This page freezes the user-visible qbank `0.2.0` interfaces. Except for blocking defects, the
-release does not add, remove, or rename the interfaces below. Third-party Python import paths are
-outside this stability commitment.
+This page records the user-visible qbank `0.2.0` interfaces as released. That line accepts only
+security, data-loss, and blocking compatibility fixes; it does not add, remove, or rename the
+interfaces below. Third-party Python import paths are outside this stability commitment.
 
 ## Version matrix
 
-| Layer | Frozen version | Meaning |
+| Layer | Recorded 0.2.0 value | Meaning |
 | --- | --- | --- |
 | qbank package | `0.2.0` | CLI, Studio, Skills, and MCP use one installed version |
 | Question Schema | `1.0` | Question Markdown front matter and exchange JSON |
@@ -22,7 +22,7 @@ Schema versions are independent from the package version. The runtime authority 
 
 ## CLI commands
 
-Frozen top-level commands:
+0.2.0 top-level commands:
 
 ```text
 qbank init
@@ -44,7 +44,7 @@ qbank preview
 qbank export
 ```
 
-Frozen command groups and subcommands:
+0.2.0 command groups and subcommands:
 
 ```text
 qbank index rebuild

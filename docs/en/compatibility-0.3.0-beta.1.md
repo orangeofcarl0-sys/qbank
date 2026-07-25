@@ -13,5 +13,5 @@
 | Fallback desktop entry | `qbank desktop` | QBank Studio Legacy for severe maintenance only |
 | Codex | CLI, repository Skills, optional MCP | All reuse qbank application services |
 
-`v0.2.0` remains an immutable baseline. The 0.3 beta neither moves the old tag, replaces its
-artifacts, nor automatically changes a question bank.
+`v0.2.0` remains available as the previous release. The 0.3 beta neither changes that tag or its
+artifacts nor automatically modifies a question bank.

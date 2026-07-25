@@ -1,13 +1,13 @@
-# qbank 0.2.0 兼容性基线
+# qbank 0.2.0 兼容性参考
 
 [English](../en/compatibility-0.2.0.md) · [中文文档](README.md)
 
-本文冻结 qbank `0.2.0` 的用户可见接口。除阻断性缺陷外，`0.2.0` 不再增加、删除或重命名
-下列接口。第三方 Python 模块导入路径不属于本次稳定性承诺。
+本文记录 qbank `0.2.0` 已发布的用户可见接口。该版本线仅接受安全、数据损坏和阻断性
+兼容修复，不再增加、删除或重命名下列接口。第三方 Python 模块导入路径不属于本次稳定性承诺。
 
 ## 版本矩阵
 
-| 层 | 冻结版本 | 说明 |
+| 层 | 0.2.0 记录值 | 说明 |
 | --- | --- | --- |
 | qbank 软件包 | `0.2.0` | CLI、Studio、Skill 与 MCP 使用同一安装版本 |
 | Question Schema | `1.0` | 题目 Markdown front matter 与交换 JSON |
@@ -21,7 +21,7 @@ Schema 版本独立于软件包版本。`qbank schema --kind question|paper|patc
 
 ## CLI 命令
 
-冻结顶层命令：
+0.2.0 顶层命令：
 
 ```text
 qbank init
@@ -43,7 +43,7 @@ qbank preview
 qbank export
 ```
 
-冻结命令组与子命令：
+0.2.0 命令组与子命令：
 
 ```text
 qbank index rebuild

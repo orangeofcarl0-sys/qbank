@@ -2,8 +2,9 @@
 
 [简体中文](../zh-CN/compatibility-policy.md) · [English documentation](README.md)
 
-qbank treats its documented CLI and data formats as compatibility-sensitive. The `v0.2.0` tag is
-an immutable release baseline and must never be moved or recreated.
+qbank treats its documented CLI and data formats as compatibility-sensitive. Published tags
+identify their original releases and are not moved or recreated; fixes are delivered as new
+versions.
 
 ## Release lines and independent versions
 
@@ -14,12 +15,12 @@ an immutable release baseline and must never be moved or recreated.
   versions. A package release does not imply a Schema change; every Schema change is versioned and
   documented separately.
 
-## Frozen release and later documentation
+## Published releases and later documentation
 
-The `v0.2.0` tag and its wheel, sdist, checksums, and provenance remain bound to the original frozen
-commit. Documentation-maintenance commits made afterward belong to candidate `main` history and do
-not change artifact identity. GitHub-generated source archives follow the selected tag and therefore
-do not include later documentation.
+The `v0.2.0` tag and its wheel, sdist, checksums, and provenance remain associated with that release
+commit. Documentation-maintenance commits made afterward belong to later `main` history and do not
+change artifact identity. GitHub-generated source archives follow the selected tag and therefore do
+not include later documentation.
 
 ## Preserved interfaces
 

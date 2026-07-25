@@ -5,6 +5,9 @@
 - Replaced obsolete Qt-based README screenshots with deterministic captures of the current Tauri
   Studio, redrew the bilingual architecture and safe-write diagrams, and aligned the Studio guides,
   design system, screenshot provenance, and repository UI Skill with the modern/Legacy boundary.
+- Reframed the public READMEs around the project's coding-agent origin, added an explicit AI-first
+  development disclosure and open-source acknowledgements, clarified supported versions and the
+  0.2.x Qt Legacy scope, and simplified the contribution guide.
 
 ## 0.3.0-beta.1 - 2026-07-26
 
@@ -27,8 +30,8 @@
 - Added a deterministic documentation synchronization gate covering CLI, MCP, Codex Skill,
   capability manifest, README examples, public-data safety, compatibility notes, and
   user-facing CHANGELOG coverage.
-- Defined immutable `v0.2.0`, `release/0.2` patch maintenance, and `0.3.0` feature-development
-  rules without changing runtime behavior, data formats, or Schema versions.
+- Documented published-tag retention, `release/0.2` patch maintenance, and `0.3.0`
+  feature-development rules without changing runtime behavior, data formats, or Schema versions.
 - Published the first unified beta as unsigned Windows installer and portable artifacts. Windows
   SmartScreen may warn; users should verify the attached SHA-256 checksums before running them.
 
@@ -63,7 +66,7 @@
 
 ## 0.1.0 - 2026-07-23
 
-- Frozen the first private release baseline and completed the README with explicit product
+- Prepared the first private release and completed the README with explicit product
   boundaries, Studio/CLI/Codex entry points, installation paths, artifact verification, and
   compatibility expectations.
 

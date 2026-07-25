@@ -45,5 +45,5 @@
 - qbank 不提供模型 SDK、API key 管理、Studio 内嵌聊天、MCP HTTP transport、Prompts 或订阅。
 - qbank 不包含 OCR、扫描版自动分题、答案推断、在线考试或自动组卷算法。
 - `$qbank-digitize` 帮助定义电子化规则与校准样本，但事实、分类和最终授权由用户负责。
-- 第三方 Python API 尚未冻结；稳定边界是[兼容性基线](compatibility-0.2.0.md)记录的 CLI、
+- 第三方 Python API 尚未承诺稳定；稳定边界是[兼容性参考](compatibility-0.2.0.md)记录的 CLI、
   Schema、Markdown、JSON、Skill 与 MCP。

@@ -34,7 +34,7 @@ Question、Paper、Schema、项目锁、事务、历史或索引实现。
 - 对外产品版本：`0.3.0-beta.1`
 - Studio Protocol：`1.0`
 - Question、Asset、Paper Schema：`1.0`
-- 冻结基线：`v0.2.0`，不得移动或重建
+- 上一发布线：`v0.2.0`；已发布 tag 保持对应原发布提交
 
 Python wheel、Studio 安装器和便携包必须由同一干净 Git 提交生成。生成的 manifest 记录
 提交、依赖锁哈希和各制品 SHA-256。

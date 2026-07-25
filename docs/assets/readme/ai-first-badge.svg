@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="244" height="28" role="img"
+     aria-labelledby="title desc">
+  <title id="title">AI-first, coded with agents</title>
+  <desc id="desc">Project provenance badge: AI-first development using coding agents</desc>
+  <defs>
+    <linearGradient id="surface" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#273342"/>
+      <stop offset="1" stop-color="#1f2935"/>
+    </linearGradient>
+    <clipPath id="frame">
+      <rect width="244" height="28" rx="6"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="86" height="28" fill="url(#surface)"/>
+    <rect x="86" width="158" height="28" fill="#426b8f"/>
+    <path d="M86 0h1v28h-1z" fill="#8fb1ce" opacity=".5"/>
+  </g>
+  <rect x=".5" y=".5" width="243" height="27" rx="5.5" fill="none"
+        stroke="#1b2530" stroke-opacity=".55"/>
+  <g fill="#fff" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11"
+     font-weight="600" text-anchor="middle">
+    <text x="43" y="18">AI-FIRST</text>
+    <text x="165" y="18">CODED WITH AGENTS</text>
+  </g>
+</svg>

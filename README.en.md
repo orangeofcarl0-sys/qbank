@@ -2,13 +2,28 @@
 
 [简体中文](README.md) · [English](README.en.md) · [Documentation](docs/README.md)
 
+![AI-first: coded with agents](docs/assets/readme/ai-first-badge.svg)
+
+qbank began with a practical gap: existing question-bank tools rarely provide coding agents with a
+reviewable, reversible interface while keeping data in ordinary files. The project therefore gives
+people, desktop software, command-line automation, and coding agents one shared set of Schemas,
+validation rules, and transaction boundaries.
+
+> **AI coding disclosure:** all code, tests, documentation, and interface iterations in this
+> repository have been generated or modified through coding agents. The maintainer defines
+> requirements, approves designs, reviews results, and authorizes releases. This records the
+> development method; reproducible tests, review evidence, and artifact verification remain the
+> basis for security and correctness claims.
+
 `qbank` is a local-first structured question-bank system for reliable human–AI collaboration.
 Questions are durable Markdown files with YAML front matter; JSON and JSONL are exchange formats;
 SQLite is only a rebuildable search projection; and `paper.yaml` describes reviewable, reproducible
 papers.
 
-> **Version status:** `v0.2.0` is the immutable release baseline. The current pre-release is
-> `0.3.0-beta.1` (Python package `0.3.0b1`). Question, Asset, and Paper Schemas remain at `1.0`.
+> **Current version:** the current pre-release is `0.3.0-beta.1` (Python package `0.3.0b1`).
+> `0.2.x` remains the previous compatibility-maintenance line, with its Qt desktop application now
+> classified as QBank Studio Legacy. `0.1.x` is unsupported. Question, Asset, and Paper Schemas
+> remain at `1.0`.
 
 > **Unsigned beta:** the Windows installer and portable package are not code-signed. SmartScreen
 > may warn. Download only from this repository's Release and verify SHA-256 against
@@ -186,7 +201,7 @@ twice. See the [Codex and MCP guide](docs/en/codex-integration.md).
 | [Studio guide](docs/en/desktop-editor.md) | Desktop interaction and resource behavior |
 | [Monorepo development](docs/monorepo-development.md) | Repository layout, tiered checks, impact mapping, and unified builds |
 | [Codex and MCP](docs/en/codex-integration.md) | Skills, cross-project context, MCP, and authorization |
-| [0.2.0 compatibility baseline](docs/en/compatibility-0.2.0.md) | Frozen CLI, Schema, MCP, diagnostics, and capabilities |
+| [0.2.0 compatibility reference](docs/en/compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |
 | [Compatibility policy](docs/en/compatibility-policy.md) | Stable interfaces and release rules |
 | [0.2.0 known limitations](docs/en/known-limitations-0.2.0.md) | Filesystem, transaction, performance, and product limits |
 | [Architecture](docs/architecture.md) | Layers, ownership, transactions, and extension boundaries |
@@ -194,8 +209,53 @@ twice. See the [Codex and MCP guide](docs/en/codex-integration.md).
 All commands provide `--help`. Machine-readable output belongs on stdout; human diagnostics belong
 on stderr. Use `--format json` for automation.
 
+## Current limitations
+
+- The current beta does not promise a stable third-party Python API. The documented CLI, Schemas,
+  Markdown, and JSON fields follow the current compatibility matrix and policy.
+- LaTeX validation is structural and does not run a TeX compiler.
+- CLI-generated HTML preview uses the MathJax CDN; modern Studio ships its formula resources for
+  offline rendering.
+- `--changed` requires a usable Git worktree and otherwise falls back to full validation.
+- Local conventional filesystems are the supported deployment model. Network drives, synchronized
+  folders, and multi-machine concurrent writes are outside the safety commitment.
+- qbank is not an online exam service, OCR engine, automatic question selector, embedded Studio
+  chat, or model API wrapper.
+
+See the [0.3.0-beta.1 known limitations](docs/en/known-limitations-0.3.0-beta.1.md) for the complete
+runtime and deployment boundary.
+
 ## License
 
-qbank is released under the [MIT License](LICENSE). Third-party frontend resources embedded in
-Studio and their licenses are listed in
-[`THIRD_PARTY_NOTICES.md`](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md).
+qbank is released under the [MIT License](LICENSE). Licenses for embedded resources are documented
+separately in the [Tauri Studio notices](apps/studio/THIRD_PARTY_NOTICES.md) and
+[Qt Legacy notices](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md).
+
+## Open-source acknowledgements
+
+qbank directly uses the following open-source projects. Lock files and the third-party notices are
+the authority for exact versions and transitive dependencies.
+
+- [Tauri](https://github.com/tauri-apps/tauri) provides the modern desktop shell and packaging;
+  [Vditor](https://github.com/Vanessa219/vditor), [MathJax](https://github.com/mathjax/MathJax),
+  and [KaTeX](https://github.com/KaTeX/KaTeX) support Markdown/TeX editing and presentation.
+- [markdown-it-py](https://github.com/executablebooks/markdown-it-py),
+  [Jinja](https://github.com/pallets/jinja), [Pydantic](https://github.com/pydantic/pydantic),
+  [Typer](https://github.com/fastapi/typer), and [Rich](https://github.com/Textualize/rich)
+  support parsing, templates, data contracts, and the CLI.
+- [SQLite](https://www.sqlite.org/), [Pandoc](https://github.com/jgm/pandoc), and
+  [Ipe](https://github.com/otfried/ipe) provide rebuildable search, document conversion, and
+  editable-graphics workflows.
+- [PySide6 / Qt for Python](https://doc.qt.io/qtforpython-6/),
+  [CodeMirror](https://github.com/codemirror/dev/), and
+  [QtAwesome](https://github.com/spyder-ide/qtawesome) support QBank Studio Legacy.
+
+Product design also learned from the public question organization, reuse, and authoring practices
+of [Moodle Question Bank](https://github.com/moodle/moodle) and
+[Open edX](https://github.com/openedx/openedx-platform). Those projects neither endorse nor are
+affiliated with qbank; this acknowledgement does not imply that their code or data formats were
+copied.
+The AI-provenance label format was informed by
+[made-by-ai](https://github.com/mefengl/made-by-ai) and
+[ai-badges](https://github.com/40ants/ai-badges). qbank ships its own SVG and does not rely on a
+remote badge service.

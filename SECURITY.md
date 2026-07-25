@@ -2,14 +2,15 @@
 
 ## Supported versions
 
-当前安全维护基线如下：
+当前支持范围如下：
 
-| Version | Status |
+| Version | Support status |
 | --- | --- |
-| 0.2.x | 接受阻断性兼容与安全修复 |
-| 0.1.x | 不再主动维护 |
+| 0.3.0-beta.x | 当前开发线；接受安全、数据安全和阻断性兼容修复 |
+| 0.2.x | 有限维护；核心 CLI 与数据边界接受安全和阻断性兼容修复，Qt 桌面端作为 QBank Studio Legacy 仅处理安全、数据损坏或严重兼容问题 |
+| 0.1.x | 不提供支持或补丁回移 |
 
-`v0.2.0` tag 永久保持不变。必要修复进入 `release/0.2`，并以新的补丁版本发布。
+已发布版本通过新的补丁版本接收修复；维护者不会移动或重建已有版本 tag。
 
 ## Reporting a vulnerability
 

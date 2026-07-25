@@ -18,7 +18,7 @@
 | `docs/features/capability-matrix.md` | 集成维护者 | CLI、Studio、MCP 能力映射 | capability manifest 或入口 |
 | `docs/*/compatibility-policy.md` | 集成方 | 稳定接口、迁移和版本规则 | 公共契约 |
 | `docs/*/compatibility-0.3.0-beta.1.md` | beta 用户 | 当前软件、Protocol 与 Schema 矩阵 | 0.3 beta 冻结 |
-| `docs/*/known-limitations-0.2.0.md` | 部署者 | 冻结版本限制 | 0.2.x 限制澄清 |
+| `docs/*/known-limitations-0.2.0.md` | 部署者 | 0.2.x 版本限制 | 0.2.x 限制澄清 |
 | `docs/*/known-limitations-0.3.0-beta.1.md` | beta 部署者 | unsigned beta 与运行边界 | beta 限制变化 |
 | `docs/localization.md` | 文档维护者 | 语言范围、编写与同步门禁 | 支持语言或本地化范围 |
 | `docs/architecture.md` | 维护者 | 分层、数据和事务边界 | 架构边界 |
@@ -41,5 +41,5 @@ README 只承担项目首页职责。完整命令进入 CLI 参考，操作流�
 ## 发布材料
 
 `build/public-release-prep/` 是本地、可重建的发布审查输出，不进入分发包。正式 Release
-notes 从 CHANGELOG 与冻结版本兼容性文档生成；wheel、sdist 和 checksums 必须来自同一
-冻结提交。
+notes 从 CHANGELOG 与对应版本的兼容性文档生成；wheel、sdist 和 checksums 必须来自同一
+发布提交。

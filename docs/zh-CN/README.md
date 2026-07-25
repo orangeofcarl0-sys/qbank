@@ -13,9 +13,9 @@
 | [Codex 与 MCP 接入](codex-integration.md) | Skill、跨项目上下文、MCP 安装与授权 |
 | [0.3.0-beta.1 兼容矩阵](compatibility-0.3.0-beta.1.md) | 软件、Protocol、Schema、入口与迁移关系 |
 | [0.3.0-beta.1 已知限制](known-limitations-0.3.0-beta.1.md) | unsigned beta、文件系统与外部依赖边界 |
-| [0.2.0 兼容性基线](compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、诊断码与 capability |
+| [0.2.0 兼容性参考](compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、诊断码与 capability |
 | [兼容性策略](compatibility-policy.md) | 稳定接口、版本线、迁移和弃用规则 |
-| [0.2.0 已知限制](known-limitations-0.2.0.md) | 冻结版本的部署、事务、性能和产品边界 |
+| [0.2.0 已知限制](known-limitations-0.2.0.md) | 该版本的部署、事务、性能和产品边界 |
 
 ## 维护者资料
 
@@ -26,4 +26,4 @@
 - [Studio 设计系统](../ui/design-system.md)与[代码审查指南](../code_review.md)
 
 维护者资料保留其原始工作语言。面向用户的契约以本页所列双语文档、CLI `--help`、Schema
-和冻结兼容性基线为准。
+和对应版本的兼容性参考为准。

@@ -5,7 +5,7 @@
 This page lists the qbank `0.3.0-beta.1` public command entry points. This beta retains the
 documented 0.2.0 command names. Each command's `--help`, the
 [current compatibility matrix](compatibility-0.3.0-beta.1.md), and the
-[0.2.0 baseline](compatibility-0.2.0.md) define options, defaults, and exit codes.
+[0.2.0 compatibility reference](compatibility-0.2.0.md) define options, defaults, and exit codes.
 
 ## Project, diagnostics, and index
 

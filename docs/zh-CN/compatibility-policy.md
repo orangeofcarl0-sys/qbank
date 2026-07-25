@@ -2,8 +2,8 @@
 
 [English](../en/compatibility-policy.md) · [中文文档](README.md)
 
-qbank 将已记录的 CLI 和数据格式视为兼容性敏感接口。`v0.2.0` tag 是不可变发布基线，永远
-不得移动或重建。
+qbank 将已记录的 CLI 和数据格式视为兼容性敏感接口。已发布 tag 用于标识对应的原始版本，
+不会被移动或重建；后续修复通过新的版本发布。
 
 ## 发布线与独立版本
 
@@ -12,11 +12,11 @@ qbank 将已记录的 CLI 和数据格式视为兼容性敏感接口。`v0.2.0` 
 - Python 软件包版本与 Question、Asset、Paper、taxonomy 和 view Schema 版本独立。软件发布
   不代表 Schema 变化；Schema 变化必须独立定版和记录。
 
-## 冻结版本与后续文档
+## 已发布版本与后续文档
 
-`v0.2.0` tag 及其 wheel、sdist、checksums 和 provenance 永远对应原冻结提交。tag 后的文档
-维护提交属于候选 `main` 历史，不改变制品身份。GitHub 自动源码归档来自所选 tag，因此不含
-后续文档。
+`v0.2.0` tag 及其 wheel、sdist、checksums 和 provenance 继续对应当时的发布提交。tag 后的
+文档维护提交属于后续 `main` 历史，不改变既有制品身份。GitHub 自动源码归档来自所选 tag，
+因此不含后续文档。
 
 ## 受保护接口
 
