@@ -42,6 +42,7 @@ PUBLIC_FILES = (
     "docs/feature-lifecycle.md",
     "docs/documentation-map.md",
     "docs/compatibility-policy.md",
+    "docs/installation.md",
     "docs/cli-reference.md",
     "docs/features/README.md",
     "docs/features/_template.md",
@@ -58,10 +59,13 @@ LOCALIZED_DOCUMENTS = (
     "user-guide.md",
     "cli-reference.md",
     "desktop-editor.md",
+    "installation.md",
     "codex-integration.md",
     "compatibility-0.2.0.md",
+    "compatibility-0.3.0-beta.1.md",
     "compatibility-policy.md",
     "known-limitations-0.2.0.md",
+    "known-limitations-0.3.0-beta.1.md",
 )
 LOCALIZED_ROOT_PAIR = ("README.md", "README.en.md")
 LOCALE_ROOTS = {"zh-CN": "docs/zh-CN", "en": "docs/en"}

@@ -2,8 +2,9 @@
 
 [English](../en/cli-reference.md) · [中文文档](README.md)
 
-本文列出 qbank 0.2.0 的公共命令入口。参数、默认值和退出码以各命令的 `--help` 及
-[0.2.0 兼容性基线](compatibility-0.2.0.md)为准；操作流程见[用户指南](user-guide.md)。
+本文列出 qbank `0.3.0-beta.1` 的公共命令入口。本 beta 保留 0.2.0 已记录的命令名称；
+参数、默认值和退出码以各命令的 `--help`、[当前兼容矩阵](compatibility-0.3.0-beta.1.md)
+及[0.2.0 兼容性基线](compatibility-0.2.0.md)为准。
 
 ## 项目、诊断与索引
 

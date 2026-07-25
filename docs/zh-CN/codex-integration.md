@@ -6,6 +6,9 @@ qbank 通过仓库规则、Skill、本地 CLI 和可选 STDIO MCP 与 Codex 协�
 不调用模型 SDK，也不要求 OpenAI API key。Codex 负责语义判断，qbank 负责确定性校验、事务
 写入和产物生成。
 
+`0.3.0-beta.1` 中 CLI、仓库 Skill、MCP、Studio 和 sidecar 位于同一仓库并复用同一
+application services；Studio 不包含另一套业务规则。
+
 ## 三种独立状态
 
 | 状态 | 作用 |

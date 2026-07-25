@@ -20,7 +20,7 @@ def test_documentation_sync_gate_passes_repository_contract() -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "PASS localized-document-pairs: 9 locale pairs present" in result.stdout
+    assert "PASS localized-document-pairs: 12 locale pairs present" in result.stdout
     assert (
         "PASS localized-language-purity: localized prose is separated by language" in result.stdout
     )

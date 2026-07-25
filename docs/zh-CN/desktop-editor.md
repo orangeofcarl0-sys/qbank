@@ -18,6 +18,8 @@ npm run tauri dev
 
 正式使用应选择同一提交生成的 Windows 安装器或便携包。Studio Protocol 保持 `1.0`；
 Python 包版本为 `0.3.0b1`，界面对外显示 `0.3.0-beta.1`，数据 Schema 仍为 `1.0`。
+本 beta 尚未代码签名，SmartScreen 可能警告；运行前必须按
+[安装与升级指南](installation.md)核对 Release 中的 SHA-256。
 
 ## QBank Studio Legacy
 

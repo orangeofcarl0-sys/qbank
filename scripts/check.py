@@ -16,6 +16,10 @@ IMPACT_FILE = ROOT / "scripts" / "change-impact.json"
 SCOPES = {"core", "legacy", "sidecar", "studio", "build", "docs"}
 
 
+def command_name(name: str) -> str:
+    return f"{name}.cmd" if sys.platform == "win32" and name in {"npm", "npx"} else name
+
+
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
     print(f"+ {' '.join(command)}")
     subprocess.run(command, cwd=cwd, check=True)
@@ -26,6 +30,8 @@ def cargo_check_command() -> list[str]:
     if target is None and sys.platform == "win32":
         target = "x86_64-pc-windows-msvc"
     command = ["cargo"]
+    if target == "x86_64-pc-windows-gnu":
+        command.append("+stable-x86_64-pc-windows-gnu")
     command.extend(
         [
             "check",
@@ -137,7 +143,7 @@ def run_fast(scopes: set[str], paths: set[str]) -> None:
             ]
         )
     if "studio" in scopes:
-        run(["npm", "run", "check"], cwd=STUDIO)
+        run([command_name("npm"), "run", "check"], cwd=STUDIO)
     if "build" in scopes:
         run([sys.executable, "-m", "pytest", "-q", "tests/test_unified_build.py"])
     if "docs" in scopes:
@@ -158,10 +164,10 @@ def run_integration(scopes: set[str]) -> None:
             ]
         )
     if scopes & {"studio", "build"}:
-        run(["npm", "run", "build"], cwd=STUDIO)
+        run([command_name("npm"), "run", "build"], cwd=STUDIO)
         run(
             [
-                "npm",
+                command_name("npm"),
                 "run",
                 "test:browser",
                 "--",
@@ -181,8 +187,8 @@ def run_release() -> None:
     run(import_linter_command())
     run([sys.executable, "-m", "deptry", "."])
     run([sys.executable, "-m", "pytest", "--cov=qbank", "--cov-fail-under=90"])
-    run(["npm", "run", "check"], cwd=STUDIO)
-    run(["npm", "run", "test:browser"], cwd=STUDIO)
+    run([command_name("npm"), "run", "check"], cwd=STUDIO)
+    run([command_name("npm"), "run", "test:browser"], cwd=STUDIO)
     run(
         [
             "cargo",

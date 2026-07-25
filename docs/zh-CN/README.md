@@ -9,7 +9,10 @@
 | [用户指南](user-guide.md) | 项目结构、写入、查询、标签、资产、组卷、导出与诊断 |
 | [CLI 命令参考](cli-reference.md) | 全部公共命令入口和自动化边界 |
 | [Studio 桌面编辑器](desktop-editor.md) | 安装、窗口结构、编辑、筛选、资源和失败状态 |
+| [安装与升级](installation.md) | CLI、Studio、校验、升级和卸载 |
 | [Codex 与 MCP 接入](codex-integration.md) | Skill、跨项目上下文、MCP 安装与授权 |
+| [0.3.0-beta.1 兼容矩阵](compatibility-0.3.0-beta.1.md) | 软件、Protocol、Schema、入口与迁移关系 |
+| [0.3.0-beta.1 已知限制](known-limitations-0.3.0-beta.1.md) | unsigned beta、文件系统与外部依赖边界 |
 | [0.2.0 兼容性基线](compatibility-0.2.0.md) | 冻结的 CLI、Schema、MCP、诊断码与 capability |
 | [兼容性策略](compatibility-policy.md) | 稳定接口、版本线、迁移和弃用规则 |
 | [0.2.0 已知限制](known-limitations-0.2.0.md) | 冻结版本的部署、事务、性能和产品边界 |

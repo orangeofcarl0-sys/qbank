@@ -33,6 +33,21 @@ def test_python_and_display_versions_share_the_beta_line() -> None:
     assert PROTOCOL_VERSION == "1.0"
 
 
+def test_sdist_excludes_generated_and_dependency_trees() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    excluded = set(project["tool"]["hatch"]["build"]["targets"]["sdist"]["exclude"])
+    assert {
+        "/.venv",
+        "/apps/studio/dist",
+        "/apps/studio/node_modules",
+        "/apps/studio/playwright-report",
+        "/apps/studio/src-tauri/binaries",
+        "/apps/studio/src-tauri/target",
+        "/apps/studio/test-results",
+        "/build",
+    } <= excluded
+
+
 def test_sidecar_reuses_qbank_services_without_domain_copies() -> None:
     source = "\n".join(
         path.read_text(encoding="utf-8")

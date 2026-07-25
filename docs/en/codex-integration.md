@@ -6,6 +6,9 @@ qbank collaborates with Codex through repository rules, Skills, the local CLI, a
 STDIO MCP server. It embeds no chat UI, calls no model SDK, and requires no OpenAI API key. Codex
 makes semantic decisions; qbank provides deterministic validation, transactions, and rendering.
 
+In `0.3.0-beta.1`, the CLI, repository Skills, MCP, Studio, and sidecar live in one repository and
+reuse the same application services; Studio does not contain a second business implementation.
+
 ## Three independent states
 
 | State | Role |

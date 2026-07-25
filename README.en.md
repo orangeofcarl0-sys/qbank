@@ -7,9 +7,12 @@ Questions are durable Markdown files with YAML front matter; JSON and JSONL are 
 SQLite is only a rebuildable search projection; and `paper.yaml` describes reviewable, reproducible
 papers.
 
-> **Version status:** `v0.2.0` is the immutable release baseline. `main` now uses the unified
-> `0.3.0b1` development line, displayed as `0.3.0-beta.1`. Question, Asset, and Paper Schemas
-> remain at `1.0`.
+> **Version status:** `v0.2.0` is the immutable release baseline. The current pre-release is
+> `0.3.0-beta.1` (Python package `0.3.0b1`). Question, Asset, and Paper Schemas remain at `1.0`.
+
+> **Unsigned beta:** the Windows installer and portable package are not code-signed. SmartScreen
+> may warn. Download only from this repository's Release and verify SHA-256 against
+> `checksums.txt` before running either artifact.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
@@ -85,9 +88,13 @@ qbank doctor --format json
 material. Verify a Release wheel against the Release checksum before installing it:
 
 ```powershell
-Get-FileHash .\qbank-0.2.0-py3-none-any.whl -Algorithm SHA256
-pip install .\qbank-0.2.0-py3-none-any.whl
+Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.3.0b1-py3-none-any.whl
 ```
+
+Windows desktop users can download `QBank-Studio-0.3.0-beta.1-x64-setup.exe` or the portable ZIP.
+See the [installation and upgrade guide](docs/en/installation.md) for verification, upgrades, and
+the Legacy fallback.
 
 For development, install all quality and Studio test dependencies with
 `pip install -e ".[dev,studio-dev]"`.

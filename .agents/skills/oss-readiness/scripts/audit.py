@@ -252,7 +252,9 @@ def _scan_tree(root: Path, output: Path) -> tuple[list[Finding], list[str]]:
         relative = item.relative_to(root).as_posix()
         seen.append(relative)
         lowered = relative.lower()
-        synthetic_demo = lowered.startswith("examples/public-demo/")
+        synthetic_demo = lowered.startswith(
+            ("examples/public-demo/", "apps/studio/fixtures/synthetic-bank/")
+        )
         if not synthetic_demo and re.search(
             r"(?:^|/)(?:integration-pilot|questions)(?:/|$)", lowered
         ):
@@ -537,7 +539,13 @@ def _license_findings(
         suffix = Path(filename).suffix.lower()
         if suffix not in FONT_EXTENSIONS | MEDIA_EXTENSIONS:
             continue
-        self_authored = filename.startswith("examples/public-demo/") or filename in {
+        self_authored = filename.startswith(
+            (
+                "examples/public-demo/",
+                "apps/studio/fixtures/synthetic-bank/",
+                "docs/assets/readme/",
+            )
+        ) or filename in {
             "examples/interference.svg",
             "src/qbank/resources/init/assets/images/interference.svg",
         }

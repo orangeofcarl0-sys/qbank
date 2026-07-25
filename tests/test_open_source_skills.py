@@ -156,6 +156,11 @@ def test_archive_manifests_match_wheel_and_sdist(tmp_path: Path) -> None:
         demo = tarfile.TarInfo("fixture-0.1.0/examples/public-demo/questions/demo/DEMO-GEO-0001.md")
         demo.size = 0
         archive.addfile(demo, io.BytesIO())
+        studio_fixture = tarfile.TarInfo(
+            "fixture-0.1.0/apps/studio/fixtures/synthetic-bank/questions/demo/DEMO-0002.md"
+        )
+        studio_fixture.size = 0
+        archive.addfile(studio_fixture, io.BytesIO())
 
     checks, manifests = module._inspect_archives(artifacts)
 
@@ -165,6 +170,7 @@ def test_archive_manifests_match_wheel_and_sdist(tmp_path: Path) -> None:
         "fixture/__init__.py",
     ]
     assert manifests[sdist.name] == [
+        "fixture-0.1.0/apps/studio/fixtures/synthetic-bank/questions/demo/DEMO-0002.md",
         "fixture-0.1.0/examples/public-demo/questions/demo/DEMO-GEO-0001.md",
         "fixture-0.1.0/pyproject.toml",
     ]

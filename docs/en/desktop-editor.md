@@ -20,6 +20,8 @@ npm run tauri dev
 Production use should use the Windows installer or portable archive built from the same commit.
 Studio Protocol remains at `1.0`; the Python package is `0.3.0b1`, the product displays
 `0.3.0-beta.1`, and the data Schemas remain at `1.0`.
+This beta is unsigned and may trigger SmartScreen. Verify the Release SHA-256 values as described
+in the [installation and upgrade guide](installation.md) before running it.
 
 ## QBank Studio Legacy
 

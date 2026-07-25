@@ -22,6 +22,10 @@ PYTHON_VERSION = "0.3.0b1"
 DISPLAY_VERSION = "0.3.0-beta.1"
 
 
+def command_name(name: str) -> str:
+    return f"{name}.cmd" if sys.platform == "win32" and name in {"npm", "npx"} else name
+
+
 def run(
     command: list[str],
     *,
@@ -96,6 +100,24 @@ def build_wheel(artifacts: Path) -> Path:
     return next(artifacts.glob(f"qbank-{PYTHON_VERSION}-*.whl"))
 
 
+def build_sdist(artifacts: Path) -> Path:
+    for candidate in artifacts.glob("qbank-*.tar.gz"):
+        candidate.unlink()
+    run(
+        [
+            sys.executable,
+            "-m",
+            "hatchling",
+            "build",
+            "--target",
+            "sdist",
+            "--directory",
+            str(artifacts),
+        ]
+    )
+    return next(artifacts.glob(f"qbank-{PYTHON_VERSION}.tar.gz"))
+
+
 def venv_python(directory: Path) -> Path:
     python = directory / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     if not python.is_file():
@@ -148,7 +170,7 @@ def build_sidecar(wheel: Path, target: str) -> Path:
 
 def ensure_node_dependencies() -> None:
     if not (STUDIO / "node_modules").is_dir():
-        run(["npm", "ci"], cwd=STUDIO)
+        run([command_name("npm"), "ci"], cwd=STUDIO)
 
 
 def release_directory(target: str) -> Path:
@@ -172,9 +194,18 @@ def rust_environment(target: str) -> dict[str, str]:
 def build_studio(wheel: Path, artifacts: Path, target: str) -> tuple[Path, Path]:
     build_sidecar(wheel, target)
     ensure_node_dependencies()
-    run(["npm", "run", "check"], cwd=STUDIO)
+    run([command_name("npm"), "run", "check"], cwd=STUDIO)
     run(
-        ["npx", "tauri", "build", "--ci", "--target", target, "--bundles", "nsis"],
+        [
+            command_name("npx"),
+            "tauri",
+            "build",
+            "--ci",
+            "--target",
+            target,
+            "--bundles",
+            "nsis",
+        ],
         cwd=STUDIO,
         environment=rust_environment(target),
     )
@@ -195,6 +226,7 @@ def build_studio(wheel: Path, artifacts: Path, target: str) -> tuple[Path, Path]
         (sidecar, "qbank-sidecar.exe"),
         (loader, "WebView2Loader.dll"),
         (STUDIO / "scripts" / "portable-README.txt", "README.txt"),
+        (STUDIO / "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
     ):
         shutil.copy2(source, portable_root / name)
     archive = artifacts / f"QBank-Studio-{DISPLAY_VERSION}-portable-x64.zip"
@@ -237,8 +269,13 @@ def write_manifest(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    manifest_path = OUTPUT / "release-manifest.json"
+    checksum_items = [
+        *data["artifacts"],
+        {"name": manifest_path.name, "sha256": sha256(manifest_path)},
+    ]
     (OUTPUT / "checksums.txt").write_text(
-        "".join(f"{item['sha256']}  {item['name']}\n" for item in data["artifacts"]),
+        "".join(f"{item['sha256']}  {item['name']}\n" for item in checksum_items),
         encoding="utf-8",
     )
 
@@ -258,6 +295,8 @@ def main() -> None:
     artifacts_dir = ensure_output()
     wheel = build_wheel(artifacts_dir)
     artifacts = [wheel]
+    if args.kind == "all":
+        artifacts.append(build_sdist(artifacts_dir))
     if args.kind in {"studio", "all"}:
         artifacts.extend(build_studio(wheel, artifacts_dir, args.target))
     write_manifest(artifacts, commit=commit, dirty=dirty, target=args.target)

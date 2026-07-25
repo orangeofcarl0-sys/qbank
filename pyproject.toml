@@ -55,6 +55,18 @@ qbank-studio-sidecar = "qbank.studio_sidecar.__main__:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/qbank"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.venv",
+  "/apps/studio/dist",
+  "/apps/studio/node_modules",
+  "/apps/studio/playwright-report",
+  "/apps/studio/src-tauri/binaries",
+  "/apps/studio/src-tauri/target",
+  "/apps/studio/test-results",
+  "/build",
+]
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]

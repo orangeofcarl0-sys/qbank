@@ -6,9 +6,12 @@
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **版本状态：** `v0.2.0` 是不可变发布基线；`main` 现进入统一的 `0.3.0b1`
-> 开发线，对外显示为 `0.3.0-beta.1`。Question、Asset、Paper Schema 仍为 `1.0`。
+> **版本状态：** `v0.2.0` 是不可变发布基线；当前预发布为 `0.3.0-beta.1`
+> （Python 包 `0.3.0b1`）。Question、Asset、Paper Schema 仍为 `1.0`。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
+
+> **Unsigned beta：** 本版 Windows 安装器和便携包尚未代码签名，SmartScreen 可能显示
+> 警告。仅从本仓库 Release 下载，并在运行前使用随附 `checksums.txt` 核对 SHA-256。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
@@ -104,9 +107,12 @@ qbank doctor --format json
 从 Release 下载 wheel 时，应先使用同一 Release 中的 `checksums.txt` 核对 SHA-256：
 
 ```powershell
-Get-FileHash .\qbank-0.2.0-py3-none-any.whl -Algorithm SHA256
-pip install .\qbank-0.2.0-py3-none-any.whl
+Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.3.0b1-py3-none-any.whl
 ```
+
+Windows 桌面用户可下载 `QBank-Studio-0.3.0-beta.1-x64-setup.exe` 或便携 ZIP。安装、
+升级、校验和 Legacy 回退见[安装与升级指南](docs/zh-CN/installation.md)。
 
 参与开发时安装完整质量检查和 Studio 测试依赖：
 

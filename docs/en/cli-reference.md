@@ -2,9 +2,10 @@
 
 [简体中文](../zh-CN/cli-reference.md) · [English documentation](README.md)
 
-This page lists the public qbank 0.2.0 command entry points. Each command's `--help` output and the
-[0.2.0 compatibility baseline](compatibility-0.2.0.md) define options, defaults, and exit codes.
-See the [user guide](user-guide.md) for complete workflows.
+This page lists the qbank `0.3.0-beta.1` public command entry points. This beta retains the
+documented 0.2.0 command names. Each command's `--help`, the
+[current compatibility matrix](compatibility-0.3.0-beta.1.md), and the
+[0.2.0 baseline](compatibility-0.2.0.md) define options, defaults, and exit codes.
 
 ## Project, diagnostics, and index
 

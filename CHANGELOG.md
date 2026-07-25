@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0-beta.1 - 2026-07-26
 
 - Unified the modern Tauri QBank Studio, Studio Protocol v1, Python sidecar, CLI, MCP,
   Skills, and QBank Studio Legacy in one repository and one `0.3.0b1` development line.
@@ -23,6 +23,8 @@
   user-facing CHANGELOG coverage.
 - Defined immutable `v0.2.0`, `release/0.2` patch maintenance, and `0.3.0` feature-development
   rules without changing runtime behavior, data formats, or Schema versions.
+- Published the first unified beta as unsigned Windows installer and portable artifacts. Windows
+  SmartScreen may warn; users should verify the attached SHA-256 checksums before running them.
 
 ## 0.2.0 - 2026-07-23
 

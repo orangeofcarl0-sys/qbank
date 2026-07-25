@@ -10,6 +10,8 @@ export default defineConfig({
         // Vditor appends `/dist/...` to `cdn`; preserve that directory level so
         // the editor, i18n bundle, MathJax and theme assets stay fully local.
         { src: "node_modules/vditor/dist", dest: "vendor/vditor" },
+        { src: "node_modules/vditor/LICENSE", dest: "vendor/vditor" },
+        { src: "THIRD_PARTY_NOTICES.md", dest: "." },
       ],
     }),
   ],

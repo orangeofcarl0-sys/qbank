@@ -9,7 +9,10 @@
 | [User guide](user-guide.md) | Project layout, writes, queries, tags, assets, papers, export, and diagnostics |
 | [CLI reference](cli-reference.md) | Every public command entry point and automation boundary |
 | [Studio desktop editor](desktop-editor.md) | Installation, window model, editing, filters, assets, and failure states |
+| [Installation and upgrade](installation.md) | CLI, Studio, verification, upgrades, and removal |
 | [Codex and MCP integration](codex-integration.md) | Skills, cross-project context, MCP installation, and authorization |
+| [0.3.0-beta.1 compatibility matrix](compatibility-0.3.0-beta.1.md) | Software, Protocol, Schema, entry points, and migration |
+| [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md) | Unsigned beta, filesystem, and external dependency boundaries |
 | [0.2.0 compatibility baseline](compatibility-0.2.0.md) | Frozen CLI, Schema, MCP, diagnostics, and capabilities |
 | [Compatibility policy](compatibility-policy.md) | Stable interfaces, release lines, migration, and deprecation |
 | [0.2.0 known limitations](known-limitations-0.2.0.md) | Frozen-release deployment, transaction, performance, and product boundaries |

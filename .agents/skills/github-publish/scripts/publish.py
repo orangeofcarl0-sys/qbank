@@ -94,14 +94,15 @@ def _preflight(request: PublishRequest) -> tuple[list[str], dict[str, Any]]:
         "branch": branch,
         "commit": commit,
         "tag": request.tag,
-        "release_title": f"qbank {plan.get('version', request.tag.removeprefix('v'))}",
+        "release_title": str(plan.get("release_title", f"QBank {request.tag.removeprefix('v')}")),
+        "prerelease": bool(plan.get("prerelease", False)),
         "attachments": artifacts,
         "operations": [
             "create public repository" if request.create_repository else "use target repository",
             "make target repository public if necessary",
             "atomically push current branch and new tag",
             "create GitHub Release",
-            "upload wheel, sdist, and checksums",
+            "upload wheel, sdist, Studio artifacts, checksums, and release manifest",
             "download and verify published attachments",
         ],
         "remote_writes": False,
@@ -303,8 +304,10 @@ def _create_release(request: PublishRequest, details: dict[str, Any]) -> int:
         details["release_title"],
         "--notes-file",
         str(notes),
-        *[str(path) for path in _artifact_paths(request.root)],
     ]
+    if details.get("prerelease"):
+        release_args.extend(["--prerelease", "--latest=false"])
+    release_args.extend(str(path) for path in _artifact_paths(request.root))
     released = _gh(request.root, release_args, timeout=600)
     if released.returncode != 0:
         print("Code and tag were pushed, but GitHub Release creation failed.", file=sys.stderr)

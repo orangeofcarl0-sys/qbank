@@ -66,6 +66,25 @@ QUALITY_GATES = (
     ("pip-check", ["python", "-m", "pip", "check"]),
     ("pip-audit", ["pip-audit"]),
 )
+LIGHTWEIGHT_BETA_GATES = (
+    ("fast", ["python", "scripts/check.py", "fast"]),
+    (
+        "targeted-integration",
+        [
+            "python",
+            "scripts/check.py",
+            "integration",
+            "--scope",
+            "sidecar",
+            "--scope",
+            "studio",
+            "--scope",
+            "build",
+        ],
+    ),
+    ("docs-sync", ["python", "scripts/check_docs_sync.py"]),
+    ("git-diff-check", ["git", "diff", "--check"]),
+)
 
 
 @dataclass(frozen=True)
@@ -115,10 +134,11 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
-def _metadata(root: Path) -> tuple[str, str]:
+def _metadata(root: Path) -> tuple[str, str, str]:
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
-    return str(project["name"]), str(project["version"])
+    studio = json.loads((root / "apps/studio/package.json").read_text(encoding="utf-8"))
+    return str(project["name"]), str(project["version"]), str(studio["version"])
 
 
 def _read_audit(root: Path) -> tuple[str, Check]:
@@ -168,14 +188,15 @@ def _check_readme(root: Path) -> list[Check]:
     return checks
 
 
-def _run_quality_gates(root: Path, skip: bool) -> list[Check]:
+def _run_quality_gates(root: Path, skip: bool, *, lightweight_beta: bool) -> list[Check]:
     if skip:
         return [Check("quality-gates", "failed", "skipped by request")]
     checks: list[Check] = []
     environment = os.environ.copy()
     environment["PYTHONUTF8"] = "1"
     environment["PYTHONPATH"] = str(root / "src") + os.pathsep + environment.get("PYTHONPATH", "")
-    for name, command in QUALITY_GATES:
+    gates = LIGHTWEIGHT_BETA_GATES if lightweight_beta else QUALITY_GATES
+    for name, command in gates:
         executable = command[0]
         if executable == "python":
             resolved = sys.executable
@@ -279,6 +300,32 @@ def _build(root: Path, artifacts: Path, skip: bool) -> list[Check]:
     ]
 
 
+def _reuse_unified_build(root: Path, artifacts: Path) -> list[Check]:
+    source = root / "build" / "unified"
+    source_artifacts = source / "artifacts"
+    required = (
+        "qbank-0.3.0b1-py3-none-any.whl",
+        "qbank-0.3.0b1.tar.gz",
+        "QBank-Studio-0.3.0-beta.1-x64-setup.exe",
+        "QBank-Studio-0.3.0-beta.1-portable-x64.zip",
+    )
+    missing = [name for name in required if not (source_artifacts / name).is_file()]
+    manifest = source / "release-manifest.json"
+    if missing or not manifest.is_file():
+        detail = "missing: " + ", ".join(
+            (*missing, *(() if manifest.is_file() else ("release-manifest.json",)))
+        )
+        return [Check("unified-artifacts", "failed", detail)]
+    artifacts.mkdir(parents=True, exist_ok=True)
+    for existing in artifacts.iterdir():
+        if existing.is_file():
+            existing.unlink()
+    for name in required:
+        shutil.copy2(source_artifacts / name, artifacts / name)
+    shutil.copy2(manifest, artifacts / manifest.name)
+    return [Check("unified-artifacts", "passed", "wheel, sdist, installer, portable, and manifest")]
+
+
 def _members(path: Path) -> list[str]:
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as archive:
@@ -291,7 +338,7 @@ def _inspect_archives(artifacts: Path) -> tuple[list[Check], dict[str, list[str]
     manifests: dict[str, list[str]] = {}
     checks: list[Check] = []
     for path in sorted(artifacts.glob("*")):
-        if path.suffix != ".whl" and not path.name.endswith(".tar.gz"):
+        if path.suffix != ".whl" and path.suffix != ".zip" and not path.name.endswith(".tar.gz"):
             continue
         try:
             members = _members(path)
@@ -304,8 +351,16 @@ def _inspect_archives(artifacts: Path) -> tuple[list[Check], dict[str, list[str]
         unsafe = []
         for member in members:
             normalized = f"/{member.lower()}"
-            public_demo = "/examples/public-demo/questions/" in normalized
-            if not public_demo and any(part in normalized for part in FORBIDDEN_ARCHIVE_PARTS):
+            synthetic_questions = any(
+                prefix in normalized
+                for prefix in (
+                    "/examples/public-demo/questions/",
+                    "/apps/studio/fixtures/synthetic-bank/questions/",
+                )
+            )
+            if not synthetic_questions and any(
+                part in normalized for part in FORBIDDEN_ARCHIVE_PARTS
+            ):
                 unsafe.append(member)
         checks.append(
             Check(
@@ -347,7 +402,7 @@ def _smoke(root: Path, artifacts: Path, skip: bool) -> list[Check]:
 def _checksums(artifacts: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     for path in sorted(artifacts.glob("*")):
-        if path.is_file() and (path.suffix == ".whl" or path.name.endswith(".tar.gz")):
+        if path.is_file():
             values[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return values
 
@@ -363,7 +418,30 @@ def _release_notes(root: Path, version: str) -> str:
         if match
         else "Release details must be completed from CHANGELOG.md."
     )
-    return f"# qbank {version}\n\n{body}\n\n## Artifacts\n\nWheel, source distribution, and SHA-256 checksums are attached.\n"
+    summary = """## Highlights
+
+- Codex-first CLI, repository Skill, and optional STDIO MCP integration.
+- The modern Tauri QBank Studio is the default desktop interface; QBank Studio Legacy remains
+  available as the Qt fallback.
+- Markdown/TeX authoring with offline MathJax rendering.
+- Multi-representation assets, including controlled Ipe editing and rendering workflows.
+- Tags, filters, saved views, batch operations, and reproducible paper definitions.
+
+## Beta notice and known limitations
+
+This is an unsigned Windows beta. Windows SmartScreen may warn when the installer or portable
+executable is opened. Download artifacts only from this Release and verify their SHA-256 values
+against `checksums.txt`.
+
+Repositories are local-file-system projects. Concurrent multi-machine editing over synchronized
+or network folders is not supported. Remote assets remain explicit warning-bearing references,
+and some export formats still require external tools such as Pandoc or Ipe.
+"""
+    return (
+        f"# QBank {version}\n\n{summary}\n\n## Changes\n\n{body}\n\n"
+        "## Artifacts\n\nWheel, source distribution, Windows installer, portable archive, "
+        "release manifest, and SHA-256 checksums are attached.\n"
+    )
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -394,12 +472,20 @@ def _report(decision: str, version: str, checks: list[Check]) -> str:
     return "\n".join(lines)
 
 
-def prepare(root: Path, output: Path, skip_quality: bool, skip_build: bool) -> int:
+def prepare(
+    root: Path,
+    output: Path,
+    skip_quality: bool,
+    skip_build: bool,
+    *,
+    lightweight_beta: bool,
+    reuse_unified: bool,
+) -> int:
     root = root.resolve()
     output = output.resolve()
     artifacts = output / "artifacts"
     output.mkdir(parents=True, exist_ok=True)
-    name, version = _metadata(root)
+    name, python_version, release_version = _metadata(root)
     audit_decision, audit_check = _read_audit(root)
     status = _git(root, "status", "--porcelain")
     branch = _git(root, "branch", "--show-current")
@@ -414,13 +500,19 @@ def prepare(root: Path, output: Path, skip_quality: bool, skip_build: bool) -> i
         ),
         Check("git-branch", "passed" if branch else "failed", branch or "detached or unavailable"),
         Check(
-            "version", "passed" if re.fullmatch(r"\d+\.\d+\.\d+", version) else "failed", version
+            "version",
+            "passed" if re.fullmatch(r"\d+\.\d+\.\d+(?:b\d+)?", python_version) else "failed",
+            f"python={python_version}; release={release_version}",
         ),
         *_check_readme(root),
-        *_compatibility_checks(root, version),
+        *_compatibility_checks(root, python_version),
     ]
-    checks.extend(_run_quality_gates(root, skip_quality))
-    checks.extend(_build(root, artifacts, skip_build))
+    checks.extend(_run_quality_gates(root, skip_quality, lightweight_beta=lightweight_beta))
+    checks.extend(
+        _reuse_unified_build(root, artifacts)
+        if reuse_unified
+        else _build(root, artifacts, skip_build)
+    )
     archive_checks, manifests = _inspect_archives(artifacts)
     checks.extend(archive_checks)
     checks.extend(_smoke(root, artifacts, skip_build))
@@ -431,12 +523,17 @@ def prepare(root: Path, output: Path, skip_quality: bool, skip_build: bool) -> i
     (output / "checksums.txt").write_text(
         "".join(f"{digest}  {filename}\n" for filename, digest in hashes.items()), encoding="utf-8"
     )
-    (output / "release-notes.md").write_text(_release_notes(root, version), encoding="utf-8")
+    (output / "release-notes.md").write_text(
+        _release_notes(root, release_version), encoding="utf-8"
+    )
     plan = {
         "decision": decision,
         "project": name,
-        "version": version,
-        "tag": f"v{version}",
+        "version": release_version,
+        "python_version": python_version,
+        "tag": f"v{release_version}",
+        "release_title": f"QBank {release_version}",
+        "prerelease": True,
         "branch": branch,
         "commit": commit,
         "head_tags": tags,
@@ -451,9 +548,9 @@ def prepare(root: Path, output: Path, skip_quality: bool, skip_build: bool) -> i
     }
     _write_json(output / "release-plan.json", plan)
     (output / "release-readiness.md").write_text(
-        _report(decision, version, checks), encoding="utf-8"
+        _report(decision, release_version, checks), encoding="utf-8"
     )
-    print(json.dumps({"decision": decision, "version": version, "output": str(output)}))
+    print(json.dumps({"decision": decision, "version": release_version, "output": str(output)}))
     return 0 if decision == "GREEN" else 3
 
 
@@ -463,10 +560,19 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--skip-quality-gates", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--lightweight-beta", action="store_true")
+    parser.add_argument("--reuse-unified", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
     output = args.output.resolve() if args.output else root / "build" / "release"
-    return prepare(root, output, args.skip_quality_gates, args.skip_build)
+    return prepare(
+        root,
+        output,
+        args.skip_quality_gates,
+        args.skip_build,
+        lightweight_beta=args.lightweight_beta,
+        reuse_unified=args.reuse_unified,
+    )
 
 
 if __name__ == "__main__":

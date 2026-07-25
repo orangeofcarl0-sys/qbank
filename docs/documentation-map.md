@@ -13,10 +13,13 @@
 | `docs/*/user-guide.md` | CLI 用户 | 完整日常工作流 | 数据与命令行为 |
 | `docs/*/cli-reference.md` | 自动化用户 | 公共命令清单与分组 | 命令新增、重命名、删除 |
 | `docs/*/desktop-editor.md` | Studio 用户 | 桌面操作与失败状态 | Studio 交互 |
+| `docs/*/installation.md` | 安装与部署用户 | 制品校验、安装、升级与卸载 | 版本、制品或安装行为 |
 | `docs/*/codex-integration.md` | Codex/MCP 用户 | Skill、MCP、授权和恢复 | manifest、Skill、MCP |
 | `docs/features/capability-matrix.md` | 集成维护者 | CLI、Studio、MCP 能力映射 | capability manifest 或入口 |
 | `docs/*/compatibility-policy.md` | 集成方 | 稳定接口、迁移和版本规则 | 公共契约 |
+| `docs/*/compatibility-0.3.0-beta.1.md` | beta 用户 | 当前软件、Protocol 与 Schema 矩阵 | 0.3 beta 冻结 |
 | `docs/*/known-limitations-0.2.0.md` | 部署者 | 冻结版本限制 | 0.2.x 限制澄清 |
+| `docs/*/known-limitations-0.3.0-beta.1.md` | beta 部署者 | unsigned beta 与运行边界 | beta 限制变化 |
 | `docs/localization.md` | 文档维护者 | 语言范围、编写与同步门禁 | 支持语言或本地化范围 |
 | `docs/architecture.md` | 维护者 | 分层、数据和事务边界 | 架构边界 |
 | `docs/monorepo-development.md` | 开发者 | Studio/CLI/MCP/Legacy 目录、三级检查与统一构建 | 仓库结构、版本或构建入口 |
