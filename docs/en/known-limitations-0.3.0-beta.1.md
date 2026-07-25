@@ -5,6 +5,10 @@
 - Windows Studio artifacts are not code-signed; SmartScreen may warn and SHA-256 verification is
   required.
 - Studio currently ships for Windows x64 and requires a usable Microsoft Edge WebView2 runtime.
+- The portable archive's text README retains legacy “alpha” wording. The executable, manifest,
+  artifact names, and Python package metadata correctly identify `0.3.0-beta.1`.
+- The current safe-preview policy may replace some declared local SVG files with a placeholder.
+  Asset mutation, capability checks, and browser-rendering smoke remain unaffected.
 - qbank targets ordinary local filesystems. Network shares, synchronized folders, and multi-host
   concurrent writes are outside its safety guarantee.
 - Pandoc, Ipe, and Git are optional external tools. DOCX, Ipe, or version-control capabilities

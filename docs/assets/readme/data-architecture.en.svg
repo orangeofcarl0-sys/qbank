@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">qbank unified repository and data architecture</title>
+  <desc id="desc">Tauri Studio, CLI, MCP, and Codex Skill use one application core for authoritative Markdown, logical assets, and history. SQLite, previews, papers, and exports are rebuildable projections. Qt Legacy is maintenance fallback only.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.panel{fill:#fff;stroke:#ccd4db;stroke-width:1.5}.soft{fill:#eef3f7;stroke:#c8d5df;stroke-width:1.5}.accent{fill:#e3eef6;stroke:#6f91ad;stroke-width:1.8}.authority{fill:#edf4ef;stroke:#779181;stroke-width:1.8}.derived{fill:#f1f3f5;stroke:#aeb8c1;stroke-width:1.5}.legacy{fill:none;stroke:#9ba6af;stroke-width:1.5;stroke-dasharray:6 5}.line{fill:none;stroke:#6f879b;stroke-width:2.2;marker-end:url(#arrow)}.dash{stroke-dasharray:7 6}.title{fill:#25313b;font:700 28px 'Segoe UI',sans-serif}.section{fill:#25313b;font:600 18px 'Segoe UI',sans-serif}.body{fill:#4e5d69;font:14px 'Segoe UI',sans-serif}.small{fill:#687784;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.panel{fill:#282f36;stroke:#45515b}.soft{fill:#25333f;stroke:#405565}.accent{fill:#294459;stroke:#78a4c7}.authority{fill:#293a31;stroke:#77a087}.derived{fill:#252c32;stroke:#4b5863}.legacy{stroke:#687581}.title,.section{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#9eabb6}.label{fill:#9cc3df}.line{stroke:#7f9bb1}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="700" rx="18"/>
+  <text class="title" x="48" y="54">One business core, multiple controlled interfaces</text>
+  <text class="body" x="48" y="82">Markdown and logical assets remain authoritative while desktop, automation, and AI workflows share validation and transaction semantics.</text>
+
+  <text class="label" x="48" y="126">INTERFACES</text>
+  <rect class="panel" x="48" y="144" width="270" height="384" rx="12"/>
+  <rect class="accent" x="70" y="170" width="226" height="66" rx="8"/>
+  <text class="section" x="88" y="197">QBank Studio</text><text class="small" x="88" y="220">Tauri → Protocol 1.0 → sidecar</text>
+  <rect class="soft" x="70" y="252" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="278">CLI</text><text class="small" x="88" y="299">Batch and deterministic automation</text>
+  <rect class="soft" x="70" y="326" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="352">MCP</text><text class="small" x="88" y="373">prepare → revision → commit</text>
+  <rect class="soft" x="70" y="400" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="426">Codex Skill</text><text class="small" x="88" y="447">Protocol, workflows, authorization</text>
+  <rect class="legacy" x="70" y="474" width="226" height="34" rx="7"/>
+  <text class="small" x="88" y="496">Qt Legacy · severe-maintenance fallback</text>
+
+  <text class="label" x="410" y="126">SHARED APPLICATION CORE</text>
+  <rect class="accent" x="410" y="144" width="330" height="384" rx="12"/>
+  <text class="section" x="438" y="181">qbank application services</text>
+  <rect class="panel" x="438" y="204" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="231">ProjectContext</text><text class="small" x="456" y="253">Path boundary, config, repository identity</text>
+  <rect class="panel" x="438" y="284" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="311">Repository snapshot</text><text class="small" x="456" y="333">Parse, duplicate IDs, damaged sources</text>
+  <rect class="panel" x="438" y="364" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="391">Rules and rendering</text><text class="small" x="456" y="413">Validation, query, assets, safe render</text>
+  <rect class="panel" x="438" y="444" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="471">Mutation transaction</text><text class="small" x="456" y="493">Dry-run, lock, rollback, history</text>
+
+  <text class="label" x="832" y="126">AUTHORITATIVE FILES</text>
+  <rect class="authority" x="832" y="144" width="320" height="384" rx="12"/>
+  <rect class="panel" x="856" y="170" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="197">questions/**/*.md</text><text class="small" x="875" y="219">Question, answer, solution, provenance</text>
+  <rect class="panel" x="856" y="250" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="277">assets/ + manifests</text><text class="small" x="875" y="299">Multi-representation, traceable assets</text>
+  <rect class="panel" x="856" y="330" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="357">Project definitions</text><text class="small" x="875" y="379">qbank · taxonomy · views · papers</text>
+  <rect class="panel" x="856" y="410" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="437">.qbank/history/</text><text class="small" x="875" y="459">One authority unit with each mutation</text>
+  <text class="small" x="856" y="502">Git-reviewable files; models generate Schemas.</text>
+
+  <path class="line" d="M318 336H398"/><path class="line" d="M740 336H820"/>
+  <text class="label" x="48" y="578">REBUILDABLE PROJECTIONS AND OUTPUTS</text>
+  <path class="line dash" d="M992 528V555H575"/>
+  <rect class="derived" x="48" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="68" y="625">SQLite FTS5</text><text class="small" x="68" y="649">Read-only query; rebuild when dirty</text>
+  <rect class="derived" x="318" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="338" y="625">Safe preview</text><text class="small" x="338" y="649">Markdown, offline MathJax, asset copies</text>
+  <rect class="derived" x="588" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="608" y="625">Papers</text><text class="small" x="608" y="649">Student, answer, and solution variants</text>
+  <rect class="derived" x="858" y="596" width="294" height="70" rx="9"/>
+  <text class="section" x="878" y="625">Export and exchange</text><text class="small" x="878" y="649">MD · HTML · JSON(L) · DOCX</text>
+</svg>

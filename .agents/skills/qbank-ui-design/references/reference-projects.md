@@ -1,23 +1,19 @@
 # Reference projects
 
-Use these projects for principles, not copied code or a pasted visual identity.
+Use reference products for principles, not copied code, assets, or visual identity.
 
-- Zotero: borrow stable library/navigation hierarchy, dense lists, and secondary
-  attachment metadata. Source is AGPL-3.0; do not copy implementation or assets.
-- PyQt-Fluent-Widgets Gallery: inspect component states, icon/action clarity, and
-  light/dark breadth. GPL-3.0 for non-commercial use/commercial license otherwise;
-  reference only unless separately approved.
-- Qlementine: inspect restrained Qt6 `QStyle` proportions and state coverage.
-  MIT, but the primary project requires CMake and Qt 6.8+; use only as an isolated
-  spike until a stable Python binding and packaging story are proven.
-- qt-material: compare broad QSS theming and theme switching. BSD-2-Clause and
-  PySide6-compatible, but its Material proportions and global stylesheet are too
-  intrusive for the document-editor baseline.
-- QtAwesome: preferred centralized icon-font adapter. MIT and compatible with
-  PySide6 through QtPy; record bundled font licenses in notices.
-- superqt: use only when a specific missing control is required. BSD-3-Clause,
-  PySide6-tested; do not add it speculatively.
+- Zotero: stable library hierarchy, dense item lists, and secondary attachment metadata. Reference
+  only; do not copy AGPL implementation or assets.
+- Visual Studio Code and Obsidian: source/editor density, restrained dark surfaces, visible focus,
+  and document-first workspace behavior. Reference interaction principles only.
+- PowerPoint: image-object affordances and explicit object actions. Do not copy ribbon density.
+- Tauri platform guidance: preserve native window and dialog behavior and keep frontend permissions
+  explicit.
+- Vditor and MathJax: use the pinned, bundled dependencies already present in Studio. Do not add a
+  second editor or remote renderer for visual convenience.
 
-Authoritative evaluation and source links live in
-`docs/ui/reference-evaluation.md`.
+Qt-specific libraries such as Qlementine, qt-material, PyQt-Fluent-Widgets, QtAwesome, and superqt
+are relevant only to QBank Studio Legacy. They must not be introduced into the Tauri frontend.
 
+The maintained evaluation history is in `docs/ui/reference-evaluation.md`; its Qt entries are
+Legacy context rather than modern dependency recommendations.

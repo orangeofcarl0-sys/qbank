@@ -4,6 +4,10 @@
 
 - Windows Studio 制品尚未代码签名，SmartScreen 可能警告；必须核对 SHA-256。
 - Studio 当前提供 Windows x64 安装器和便携包，需要可用的 Microsoft Edge WebView2。
+- 便携包内的纯文本 README 仍保留旧的 “alpha” 用语；可执行文件、manifest、制品名称和
+  Python 包元数据均正确标识为 `0.3.0-beta.1`。
+- 当前安全预览策略可能以占位图替换部分已声明的本地 SVG；资产写入、能力判断和浏览器渲染
+  smoke 不受影响。
 - qbank 面向本机常规文件系统；网络盘、同步目录和多机共享写入不在安全承诺内。
 - Pandoc、Ipe 和 Git 属于可选外部工具；缺失时对应 DOCX、Ipe 或版本控制能力降级。
 - HTTP/HTTPS 图片允许但始终产生 warning，不会被 Studio 自动下载。

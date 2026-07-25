@@ -15,6 +15,7 @@ test("capture deterministic light, dark, asset and formula states", async ({ pag
   await page.getByRole("option", { name: /Round-trip/ }).click();
   await expect(page.frameLocator("#secure-preview").locator("mjx-container").first()).toBeVisible();
   await expect(page.locator(".asset-card")).toBeVisible();
+  await expect(page.locator("#preview-progress")).toBeHidden();
 
   await page.screenshot({ path: resolve(screenshots, "studio-light.png"), fullPage: true });
   await page.locator("#advanced-filters").evaluate((element: HTMLDetailsElement) => {
@@ -32,10 +33,12 @@ test("capture deterministic light, dark, asset and formula states", async ({ pag
   });
   await page.locator("#theme-toggle").click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("#preview-progress")).toBeHidden();
   await page.screenshot({ path: resolve(screenshots, "studio-dark.png"), fullPage: true });
 
   await page.locator(".asset-menu-button").first().click();
   await expect(page.locator(".asset-menu").first()).toBeVisible();
+  await expect(page.locator("#preview-progress")).toBeHidden();
   await page.screenshot({ path: resolve(screenshots, "studio-asset-menu.png"), fullPage: true });
 
   await page.locator("#document-title").click();

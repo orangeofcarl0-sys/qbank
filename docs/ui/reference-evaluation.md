@@ -1,8 +1,12 @@
-# qbank Studio reference evaluation
+# QBank Studio Legacy reference evaluation
 
 Assessment date: 2026-07-21. The evaluation uses project documentation and
 upstream repositories as interaction references only; no external source or
 visual assets are copied into qbank.
+
+This record predates the Tauri Studio becoming the default desktop entry. Its
+Qt/PySide6 dependency decisions now apply only to QBank Studio Legacy. The
+current Tauri design authority is [design-system.md](design-system.md).
 
 | Project | Useful reference | Fit for qbank | License | Qt/PySide6 constraints | Intrusiveness | Production dependency |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -37,8 +41,9 @@ pre-release candidate in the evaluated ecosystem. That adds binary-wheel and
 Windows packaging uncertainty without replacing the need for web-surface tokens.
 No binding is introduced into the production application.
 
-## Final decision
+## Legacy decision
 
 Select A. It has the lowest licensing, packaging, startup, accessibility, and
 maintenance risk while meeting the required visual consistency. Add QtAwesome only;
-defer superqt, qt-material, Qlementine, and QFluentWidgets.
+defer superqt, qt-material, Qlementine, and QFluentWidgets. This decision does
+not authorize those dependencies in the modern Tauri frontend.

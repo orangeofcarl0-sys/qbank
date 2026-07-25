@@ -17,7 +17,7 @@ documented 0.2.0 command names. Each command's `--help`, the
 | `qbank schema` | Emit Question, Paper, Patch, or Asset Schemas |
 | `qbank index rebuild` | Atomically rebuild the SQLite search projection |
 | `qbank preview` | Build static preview; `--serve` is interactive only |
-| `qbank desktop` | Start the optional Studio desktop editor |
+| `qbank desktop` | Start QBank Studio Legacy; use the installer or portable package for modern Tauri Studio |
 
 ## Questions and retrieval
 

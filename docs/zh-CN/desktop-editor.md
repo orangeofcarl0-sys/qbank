@@ -1,103 +1,120 @@
-# qbank Studio 桌面编辑器
+# QBank Studio 桌面编辑器
 
 [English](../en/desktop-editor.md) · [中文文档](README.md)
 
-## 范围与安装
+## 产品边界
 
-QBank Studio 是同一 qbank 仓库中 `apps/studio/` 下的现代 Tauri presentation adapter，
-可独立打包和安装，但不是另一套题库实现。Markdown 仍是权威数据，SQLite 仍可重建；题目、
-taxonomy、试卷和资产写入通过 `qbank.studio_sidecar` 调用与 CLI、MCP 相同的类型化服务、
-事务、校验、历史和项目锁。
+QBank Studio 是 qbank 的默认桌面入口，也是 `apps/studio/` 下的现代 Tauri presentation
+adapter。它通过 Studio Protocol `1.0` 与本地 `qbank.studio_sidecar` 通信，并复用 CLI 和
+MCP 所使用的应用服务、项目锁、事务、校验、历史与索引策略。Markdown 题目和逻辑资产仍是
+权威数据；Studio 不维护另一套题库格式。
+
+当前预发布界面版本为 `0.3.0-beta.1`，Python 包版本为 `0.3.0b1`，Question、Asset 和
+Paper Schema 均为 `1.0`。Windows 安装器尚未代码签名，运行前应按照
+[安装与升级指南](installation.md)核对 Release 中的 SHA-256。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/readme/studio-main-dark.png">
+  <img src="../assets/readme/studio-main-light.png" alt="现代 Tauri QBank Studio：左侧导航、中央 Markdown 与公式预览、右侧 Inspector" width="1480">
+</picture>
+
+上图来自公开合成 fixture，不包含真实考试内容、用户数据或本机绝对路径。
+
+## 工作区结构
+
+Studio 使用稳定的三区域文档编辑布局：
+
+- 顶栏显示产品版本、当前题库身份、仓库健康状态和主题切换；
+- 左侧导航提供打开题库、新建、复制、导入、删除、保存视图、搜索、筛选、标签和题目列表；
+- 中央工作区包含文档操作栏、题目身份、校验状态，以及源码、分栏和即时渲染三种编辑模式；
+- 右侧 Inspector 编辑基础属性，并显示逻辑资产与最近历史；窗口较窄时 Inspector 自动隐藏，
+  以保证编辑区可用宽度。
+
+题库路径用于确认当前工作位置，界面会在空间不足时截断显示。README 截图使用
+`fixture://synthetic-bank`，不展示维护者或用户的本地目录。
+
+打开题目与批量选择是两个独立状态。打开题目不会自动加入批量操作；批量选择必须通过题目行
+复选框明确完成。当前题目即使不属于筛选结果，也会保持打开，避免打断尚未保存的编辑。
+
+## 编辑、校验与保存
+
+中央编辑器以 Markdown/TeX 源码为权威缓冲区。Vditor、MathJax 和预览资源随应用打包，
+源码、分栏和即时渲染模式均可离线使用。原始 HTML 继续禁用；预览位于隔离 frame 中，不会
+反向改写 Markdown。
+
+dirty 状态、保存按钮、源码快照、Inspector 和预览 generation 保持同步。保存和属性更新由
+sidecar 先生成 dry-run，再执行同一权威事务。提交成功后运行校验与索引同步；索引失败不会
+回滚已提交的 Markdown 和历史，而会标记索引 dirty，并要求执行：
+
+```powershell
+qbank index rebuild --format json
+```
+
+多文件权威操作失败时回滚已暂存变化。补偿失败作为附加诊断报告，不遮蔽原始提交错误。
+
+## 搜索、筛选与保存视图
+
+搜索读取可重建的 SQLite 索引，并使用 generation token 防止旧结果覆盖新输入。保存视图是
+可编辑的可见筛选快照，不会在控制器中叠加隐藏条件。字段分面、包含或排除标签、AND/OR
+模式和筛选芯片共同描述当前结果；清除操作一次性恢复“全部题目”。
+
+“需要重绘”和“当前试卷”等特殊视图只定义成员范围，仍可与可见筛选组合。筛选芯片在紧凑
+导航栏中自动换行，所有条件均可逐项移除。
+
+## 逻辑资产
+
+资产卡片显示首选表示、状态、缩略图和能力菜单。菜单固定呈现以下操作，并根据资产的真实
+能力启用或禁用：
+
+1. 打开原图；
+2. 使用 Ipe 编辑；
+3. 检测修改并重新渲染；
+4. 替换为本地文件；
+5. 从剪贴板替换；
+6. 重新渲染；
+7. 在资源管理器中显示。
+
+![深色模式下的逻辑资产能力菜单](../assets/readme/studio-assets-dark.png)
+
+本地资源只有在位于题库 assets 边界内且实际存在时才会加载。HTTP/HTTPS 资源保持只读并
+产生 warning；绝对路径、非法 URI 和越界路径不会被读取。Ipe 编辑采用版本化工作副本，
+源表示变化后派生渲染会标记为 stale，重新渲染必须显式执行。
+
+拖到现有图片上会请求替换；拖到允许插入的编辑区域会创建逻辑资产并写入稳定引用。未保存
+源码遇到资产操作时，Studio 要求保存、放弃或取消；只有保存成功或明确放弃后才继续。
+
+## 主题与可访问性
+
+浅色和深色主题由 Tauri 前端的同一组语义 CSS token 驱动，并同步覆盖导航、Vditor、隔离
+预览、Inspector、菜单、状态和对话框。预览在深色主题中保留浅色纸张表面，以维持公式和
+文档内容的稳定对比度。
+
+按钮、菜单和表单提供可访问名称、键盘焦点、tooltip 和明确禁用状态。视觉验收以当前 Tauri
+组件为准，在 100% 与 125% 缩放下检查两种主题；Qt Legacy 截图不得用作当前 Studio 的
+README 或功能证据。详细规则见 [Studio 设计系统](../ui/design-system.md)。
+
+## QBank Studio Legacy
+
+`qbank desktop` 启动保留的 Qt 客户端 QBank Studio Legacy：
+
+```powershell
+pip install "qbank[desktop]"
+qbank desktop
+```
+
+Legacy 与现代 Studio 读取同一题库格式，但只接受数据丢失、安全或严重兼容性修复。它不是
+默认桌面入口，也不代表现代 Studio 的界面和交互。两者之间不需要题库迁移。
+
+## 开发与验收
 
 ```powershell
 python scripts/check.py fast --scope studio
 Set-Location apps\studio
 npm ci
 npm run tauri dev
+npm run test:browser
 ```
 
-正式使用应选择同一提交生成的 Windows 安装器或便携包。Studio Protocol 保持 `1.0`；
-Python 包版本为 `0.3.0b1`，界面对外显示 `0.3.0-beta.1`，数据 Schema 仍为 `1.0`。
-本 beta 尚未代码签名，SmartScreen 可能警告；运行前必须按
-[安装与升级指南](installation.md)核对 Release 中的 SHA-256。
-
-## QBank Studio Legacy
-
-原 Qt 客户端已更名为 QBank Studio Legacy，并继续通过以下命令启动：
-
-```powershell
-pip install -e ".[desktop]"
-qbank desktop
-```
-
-Legacy 只接受数据损坏、安全或严重兼容性修复。它与现代 Studio 使用相同题库格式、锁、
-事务、历史和索引，不要求也不执行不可逆题库迁移。Windows 运行 Legacy 时建议使用标准
-CPython，避免其他 Python 发行版附带的 Qt DLL 与 PySide6 冲突。
-
-## 窗口与编辑模型
-
-窗口采用两栏半布局：
-
-- 左侧导航包含保存视图、搜索、可见筛选芯片、字段分面、包含/排除标签和题目列表；
-- 中部包含 Markdown 或 TeX 源码与实时预览；
-- 可折叠的右侧 Inspector 包含属性、资产、来源和历史。
-
-紧凑工具栏显示项目健康度、试卷上下文、保存与历史、源码/预览/分栏、语法和设置。完整项目
-路径可选择隐藏。主题、默认工作区、Inspector 初始状态和路径显示只影响展示，不改变题目。
-
-打开题目不等于选择批量操作对象。选择必须显式进行，并在批量标签操作旁汇总。创建、复制、
-导入和删除题目都会先 dry-run，再执行权威事务。来源类型与引用同 Markdown、待确认 taxonomy
-和单一历史事件一起提交。
-
-保存视图是可编辑快照，不是隐藏约束。全部有效条件保持可见；修改后显示已修改，并可恢复
-原始快照。筛选芯片在窄导航栏内换行。若当前题目不在筛选结果中，Studio 保留编辑器并提示，
-不会丢弃未保存工作。
-
-搜索经过防抖，并在线程外读取可重建 SQLite 投影；generation token 防止旧结果覆盖新输入。
-试卷上下文必须显式选择，启动时不会暗中选取第一个 YAML。
-
-## 保存与失败行为
-
-dirty 状态、标题标记、Inspector、源码快照和预览 generation 保持同步。若源码未保存时发起
-资产操作，会显示原生“保存 / 放弃 / 取消”：保存成功才继续；放弃恢复权威快照；取消零写入。
-
-权威提交先于索引同步。索引失败时 Markdown 与历史保持成功，索引标记为 dirty，并要求
-`qbank index rebuild`。多文件权威操作失败会回滚暂存变化；补偿失败会附加报告，但不遮蔽
-原始错误。
-
-## 资产与预览
-
-Vditor、MathJax 资源与现代 Studio 应用一起打包，可离线编辑和渲染；预览只读，Markdown
-原始 HTML 继续禁用。
-
-新图片绑定在 Markdown 中使用 `qbank-asset:<asset-id>`，在 TeX 中使用
-`\qbankasset{<asset-id>}`。本地缩略图只有通过 containment 和存在性检查后才能加载。外部
-HTTP/HTTPS 资源只读并警告；非法、绝对或越界路径绝不读取。按钮由真实资产能力决定，普通
-PNG 不会显示可执行的 Ipe 编辑操作。
-
-选中资产支持时，图片菜单提供八项稳定操作：
-
-1. 使用 Ipe 编辑；
-2. 从本地文件替换；
-3. 从剪贴板替换；
-4. 打开原始参考；
-5. 重新渲染；
-6. 设置首选表示；
-7. 在文件管理器中显示；
-8. 恢复旧版本。
-
-拖到现有图片上请求替换；拖到符合条件的空白预览区会创建资产并插入稳定引用。Ipe 编辑使用
-版本化工作副本；源变化会使派生渲染 stale，重新渲染和设为 `final` 都必须显式执行。恢复只
-移动首选指针，不删除表示或历史。
-
-## 主题与可访问性
-
-浅色和深色主题通过语义 token 统一 Qt、CodeMirror、预览、对话框和 Inspector 卡片。原生
-字体使用有效的可缩放 point size。控件提供 accessible name、完整 tooltip、可见键盘焦点和
-稳定禁用状态。视觉变更按 [Studio 设计系统](../ui/design-system.md)在两种主题、100% 和 125%
-缩放下验收。
-
-## 当前边界
-
-Studio 不内嵌聊天、OCR、在线考试系统或模型 SDK。编辑器、浏览器和文件打开均需用户直接
-触发，不得由无人值守自动化启动。冻结版本边界见[已知限制](known-limitations-0.2.0.md)。
+README 截图由浏览器验收中的生产组件和公开合成 fixture 确定性生成；真实安装器仍需进行
+最小启动与题库打开 smoke。Studio 当前不提供内嵌聊天、OCR、在线考试系统或模型 SDK。
+版本与平台限制见 [0.3.0-beta.1 已知限制](known-limitations-0.3.0-beta.1.md)。

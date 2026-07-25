@@ -1,59 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
-  <title id="title">qbank 数据架构</title>
-  <desc id="desc">Markdown、项目配置和逻辑资产是权威数据；应用服务通过事务提交历史，并生成可重建的 SQLite、预览、试卷和导出产物。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">qbank 统一仓库与数据架构</title>
+  <desc id="desc">Tauri Studio、CLI、MCP 和 Codex Skill 通过同一应用核心访问 Markdown、逻辑资产和历史；SQLite、预览、试卷与导出是可重建投影。Qt Legacy 仅为维护回退。</desc>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6686a3"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="context-stroke"/>
     </marker>
     <style>
-      .canvas{fill:#f7f6f2}.panel{fill:#ffffff;stroke:#c7d0d8;stroke-width:2}.core{fill:#e8f0f7;stroke:#6f91af;stroke-width:2}.derived{fill:#f2f4f6;stroke:#aeb9c3;stroke-width:2}.history{fill:#edf5ef;stroke:#71927b;stroke-width:2}.title{fill:#26323c;font:700 28px 'Segoe UI',sans-serif}.heading{fill:#26323c;font:600 20px 'Segoe UI',sans-serif}.body{fill:#52616e;font:15px 'Segoe UI',sans-serif}.small{fill:#687784;font:13px 'Segoe UI',sans-serif}.arrow{stroke:#6686a3;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:8 7}
-      @media (prefers-color-scheme:dark){.canvas{fill:#20252b}.panel{fill:#292f36;stroke:#46515c}.core{fill:#263c50;stroke:#6f91af}.derived{fill:#252b31;stroke:#53606c}.history{fill:#27382d;stroke:#71927b}.title,.heading{fill:#eef2f5}.body{fill:#c4cdd5}.small{fill:#aab5bf}}
+      .bg{fill:#f6f7f5}.panel{fill:#fff;stroke:#ccd4db;stroke-width:1.5}.soft{fill:#eef3f7;stroke:#c8d5df;stroke-width:1.5}.accent{fill:#e3eef6;stroke:#6f91ad;stroke-width:1.8}.authority{fill:#edf4ef;stroke:#779181;stroke-width:1.8}.derived{fill:#f1f3f5;stroke:#aeb8c1;stroke-width:1.5}.legacy{fill:none;stroke:#9ba6af;stroke-width:1.5;stroke-dasharray:6 5}.line{fill:none;stroke:#6f879b;stroke-width:2.2;marker-end:url(#arrow)}.dash{stroke-dasharray:7 6}.title{fill:#25313b;font:700 28px 'Segoe UI',sans-serif}.section{fill:#25313b;font:600 18px 'Segoe UI',sans-serif}.body{fill:#4e5d69;font:14px 'Segoe UI',sans-serif}.small{fill:#687784;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.panel{fill:#282f36;stroke:#45515b}.soft{fill:#25333f;stroke:#405565}.accent{fill:#294459;stroke:#78a4c7}.authority{fill:#293a31;stroke:#77a087}.derived{fill:#252c32;stroke:#4b5863}.legacy{stroke:#687581}.title,.section{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#9eabb6}.label{fill:#9cc3df}.line{stroke:#7f9bb1}}
     </style>
   </defs>
-  <rect class="canvas" width="1200" height="620" rx="18"/>
-  <text class="title" x="60" y="62">权威文件与可重建投影</text>
-  <text class="body" x="60" y="91">所有入口共享同一应用服务；权威内容不会由索引或导出产物反向覆盖。</text>
+  <rect class="bg" width="1200" height="700" rx="18"/>
+  <text class="title" x="48" y="54">一个业务核心，多种受控入口</text>
+  <text class="body" x="48" y="82">Markdown 与逻辑资产保持权威；界面、自动化与 AI 协作共享同一校验和事务语义。</text>
 
-  <rect class="panel" x="55" y="130" width="310" height="400" rx="12"/>
-  <text class="heading" x="82" y="170">权威数据</text>
-  <rect class="core" x="82" y="195" width="256" height="70" rx="8"/>
-  <text class="heading" x="102" y="225">questions/</text>
-  <text class="small" x="102" y="250">结构化 Markdown 题目</text>
-  <rect class="core" x="82" y="282" width="256" height="70" rx="8"/>
-  <text class="heading" x="102" y="312">assets/</text>
-  <text class="small" x="102" y="337">文件与逻辑资产 manifest</text>
-  <rect class="core" x="82" y="369" width="256" height="70" rx="8"/>
-  <text class="heading" x="102" y="399">qbank.yaml</text>
-  <text class="small" x="102" y="424">路径、默认值与功能配置</text>
-  <text class="small" x="82" y="476">taxonomy.yaml · views.yaml · papers/</text>
-  <text class="small" x="82" y="501">均为普通文件，可由 Git 审查</text>
+  <text class="label" x="48" y="126">交互与自动化入口</text>
+  <rect class="panel" x="48" y="144" width="270" height="384" rx="12"/>
+  <rect class="accent" x="70" y="170" width="226" height="66" rx="8"/>
+  <text class="section" x="88" y="197">QBank Studio</text>
+  <text class="small" x="88" y="220">Tauri → Protocol 1.0 → sidecar</text>
+  <rect class="soft" x="70" y="252" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="278">CLI</text>
+  <text class="small" x="88" y="299">批处理与确定性自动化</text>
+  <rect class="soft" x="70" y="326" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="352">MCP</text>
+  <text class="small" x="88" y="373">prepare → revision → commit</text>
+  <rect class="soft" x="70" y="400" width="226" height="58" rx="8"/>
+  <text class="section" x="88" y="426">Codex Skill</text>
+  <text class="small" x="88" y="447">协议、工作流与授权边界</text>
+  <rect class="legacy" x="70" y="474" width="226" height="34" rx="7"/>
+  <text class="small" x="88" y="496">Qt Legacy · 严重问题维护回退</text>
 
-  <rect class="panel" x="445" y="177" width="310" height="300" rx="12"/>
-  <text class="heading" x="475" y="218">应用服务与事务</text>
-  <text class="body" x="475" y="255">CLI · Studio · Codex Skill</text>
-  <path class="arrow" d="M 478 276 H 716"/>
-  <text class="body" x="475" y="310">解析 → 校验 → 计划 → 提交</text>
-  <rect class="history" x="475" y="344" width="250" height="82" rx="8"/>
-  <text class="heading" x="495" y="376">.qbank/history/</text>
-  <text class="small" x="495" y="402">与 Markdown 同步提交</text>
+  <text class="label" x="410" y="126">共享应用核心</text>
+  <rect class="accent" x="410" y="144" width="330" height="384" rx="12"/>
+  <text class="section" x="438" y="181">qbank application services</text>
+  <rect class="panel" x="438" y="204" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="231">ProjectContext</text>
+  <text class="small" x="456" y="253">路径边界、配置与仓库身份</text>
+  <rect class="panel" x="438" y="284" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="311">Repository snapshot</text>
+  <text class="small" x="456" y="333">解析、重复 ID 与损坏源诊断</text>
+  <rect class="panel" x="438" y="364" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="391">Rules and rendering</text>
+  <text class="small" x="456" y="413">校验、查询、资源与安全渲染</text>
+  <rect class="panel" x="438" y="444" width="274" height="64" rx="8"/>
+  <text class="section" x="456" y="471">Mutation transaction</text>
+  <text class="small" x="456" y="493">dry-run、项目锁、回滚与历史</text>
 
-  <rect class="panel" x="835" y="130" width="310" height="400" rx="12"/>
-  <text class="heading" x="862" y="170">派生产物</text>
-  <rect class="derived" x="862" y="195" width="256" height="62" rx="8"/>
-  <text class="heading" x="882" y="224">SQLite FTS5</text>
-  <text class="small" x="882" y="246">可删除并显式重建</text>
-  <rect class="derived" x="862" y="275" width="256" height="62" rx="8"/>
-  <text class="heading" x="882" y="304">静态预览</text>
-  <text class="small" x="882" y="326">HTML、MathJax 与资源副本</text>
-  <rect class="derived" x="862" y="355" width="256" height="62" rx="8"/>
-  <text class="heading" x="882" y="384">试卷产物</text>
-  <text class="small" x="882" y="406">学生版、答案版、解析版</text>
-  <rect class="derived" x="862" y="435" width="256" height="62" rx="8"/>
-  <text class="heading" x="882" y="464">导出文件</text>
-  <text class="small" x="882" y="486">MD · HTML · JSONL · DOCX</text>
+  <text class="label" x="832" y="126">权威文件</text>
+  <rect class="authority" x="832" y="144" width="320" height="384" rx="12"/>
+  <rect class="panel" x="856" y="170" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="197">questions/**/*.md</text>
+  <text class="small" x="875" y="219">题目、答案、解析与来源</text>
+  <rect class="panel" x="856" y="250" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="277">assets/ + manifests</text>
+  <text class="small" x="875" y="299">多表示资产与可追溯来源</text>
+  <rect class="panel" x="856" y="330" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="357">项目定义</text>
+  <text class="small" x="875" y="379">qbank · taxonomy · views · papers</text>
+  <rect class="panel" x="856" y="410" width="272" height="64" rx="8"/>
+  <text class="section" x="875" y="437">.qbank/history/</text>
+  <text class="small" x="875" y="459">与权威变更组成同一提交单元</text>
+  <text class="small" x="856" y="502">普通文件可由 Git 审查；Schema 由模型生成。</text>
 
-  <path class="arrow" d="M 365 330 H 435"/>
-  <path class="arrow" d="M 755 330 H 825"/>
-  <path class="arrow dash" d="M 835 555 H 600 V 487"/>
-  <text class="small" x="700" y="579">索引异常只产生 warning 与 dirty marker，不回滚权威文件</text>
+  <path class="line" d="M318 336H398"/>
+  <path class="line" d="M740 336H820"/>
+
+  <text class="label" x="48" y="578">可重建投影与产物</text>
+  <path class="line dash" d="M992 528V555H575"/>
+  <rect class="derived" x="48" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="68" y="625">SQLite FTS5</text>
+  <text class="small" x="68" y="649">只读查询；dirty 后显式重建</text>
+  <rect class="derived" x="318" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="338" y="625">安全预览</text>
+  <text class="small" x="338" y="649">Markdown、离线 MathJax、资源副本</text>
+  <rect class="derived" x="588" y="596" width="250" height="70" rx="9"/>
+  <text class="section" x="608" y="625">试卷</text>
+  <text class="small" x="608" y="649">学生版、答案版与解析版</text>
+  <rect class="derived" x="858" y="596" width="294" height="70" rx="9"/>
+  <text class="section" x="878" y="625">导出与交换</text>
+  <text class="small" x="878" y="649">MD · HTML · JSON(L) · DOCX</text>
 </svg>

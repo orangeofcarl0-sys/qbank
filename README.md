@@ -15,10 +15,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
-  <img src="docs/assets/readme/studio-main-light.png" alt="qbank Studio 主界面：左侧题库导航，中部 Markdown 编辑与实时预览，右侧题目详情" width="1680">
+  <img src="docs/assets/readme/studio-main-light.png" alt="QBank Studio 现代 Tauri 主界面：题库导航、Markdown 源码、公式预览和题目详情" width="1480">
 </picture>
 
-<p align="center"><sub>Studio 使用公开合成题目展示题库导航、源码编辑、实时预览和结构化属性。</sub></p>
+<p align="center"><sub>当前 Tauri Studio 使用公开合成 fixture 展示源码、离线公式预览、结构化属性与逻辑资产；截图不包含真实题目或本机路径。</sub></p>
 
 | 使用入口 | 适用场景 | 启动方式 |
 | --- | --- | --- |
@@ -48,28 +48,20 @@ qbank 面向希望将题目长期保存在普通文件中，同时让桌面编�
 ## QBank Studio 桌面编辑器
 
 QBank Studio 是位于同一仓库 `apps/studio/` 的现代 Tauri presentation adapter，可独立
-打包和安装，但不维护第二份题库实现。界面采用紧凑的
-两栏半布局：左侧用于题库导航与筛选，中部用于 Markdown/TeX 源码和实时预览，右侧用于
-题目属性、资源、来源和历史记录。
+打包和安装，但不维护第二份题库实现。左侧导航组织题目、保存视图、筛选与批量选择；中央
+工作区在源码、分栏和即时渲染模式之间切换；右侧 Inspector 编辑属性并呈现资产与历史。
+Vditor、MathJax 和预览所需资源随应用打包，可离线完成 Markdown/TeX 编辑与公式渲染。
 
 图片按文档对象处理。可用操作由资源类型和实际表示决定；本地文件必须通过题库边界校验，
 外部资源保持只读并显示警告。Studio 保存仍执行与 CLI 相同的 dry-run、提交、校验和索引同步。
 
 ![Studio 深色模式下的资源与题目详情](docs/assets/readme/studio-assets-dark.png)
 
-<p align="center"><sub>深色模式保持编辑器、预览和详情面板的一致语义，并显示资源能力与状态。</sub></p>
-
-开发环境启动现代 Studio：
-
-```powershell
-python scripts/check.py fast --scope studio
-Set-Location apps\studio
-npm ci
-npm run tauri dev
-```
+<p align="center"><sub>深色模式下的逻辑资产菜单按实际能力启用操作；不可用操作保持可见并明确禁用。</sub></p>
 
 Qt 客户端已明确更名为 QBank Studio Legacy，并继续通过 `qbank desktop` 启动；两者共享
-相同题库格式、锁、事务、历史和索引，不执行不可逆迁移。完整交互说明见
+相同题库格式、锁、事务、历史和索引，不执行不可逆迁移。Legacy 是维护回退，不代表当前
+Studio 的界面、截图或默认工作流。完整交互说明见
 [Studio 用户文档](docs/zh-CN/desktop-editor.md)，统一构建方式见
 [单仓库开发指南](docs/monorepo-development.md)，视觉规范见
 [Studio 设计系统](docs/ui/design-system.md)。

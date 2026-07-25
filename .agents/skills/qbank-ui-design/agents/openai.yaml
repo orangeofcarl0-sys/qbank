@@ -1,4 +1,4 @@
 interface:
   display_name: "qbank UI Design"
-  short_description: "Design and review qbank Studio desktop UI"
-  default_prompt: "Use $qbank-ui-design to modernize or review the qbank Studio interface."
+  short_description: "Design and review the modern Tauri QBank Studio UI"
+  default_prompt: "Use $qbank-ui-design to design or review the modern Tauri QBank Studio interface; treat Qt as Legacy."

@@ -1,23 +1,22 @@
 # Component states
 
-Every reusable component must define and visually review these states where
-applicable:
+Every reusable modern Studio component defines and visually reviews these states where applicable:
 
 | State | Requirement |
 | --- | --- |
-| Rest | Primary/secondary hierarchy remains readable. |
-| Hover | Subtle surface or border change; no layout shift. |
+| Rest | Primary and secondary hierarchy remains readable. |
+| Hover | Subtle surface or border change without layout shift. |
 | Focus | High-contrast focus ring independent of hover. |
-| Selected | Accent-tinted surface plus readable text. |
-| Disabled | Lower emphasis while retaining legibility; no pointer affordance. |
-| Loading | Current object identity remains visible; actions are disabled. |
+| Selected | Accent-tinted surface plus readable text or a second non-color cue. |
+| Disabled | Lower emphasis while retaining legibility and an unavailable explanation. |
+| Loading | Current object identity remains visible and conflicting actions are disabled. |
 | Empty | Explain what is empty and the next useful action. |
 | Error | Semantic red, concise cause, and recovery path. |
 | Warning | Semantic amber without resembling selection. |
-| Success | Semantic green used sparingly for confirmed outcomes. |
+| Success | Semantic green used only for confirmed outcomes. |
 
-Review the following composites in both themes: toolbar, saved view, question
-row, search and clear action, tabs/drawer, status badge, image object, native
-context menu, native dialog, CodeMirror focus/selection, preview loading/error,
-and Markdown/MathJax content.
+Review title bar, navigation, saved views, filter chips, question rows, batch selection, document
+toolbar, Vditor focus and selection, secure preview, Inspector forms, asset cards and menu, formula
+menu, platform dialogs, toasts, and loading/error states in both themes.
 
+Qt widget composites are reviewed separately only for explicitly scoped QBank Studio Legacy work.

@@ -25,12 +25,18 @@ DOCUMENTS = (
     ROOT / "docs" / "compatibility-0.2.0.md",
     ROOT / "docs" / "known-limitations-0.2.0.md",
 )
-README_IMAGES = (
+README_PNGS = (
     ROOT / "docs" / "assets" / "readme" / "studio-main-light.png",
     ROOT / "docs" / "assets" / "readme" / "studio-main-dark.png",
     ROOT / "docs" / "assets" / "readme" / "studio-assets-dark.png",
+)
+README_ZH_SVGS = (
     ROOT / "docs" / "assets" / "readme" / "data-architecture.svg",
     ROOT / "docs" / "assets" / "readme" / "safe-workflow.svg",
+)
+README_EN_SVGS = (
+    ROOT / "docs" / "assets" / "readme" / "data-architecture.en.svg",
+    ROOT / "docs" / "assets" / "readme" / "safe-workflow.en.svg",
 )
 MARKDOWN_TARGET = re.compile(r"!?(?:\[[^]]*\])\(([^)]+)\)")
 HTML_TARGET = re.compile(r'(?:src|srcset)="([^"]+)"')
@@ -50,19 +56,23 @@ def test_documentation_local_targets_exist() -> None:
 
 def test_readme_visual_assets_are_accessible_and_bounded() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     assert "<picture>" in readme
     assert "prefers-color-scheme: dark" in readme
-    for image in README_IMAGES:
+    for image in (*README_PNGS, *README_ZH_SVGS, *README_EN_SVGS):
         assert image.is_file()
         assert image.stat().st_size < 800_000
+    for image in (*README_PNGS, *README_ZH_SVGS):
         assert image.name in readme
+    for image in (*README_PNGS, *README_EN_SVGS):
+        assert image.name in readme_en
 
-    for png in (path for path in README_IMAGES if path.suffix == ".png"):
+    for png in README_PNGS:
         width, height = _png_dimensions(png)
-        assert width >= 1600
-        assert height >= 900
+        assert width >= 1400
+        assert height >= 850
 
-    for svg in (path for path in README_IMAGES if path.suffix == ".svg"):
+    for svg in (*README_ZH_SVGS, *README_EN_SVGS):
         root = ElementTree.parse(svg).getroot()
         namespace = {"svg": "http://www.w3.org/2000/svg"}
         assert root.find("svg:title", namespace) is not None
@@ -75,7 +85,18 @@ def test_readme_does_not_present_unimplemented_mcp_command() -> None:
     assert "ZJU841" not in readme
 
 
-def test_capture_script_exposes_deterministic_asset_state() -> None:
+def test_modern_readme_capture_uses_tauri_fixture_and_legacy_script_is_labeled() -> None:
+    capture_spec = (
+        ROOT / "apps" / "studio" / "tests" / "browser" / "visual-acceptance.spec.ts"
+    ).read_text(encoding="utf-8")
+    for expected in (
+        "/?fixture=1",
+        "studio-light.png",
+        "studio-dark.png",
+        "studio-asset-menu.png",
+    ):
+        assert expected in capture_spec
+
     completed = subprocess.run(
         [sys.executable, "scripts/capture-ui.py", "--help"],
         cwd=ROOT,
@@ -83,7 +104,7 @@ def test_capture_script_exposes_deterministic_asset_state() -> None:
         capture_output=True,
         text=True,
     )
-    assert "assets" in completed.stdout
+    assert "Legacy" in completed.stdout
     assert "--scale {1,1.25}" in completed.stdout
 
 

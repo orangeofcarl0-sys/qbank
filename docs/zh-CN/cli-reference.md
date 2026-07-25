@@ -16,7 +16,7 @@
 | `qbank schema` | 输出 Question、Paper、Patch 或 Asset Schema |
 | `qbank index rebuild` | 原子重建 SQLite 搜索投影 |
 | `qbank preview` | 构建静态预览；`--serve` 仅供交互使用 |
-| `qbank desktop` | 启动可选 Studio 桌面编辑器 |
+| `qbank desktop` | 启动 QBank Studio Legacy；现代 Tauri Studio 使用安装器或便携包 |
 
 ## 题目与检索
 

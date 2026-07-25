@@ -35,10 +35,12 @@
 | MCP 能力 | MCP 注册表与 capability manifest | capability matrix、Codex 文档 |
 | Codex 工作流 | `codex_manifest.py` 和包内 Skill 资源 | 仓库 Skill、初始化产物 |
 | 数据格式 | Pydantic 模型生成的 JSON Schema | 根 `schemas/`、用户文档 |
-| Studio 交互 | 应用服务契约与 Studio 文档 | README 截图、设计系统 |
+| Studio 交互 | `apps/studio/` 生产组件、应用服务契约与 Studio 文档 | Tauri fixture 截图、设计系统 |
 | 版本历史 | `CHANGELOG.md` | Release notes |
 
 镜像必须由生成器产生或接受逐字节一致性测试；不得长期维护未校验的第二份规则。
+现代 Studio 的公开截图只使用 Tauri 生产组件与公开合成 fixture；Qt 捕获只作为
+QBank Studio Legacy 维护证据，不得替代当前 README 截图。
 
 ## 变更记录要求
 

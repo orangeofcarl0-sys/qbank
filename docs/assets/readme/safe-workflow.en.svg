@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">qbank safe mutation and index recovery workflow</title>
+  <desc id="desc">Studio, CLI, and MCP prepare and dry-run a change before review. A revision check and project lock protect the authoritative Markdown, asset, and history commit. Validation and index synchronization follow. Preparation failures write nothing, commit failures roll back, and index failures retain authority while marking the index dirty.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.step{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.active{fill:#e3eef6;stroke:#6f91ad;stroke-width:1.8}.authority{fill:#edf4ef;stroke:#779181;stroke-width:1.8}.warn{fill:#fff3dc;stroke:#b58a45;stroke-width:1.5}.error{fill:#f8e8e7;stroke:#b46d68;stroke-width:1.5}.line{fill:none;stroke:#6f879b;stroke-width:2.2;marker-end:url(#arrow)}.branch{fill:none;stroke:#a47b3b;stroke-width:2;stroke-dasharray:6 5;marker-end:url(#arrow)}.title{fill:#25313b;font:700 28px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4e5d69;font:14px 'Segoe UI',sans-serif}.small{fill:#687784;font:12px 'Segoe UI',sans-serif}.number{fill:#fff;font:700 14px 'Segoe UI',sans-serif}.badge{fill:#5f809b}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.step{fill:#282f36;stroke:#45515b}.active{fill:#294459;stroke:#78a4c7}.authority{fill:#293a31;stroke:#77a087}.warn{fill:#3e3525;stroke:#c09a58}.error{fill:#432f31;stroke:#bd7773}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#9eabb6}.line{stroke:#7f9bb1}.branch{stroke:#c09a58}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="700" rx="18"/>
+  <text class="title" x="48" y="54">Prepare, review, commit, verify</text>
+  <text class="body" x="48" y="82">Studio, CLI, MCP, and Codex workflows share one mutation boundary; the search projection updates only after authority commits.</text>
+
+  <g transform="translate(48 134)"><rect class="step" width="190" height="116" rx="10"/><circle class="badge" cx="27" cy="27" r="15"/><text class="number" x="23" y="32">1</text><text class="heading" x="22" y="65">Scope and authorize</text><text class="small" x="22" y="88">Studio · CLI · MCP</text><text class="small" x="22" y="106">Target repository and revision</text></g>
+  <path class="line" d="M238 192H270"/>
+  <g transform="translate(270 134)"><rect class="step" width="190" height="116" rx="10"/><circle class="badge" cx="27" cy="27" r="15"/><text class="number" x="23" y="32">2</text><text class="heading" x="22" y="65">Prepare and dry-run</text><text class="small" x="22" y="88">Schema and repository snapshot</text><text class="small" x="22" y="106">Deterministic diff and diagnostics</text></g>
+  <path class="line" d="M460 192H492"/>
+  <g transform="translate(492 134)"><rect class="step" width="190" height="116" rx="10"/><circle class="badge" cx="27" cy="27" r="15"/><text class="number" x="23" y="32">3</text><text class="heading" x="22" y="65">Review the plan</text><text class="small" x="22" y="88">Human or Codex review</text><text class="small" x="22" y="106">Prepared MCP operation retained</text></g>
+  <path class="line" d="M682 192H714"/>
+  <g transform="translate(714 134)"><rect class="active" width="190" height="116" rx="10"/><circle class="badge" cx="27" cy="27" r="15"/><text class="number" x="23" y="32">4</text><text class="heading" x="22" y="65">Controlled commit</text><text class="small" x="22" y="88">Revision check · project lock</text><text class="small" x="22" y="106">Adjacent staging · atomic switch</text></g>
+  <path class="line" d="M904 192H936"/>
+  <g transform="translate(936 134)"><rect class="step" width="216" height="116" rx="10"/><circle class="badge" cx="27" cy="27" r="15"/><text class="number" x="23" y="32">5</text><text class="heading" x="22" y="65">Validate and index</text><text class="small" x="22" y="88">validate → SQLite projection</text><text class="small" x="22" y="106">Stable JSON and diagnostics</text></g>
+
+  <rect class="authority" x="714" y="300" width="438" height="94" rx="10"/>
+  <text class="heading" x="738" y="333">Authoritative commit unit</text>
+  <text class="body" x="738" y="359">Question Markdown · logical assets · project definitions · history</text>
+  <text class="small" x="738" y="380">The index is not authority and never overwrites files.</text>
+  <path class="line" d="M809 250V288"/><path class="line" d="M1044 394V430"/>
+  <rect class="authority" x="936" y="442" width="216" height="78" rx="9"/>
+  <text class="heading" x="958" y="474">Complete</text><text class="small" x="958" y="498">Authority and projection verify</text>
+
+  <path class="branch" d="M365 250V454H278"/>
+  <rect class="warn" x="48" y="430" width="230" height="108" rx="9"/>
+  <text class="heading" x="70" y="462">Prepare failure</text><text class="small" x="70" y="486">Zero authoritative writes; repair input</text><text class="small" x="70" y="506">or source, rescan, and dry-run again.</text>
+  <path class="branch" d="M809 394V570H544"/>
+  <rect class="error" x="314" y="546" width="230" height="108" rx="9"/>
+  <text class="heading" x="336" y="578">Authority commit failure</text><text class="small" x="336" y="602">Roll back authority and history;</text><text class="small" x="336" y="622">preserve the original exception.</text>
+  <path class="branch" d="M1044 250V276H1172V600H858"/>
+  <rect class="warn" x="580" y="546" width="278" height="108" rx="9"/>
+  <text class="heading" x="602" y="578">Index synchronization failure</text><text class="small" x="602" y="602">Authority remains committed; mark dirty</text><text class="small" x="602" y="622">and run qbank index rebuild.</text>
+</svg>

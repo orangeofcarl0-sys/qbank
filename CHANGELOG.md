@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Replaced obsolete Qt-based README screenshots with deterministic captures of the current Tauri
+  Studio, redrew the bilingual architecture and safe-write diagrams, and aligned the Studio guides,
+  design system, screenshot provenance, and repository UI Skill with the modern/Legacy boundary.
+
 ## 0.3.0-beta.1 - 2026-07-26
 
 - Unified the modern Tauri QBank Studio, Studio Protocol v1, Python sidecar, CLI, MCP,

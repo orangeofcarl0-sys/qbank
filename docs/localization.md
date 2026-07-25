@@ -16,8 +16,10 @@ sentence-by-sentence equivalence is not required.
 
 The following must be maintained as locale pairs: locale index, user guide, CLI reference, Studio
 guide, Codex/MCP integration, compatibility policy, frozen compatibility baseline, and
-current-release known limitations. The root
-`README.md` and `README.en.md` also form a pair.
+current-release known limitations. The root `README.md` and `README.en.md` also form a pair.
+Diagrams with explanatory labels use separate Chinese and English SVG files; screenshots may be
+shared when the application state itself is the subject and both pages provide localized
+alternative text.
 
 架构、ADR、代码审查、UI 设计研究和历史分析属于维护者资料，可保留原始工作语言。若其中的
 内容成为用户契约，必须同步进入受管的双语用户文档。
@@ -42,6 +44,8 @@ contract, it must also be reflected in the managed bilingual user documentation.
    not satisfy the gate.
 5. If translations temporarily disagree, code, Schema, and the compatibility baseline are the factual
    sources, and both languages must be reconciled before merge.
+6. Do not place Chinese explanatory diagrams in English user pages or English explanatory diagrams
+   in Chinese user pages.
 
 ## 自动门禁 / Automated gate
 

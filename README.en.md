@@ -16,8 +16,10 @@ papers.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
-  <img src="docs/assets/readme/studio-main-light.png" alt="qbank Studio with question navigation, Markdown source, live preview, and structured Inspector" width="1680">
+  <img src="docs/assets/readme/studio-main-light.png" alt="Modern Tauri QBank Studio with question navigation, Markdown source, formula preview, and structured Inspector" width="1480">
 </picture>
+
+<p align="center"><sub>The current Tauri Studio is shown with a public synthetic fixture; the screenshot contains no real questions or machine-local path.</sub></p>
 
 | Interface | Best for | Start with |
 | --- | --- | --- |
@@ -38,21 +40,19 @@ service, account system, learning-record store, automatic grader, OCR engine, or
 
 QBank Studio is the modern Tauri presentation adapter under `apps/studio/`. It can be packaged and
 installed independently, but it does not maintain a second question-bank implementation. The left
-column provides navigation and filters, the center provides source and live preview, and the right
-Inspector provides properties, assets, provenance, and history.
+navigation organizes questions, saved views, filters, and explicit batch selection. The central
+workspace switches among source, split, and instant-render modes. The right Inspector edits
+properties and presents assets and history. Vditor, MathJax, and preview resources ship with the
+application for offline Markdown/TeX editing and formula rendering.
 
 ![Studio asset and question details in dark mode](docs/assets/readme/studio-assets-dark.png)
 
-```powershell
-python scripts/check.py fast --scope studio
-Set-Location apps\studio
-npm ci
-npm run tauri dev
-```
+<p align="center"><sub>The logical-asset menu enables operations from actual capabilities and keeps unsupported actions visibly disabled.</sub></p>
 
 The Qt client is now named QBank Studio Legacy and remains available through `qbank desktop`.
 Both clients share repository formats, locks, transactions, history, and indexes without an
-irreversible migration. See the [Studio guide](docs/en/desktop-editor.md), the
+irreversible migration. Legacy is a maintenance fallback; it does not represent the current
+Studio interface, screenshots, or default workflow. See the [Studio guide](docs/en/desktop-editor.md), the
 [monorepo development guide](docs/monorepo-development.md), and the
 [design system](docs/ui/design-system.md).
 
@@ -101,7 +101,7 @@ For development, install all quality and Studio test dependencies with
 
 ## Safe write workflow
 
-![qbank safe write flow from project check and Schema through dry-run, commit, validation, and index recovery](docs/assets/readme/safe-workflow.svg)
+![qbank safe write flow from preparation and dry-run through reviewed commit, validation, and index recovery](docs/assets/readme/safe-workflow.en.svg)
 
 Every authoritative write follows one sequence: inspect the Schema or current record, run a dry-run,
 review the result, commit the identical operation, and validate. Index synchronization follows the
@@ -120,7 +120,7 @@ Ordinary writes and `--upsert` do not overwrite damaged Markdown.
 
 ## Data boundary
 
-![qbank data architecture with authoritative Markdown and logical assets plus rebuildable projections](docs/assets/readme/data-architecture.svg)
+![qbank architecture connecting Studio, CLI, MCP, and Codex guidance to shared services, authoritative files, and rebuildable projections](docs/assets/readme/data-architecture.en.svg)
 
 - `questions/` contains authoritative question Markdown.
 - `assets/` contains managed local resources and logical-asset manifests.

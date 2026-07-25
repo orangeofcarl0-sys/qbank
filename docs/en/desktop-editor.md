@@ -1,117 +1,140 @@
-# qbank Studio desktop editor
+# QBank Studio desktop editor
 
 [简体中文](../zh-CN/desktop-editor.md) · [English documentation](README.md)
 
-## Scope and installation
+## Product boundary
 
-QBank Studio is the modern Tauri presentation adapter under `apps/studio/` in the same qbank
-repository. It can be packaged and installed independently, but it is not a second question-bank
-implementation. Markdown remains authoritative and SQLite remains rebuildable. Through
-`qbank.studio_sidecar`, question, taxonomy, paper, and asset mutations use the same typed services,
-transactions, validation, history, and project lock as the CLI and MCP.
+QBank Studio is qbank's default desktop entry and the modern Tauri presentation adapter under
+`apps/studio/`. It communicates with the local `qbank.studio_sidecar` through Studio Protocol
+`1.0` and reuses the application services, project lock, transactions, validation, history, and
+index policy used by the CLI and MCP. Question Markdown and logical assets remain authoritative;
+Studio does not maintain a second repository format.
+
+The current pre-release UI is `0.3.0-beta.1`, the Python package is `0.3.0b1`, and the Question,
+Asset, and Paper Schemas are `1.0`. The Windows installer is unsigned. Verify the Release SHA-256
+values as described in the [installation and upgrade guide](installation.md).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/readme/studio-main-dark.png">
+  <img src="../assets/readme/studio-main-light.png" alt="Modern Tauri QBank Studio with navigation, Markdown and formula preview, and the Inspector" width="1480">
+</picture>
+
+The image uses a public synthetic fixture and contains no examination material, user data, or
+machine-local absolute path.
+
+## Workspace structure
+
+Studio uses a stable three-region document-editing layout:
+
+- the title bar identifies the product and current repository, reports repository health, and
+  switches theme;
+- the left navigation opens repositories and provides create, copy, import, delete, saved views,
+  search, filters, tags, and the question list;
+- the central workspace contains document actions, identity and validation state, plus source,
+  split, and instant-render editing modes;
+- the right Inspector edits core properties and presents logical assets and recent history. It
+  automatically hides at narrow window widths to preserve the editor workspace.
+
+The repository path confirms the active working location and is visually truncated when space is
+limited. Documentation captures use `fixture://synthetic-bank` rather than a maintainer or user
+directory.
+
+Opening a question and selecting questions for batch operations are separate states. Opening does
+not implicitly select the question. If filters exclude the open question, Studio keeps its editor
+available so unsaved work is not interrupted.
+
+## Editing, validation, and save
+
+Markdown/TeX source is the authoritative editor buffer. Vditor, MathJax, and preview resources ship
+with the application, so source, split, and instant-render modes work offline. Raw HTML remains
+disabled. The preview runs in an isolated frame and never writes back to Markdown.
+
+Dirty state, save availability, source snapshot, Inspector values, and preview generation stay
+synchronized. Save and metadata updates ask the sidecar to prepare a dry-run before committing the
+same authoritative transaction. Validation and index synchronization follow a successful commit.
+An index failure does not roll back committed Markdown and history; it marks the index dirty and
+requires:
+
+```powershell
+qbank index rebuild --format json
+```
+
+Failed multi-file authoritative operations roll back staged changes. Compensation failures are
+reported as additional diagnostics without hiding the original commit error.
+
+## Search, filters, and saved views
+
+Search reads the rebuildable SQLite index and uses generation tokens so older results cannot
+replace newer input. A saved view is an editable snapshot of visible filters; it does not apply a
+second set of hidden controller constraints. Field facets, included or excluded tags, AND/OR mode,
+and removable chips fully describe the current result. Clearing filters restores “All questions”
+in one refresh.
+
+Special views such as redraw-needed and current-paper define only a member scope and can still be
+combined with visible filters. Filter chips wrap inside the compact navigation column and remain
+individually removable.
+
+## Logical assets
+
+An asset card presents the preferred representation, status, preview, and a capability menu. The
+menu keeps the following actions in a stable order and enables them only when the selected asset
+supports the operation:
+
+1. open original;
+2. edit with Ipe;
+3. detect changes and rerender;
+4. replace from a local file;
+5. replace from the clipboard;
+6. rerender;
+7. reveal in the file manager.
+
+![Logical-asset capability menu in dark mode](../assets/readme/studio-assets-dark.png)
+
+A local resource loads only when it exists inside the configured repository asset boundary.
+HTTP/HTTPS resources remain read-only and generate warnings. Absolute, invalid, and escaping URIs
+are never read. Ipe editing uses a versioned working copy; a changed source makes derived renders
+stale and rerendering remains explicit.
+
+Dropping onto an existing image requests replacement. Dropping in an eligible editor region creates
+a logical asset and inserts its stable reference. If source is dirty, an asset operation requires
+Save, Discard, or Cancel; only a successful save or an explicit discard allows the operation to
+continue.
+
+## Themes and accessibility
+
+One set of semantic CSS tokens drives the Tauri navigation, Vditor, isolated preview, Inspector,
+menus, statuses, and dialogs in both themes. Dark mode retains a light paper surface for document
+preview so formulas and document content preserve stable contrast.
+
+Buttons, menus, and fields provide accessible names, keyboard focus, tooltips, and explicit disabled
+states. Visual acceptance uses the current Tauri components at 100% and 125% scaling in both themes.
+Qt Legacy captures must not be used as evidence for the current Studio README or interaction model.
+See the [Studio design system](../ui/design-system.md).
+
+## QBank Studio Legacy
+
+`qbank desktop` starts the retained Qt client, QBank Studio Legacy:
+
+```powershell
+pip install "qbank[desktop]"
+qbank desktop
+```
+
+Legacy reads the same repository format but accepts only data-loss, security, or severe
+compatibility fixes. It is not the default desktop entry and does not represent the modern Studio
+interface or interaction model. No repository migration is required between the clients.
+
+## Development and acceptance
 
 ```powershell
 python scripts/check.py fast --scope studio
 Set-Location apps\studio
 npm ci
 npm run tauri dev
+npm run test:browser
 ```
 
-Production use should use the Windows installer or portable archive built from the same commit.
-Studio Protocol remains at `1.0`; the Python package is `0.3.0b1`, the product displays
-`0.3.0-beta.1`, and the data Schemas remain at `1.0`.
-This beta is unsigned and may trigger SmartScreen. Verify the Release SHA-256 values as described
-in the [installation and upgrade guide](installation.md) before running it.
-
-## QBank Studio Legacy
-
-The former Qt client is now QBank Studio Legacy and remains available through:
-
-```powershell
-pip install -e ".[desktop]"
-qbank desktop
-```
-
-Legacy accepts only data-loss, security, or severe compatibility fixes. It shares repository
-formats, locks, transactions, history, and indexes with the modern Studio and performs no
-irreversible migration. Standard CPython is recommended for Legacy on Windows because Qt DLLs
-bundled by another Python distribution can conflict with PySide6.
-
-## Window and editing model
-
-The window uses a two-and-a-half-column layout:
-
-- the left navigation contains saved views, search, visible filter chips, field facets, include/
-  exclude tags, and the question list;
-- the center contains Markdown or TeX source and live preview;
-- the collapsible right Inspector contains properties, assets, source provenance, and history.
-
-The compact toolbar shows project health, paper context, save/history actions, source/preview/split
-mode, syntax, and settings. Displaying the full project path is optional. Presentation settings
-cover theme, initial workspace mode, Inspector visibility, and path visibility; they do not alter
-question data.
-
-Opening a question does not select it for bulk operations. Selection is explicit and summarized
-beside bulk tag actions. Creating, copying, importing, and deleting questions always performs a
-dry-run before the authoritative transaction. Source type and reference are committed with Markdown,
-pending taxonomy entries, and one history event.
-
-Saved views are editable snapshots, not hidden constraints. Every active filter remains visible;
-changes mark the view as modified and the original snapshot can be restored. Filter chips wrap in
-the compact navigation column. If the open question is outside the current result set, Studio keeps
-the editor open and reports that state rather than discarding unsaved work.
-
-Search is debounced and reads the rebuildable SQLite projection off the UI thread. Generation tokens
-prevent older results from replacing newer input. Paper context is explicit: Studio never silently
-chooses the first paper definition at startup.
-
-## Save and failure behavior
-
-Dirty state, title indicator, Inspector values, source snapshot, and preview generation are kept in
-sync. Asset operations encountered while source is dirty present a native Save / Discard / Cancel
-decision. Save must succeed before the operation continues; Discard restores the authoritative
-snapshot; Cancel performs no write.
-
-Authority commits happen before index synchronization. An index failure leaves Markdown and history
-committed, marks the index dirty, and requires `qbank index rebuild`. Failed multi-file authoritative
-operations roll back their staged changes; compensation failures are reported without hiding the
-original error.
-
-## Assets and preview
-
-Vditor and MathJax resources are bundled with the modern Studio and work offline. Preview is
-read-only and raw HTML in Markdown remains disabled.
-
-New image bindings use `qbank-asset:<asset-id>` in Markdown or `\qbankasset{<asset-id>}` in TeX.
-Local thumbnails open only after containment and existence checks. External HTTP/HTTPS resources are
-read-only and warned; invalid, absolute, or escaping paths are never loaded. Available buttons derive
-from real asset capabilities, so ordinary PNG files do not advertise Ipe editing.
-
-The image context menu provides eight stable actions when the selected asset supports them:
-
-1. edit with Ipe;
-2. replace from a local file;
-3. replace from the clipboard;
-4. open the original reference;
-5. rerender;
-6. set the preferred representation;
-7. show in the file manager;
-8. restore a previous version.
-
-Dropping on an image requests replacement; dropping in an eligible blank preview area creates an
-asset and inserts its stable reference. Ipe editing uses a versioned working copy. A changed source
-makes derived renders stale; rerendering and promotion to `final` are always explicit. Restore moves
-preference pointers and does not delete representations or history.
-
-## Themes and accessibility
-
-Light and dark themes share semantic design tokens across Qt, CodeMirror, preview, dialogs, and
-Inspector cards. Native fonts use valid scalable point sizes. Controls provide accessible names,
-full tooltips, visible keyboard focus, and stable disabled states. Visual changes are accepted at
-100% and 125% scaling in both themes according to the [Studio design system](../ui/design-system.md).
-
-## Current boundaries
-
-Studio does not embed chat, OCR, an online exam system, or a model SDK. Interactive editor, browser,
-and file-opening actions require the user's direct action and must not be launched by unattended
-automation. See [known limitations](known-limitations-0.2.0.md) for frozen-release constraints.
+README captures are generated deterministically from production components and a public synthetic
+fixture in browser acceptance. The packaged application still receives a minimal startup and
+repository-open smoke. Studio does not embed chat, OCR, an online exam system, or a model SDK. See
+the [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md).
