@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">qbank directional roadmap</title>
+  <desc id="desc">The roadmap builds on the current file-based bank and controlled entry points, then strengthens multi-agent interoperability tests, an OCR mediation layer from documents images and PDF to question candidates, a complete reviewed digitization pipeline, and MCP usability and observability. Phases depend on reproducible evidence and have no promised dates.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.phase{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.now{fill:#e7f0f7;stroke:#7195b0;stroke-width:1.8}.future{fill:#f0f2f4;stroke:#a9b3bb;stroke-width:1.4}.track{fill:none;stroke:#7890a3;stroke-width:2;marker-end:url(#arrow)}.dot{fill:#658aa6}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.phase{fill:#282f36;stroke:#46515b}.now{fill:#29475c;stroke:#80a8c4}.future{fill:#252c32;stroke:#4c5862}.track{stroke:#809caf}.dot{fill:#80a8c4}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="680" rx="18"/>
+  <text class="title" x="48" y="52">From a reliable bank core to a reviewable digitization pipeline</text>
+  <text class="body" x="48" y="80">Directions follow their dependencies; each phase requires synthetic fixtures, contract tests, and failure-recovery evidence.</text>
+
+  <path class="track" d="M94 132H1110"/>
+  <circle class="dot" cx="168" cy="132" r="7"/><circle class="dot" cx="438" cy="132" r="7"/>
+  <circle class="dot" cx="708" cy="132" r="7"/><circle class="dot" cx="978" cy="132" r="7"/>
+
+  <rect class="now" x="48" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="68" y="184">Current foundation</text>
+  <text class="heading" x="68" y="214">Unified data and operations</text>
+  <text class="body" x="68" y="243">Markdown / assets are authoritative</text>
+  <text class="body" x="68" y="267">Studio · CLI · Skills · MCP</text>
+  <text class="body" x="68" y="291">dry-run · validation · rollback</text>
+  <text class="small" x="68" y="315">Available and maintained</text>
+
+  <rect class="phase" x="318" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="338" y="184">Direction A</text>
+  <text class="heading" x="338" y="214">More agent interoperability</text>
+  <text class="body" x="338" y="243">Generic MCP client examples</text>
+  <text class="body" x="338" y="267">Discovery and authority contracts</text>
+  <text class="body" x="338" y="291">Handoff and recovery fixtures</text>
+  <text class="small" x="338" y="315">Keep host behavior out of the core</text>
+
+  <rect class="phase" x="588" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="608" y="184">Direction B</text>
+  <text class="heading" x="608" y="214">OCR mediation layer</text>
+  <text class="body" x="608" y="243">PDF · image · document sources</text>
+  <text class="body" x="608" y="267">Replaceable adapters and confidence</text>
+  <text class="body" x="608" y="291">Page, region, formula, figure provenance</text>
+  <text class="small" x="608" y="315">Produce candidates, never direct authority</text>
+
+  <rect class="phase" x="858" y="158" width="294" height="174" rx="11"/>
+  <text class="label" x="878" y="184">Direction C</text>
+  <text class="heading" x="878" y="214">Complete digitization workflow</text>
+  <text class="body" x="878" y="243">Segment → classify → calibrate</text>
+  <text class="body" x="878" y="267">Draft import → assets → validation</text>
+  <text class="body" x="878" y="291">Batch acceptance, recovery, quality report</text>
+  <text class="small" x="878" y="315">Uncertain content remains draft</text>
+
+  <text class="label" x="48" y="382">Cross-cutting · MCP clarity and observability</text>
+  <rect class="future" x="48" y="400" width="1104" height="92" rx="10"/>
+  <text class="heading" x="72" y="430">For users</text>
+  <text class="body" x="72" y="457">Dedicated setup · tool/resource catalog · read examples · prepare/commit diagram · diagnostics · client configuration</text>
+  <text class="heading" x="72" y="480">For maintainers</text>
+  <text class="body" x="208" y="480">manifest consistency · client contracts · operation lifecycle · timeout/conflict/restart recovery evidence</text>
+
+  <text class="label" x="48" y="540">Shared gate for the next phase</text>
+  <rect class="future" x="48" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="68" y="586">Synthetic public fixtures</text><text class="small" x="68" y="609">No real exams or user data</text>
+  <rect class="future" x="318" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="338" y="586">Deterministic contracts</text><text class="small" x="338" y="609">Inputs, outputs, errors, versions</text>
+  <rect class="future" x="588" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="608" y="586">Human review</text><text class="small" x="608" y="609">Candidates, diffs, provenance, confidence</text>
+  <rect class="future" x="858" y="558" width="294" height="72" rx="9"/>
+  <text class="heading" x="878" y="586">Recoverable failure</text><text class="small" x="878" y="609">No partial authority; retry and verify</text>
+  <text class="small" x="48" y="657">This roadmap communicates priorities and dependencies, not dates or compatibility commitments.</text>
+</svg>

@@ -15,6 +15,8 @@
 | `docs/*/desktop-editor.md` | Studio 用户 | 桌面操作与失败状态 | Studio 交互 |
 | `docs/*/installation.md` | 安装与部署用户 | 制品校验、安装、升级与卸载 | 版本、制品或安装行为 |
 | `docs/*/codex-integration.md` | Codex/MCP 用户 | Skill、MCP、授权和恢复 | manifest、Skill、MCP |
+| `docs/*/mcp-guide.md` | MCP 用户与 agent 集成者 | 安装、工具、资源、两阶段写入、诊断和安全边界 | MCP tool、resource、operation 或配置 |
+| `docs/*/roadmap.md` | 用户与贡献者 | 已有基础、未来方向、依赖与完成标准 | 路线优先级或已实现状态 |
 | `docs/features/capability-matrix.md` | 集成维护者 | CLI、Studio、MCP 能力映射 | capability manifest 或入口 |
 | `docs/*/compatibility-policy.md` | 集成方 | 稳定接口、迁移和版本规则 | 公共契约 |
 | `docs/*/compatibility-0.3.0-beta.1.md` | beta 用户 | 当前软件、Protocol 与 Schema 矩阵 | 0.3 beta 冻结 |

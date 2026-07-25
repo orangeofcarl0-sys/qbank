@@ -8,6 +8,10 @@
 - Reframed the public READMEs around the project's coding-agent origin, added an explicit AI-first
   development disclosure and open-source acknowledgements, clarified supported versions and the
   0.2.x Qt Legacy scope, and simplified the contribution guide.
+- Replaced the compressed data-boundary diagram with a direct project map, added a directional
+  roadmap for broader agent interoperability and reviewable OCR-assisted digitization, and
+  introduced a bilingual MCP guide covering local setup, tools, resources, two-phase writes,
+  diagnostics, recovery, and security boundaries.
 
 ## 0.3.0-beta.1 - 2026-07-26
 

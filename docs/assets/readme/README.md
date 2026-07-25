@@ -5,9 +5,9 @@ content:
 
 - `studio-main-light.png`, `studio-main-dark.png`, and `studio-assets-dark.png` are deterministic
   captures of the current Tauri Studio production components using `FixtureRpcBridge`;
-- `data-architecture.svg` and `safe-workflow.svg` are the Simplified Chinese architecture and
-  write-safety diagrams;
-- `data-architecture.en.svg` and `safe-workflow.en.svg` are their English counterparts.
+- `data-architecture.svg`, `mcp-operation.svg`, `roadmap.svg`, and `safe-workflow.svg` are the
+  Simplified Chinese project-structure, MCP, roadmap, and write-safety diagrams;
+- files with the corresponding `.en.svg` suffix are their English counterparts;
 - `ai-first-badge.svg` is the repository-owned AI-development provenance label used by both
   project READMEs; its presentation was informed by the public `made-by-ai` and `ai-badges`
   projects without embedding their assets or a remote badge service.

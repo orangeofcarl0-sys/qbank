@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">qbank 本地 MCP 读取与两阶段写入</title>
+  <desc id="desc">Agent host 通过标准输入输出连接本地 qbank MCP。读取工具直接调用共享应用服务；写工具先准备差异和仓库版本，经用户或 agent 审阅后再提交。提交时重新检查版本并取得项目锁，过期或仓库变化会拒绝写入。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.surface{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.mcp{fill:#e7f0f7;stroke:#7195b0;stroke-width:1.8}.core{fill:#dfeaf3;stroke:#668ba8;stroke-width:1.8}.state{fill:#fff4dc;stroke:#b58b48;stroke-width:1.5}.authority{fill:#e8f1eb;stroke:#73917c;stroke-width:1.7}.line{fill:none;stroke:#70899c;stroke-width:2;marker-end:url(#arrow)}.return{fill:none;stroke:#8b9aa6;stroke-width:1.7;stroke-dasharray:6 5;marker-end:url(#arrow)}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.surface{fill:#282f36;stroke:#46515b}.mcp{fill:#293d4c;stroke:#739bb8}.core{fill:#29475c;stroke:#80a8c4}.state{fill:#3d3526;stroke:#c09a58}.authority{fill:#293c32;stroke:#79a087}.line{stroke:#7f9bb1}.return{stroke:#8293a0}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="610" rx="18"/>
+  <text class="title" x="48" y="52">MCP 是本地工具协议，不是另一个题库后端</text>
+  <text class="body" x="48" y="80">Agent host 通过 STDIO 调用与 Studio、CLI 相同的应用服务；qbank 不接收模型 API key，也不把题库上传到远程服务。</text>
+
+  <rect class="surface" x="48" y="124" width="230" height="98" rx="10"/>
+  <text class="label" x="68" y="150">Agent host</text>
+  <text class="heading" x="68" y="178">Codex 或 MCP 客户端</text>
+  <text class="small" x="68" y="201">负责选择工具、解释结果与请求授权</text>
+  <path class="line" d="M278 173H332"/>
+  <text class="small" x="287" y="160">STDIO</text>
+  <rect class="mcp" x="332" y="124" width="236" height="98" rx="10"/>
+  <text class="label" x="352" y="150">qbank mcp</text>
+  <text class="heading" x="352" y="178">协议适配器</text>
+  <text class="small" x="352" y="201">工具、资源、参数与错误封装</text>
+  <path class="line" d="M568 173H622"/>
+  <rect class="core" x="622" y="124" width="254" height="98" rx="10"/>
+  <text class="label" x="642" y="150">共享核心</text>
+  <text class="heading" x="642" y="178">Application services</text>
+  <text class="small" x="642" y="201">仓储、校验、事务、历史和索引</text>
+  <path class="line" d="M876 173H930"/>
+  <rect class="authority" x="930" y="124" width="222" height="98" rx="10"/>
+  <text class="label" x="950" y="150">本地题库</text>
+  <text class="heading" x="950" y="178">权威文件</text>
+  <text class="small" x="950" y="201">Markdown · assets · definitions</text>
+
+  <text class="label" x="48" y="274">读取：一次调用，不产生写入</text>
+  <rect class="surface" x="48" y="292" width="252" height="84" rx="9"/>
+  <text class="heading" x="68" y="320">1 · 发现或缩小范围</text>
+  <text class="small" x="68" y="343">resources/list · question_search</text>
+  <text class="small" x="68" y="360">repository_status · schema_get</text>
+  <path class="line" d="M300 334H342"/>
+  <rect class="surface" x="342" y="292" width="252" height="84" rx="9"/>
+  <text class="heading" x="362" y="320">2 · 读取确定对象</text>
+  <text class="small" x="362" y="343">question_get · taxonomy_get</text>
+  <text class="small" x="362" y="360">paper_get · asset_get</text>
+  <path class="line" d="M594 334H636"/>
+  <rect class="surface" x="636" y="292" width="516" height="84" rx="9"/>
+  <text class="heading" x="656" y="320">3 · 返回类型化内容与 diagnostics</text>
+  <text class="small" x="656" y="343">MCP 只转换协议；读取遵守同一 containment、索引健康和损坏源规则。</text>
+  <text class="small" x="656" y="360">广泛查找先 search，完整正文按需 get，避免不必要读取。</text>
+
+  <text class="label" x="48" y="426">写入：prepare 与 commit 必须是两个明确步骤</text>
+  <rect class="state" x="48" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="68" y="472">1 · *_prepare</text>
+  <text class="small" x="68" y="496">校验输入，生成 diff 与 diagnostics</text>
+  <text class="small" x="68" y="516">记录 operation_id、expiry、revision</text>
+  <text class="small" x="68" y="536">此时不改权威文件</text>
+  <path class="line" d="M292 500H332"/>
+  <rect class="surface" x="332" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="352" y="472">2 · 审阅与授权</text>
+  <text class="small" x="352" y="496">检查目标、差异、warning 与范围</text>
+  <text class="small" x="352" y="516">仓库变化或过期：重新 prepare</text>
+  <text class="small" x="352" y="536">不批准：operation_cancel</text>
+  <path class="line" d="M576 500H616"/>
+  <rect class="mcp" x="616" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="636" y="472">3 · operation_commit</text>
+  <text class="small" x="636" y="496">持锁复核 revision 与有效期</text>
+  <text class="small" x="636" y="516">原子提交权威文件与历史</text>
+  <text class="small" x="636" y="536">重复 commit 返回首次结果</text>
+  <path class="line" d="M860 500H900"/>
+  <rect class="authority" x="900" y="444" width="252" height="112" rx="9"/>
+  <text class="heading" x="920" y="472">4 · 校验与投影同步</text>
+  <text class="small" x="920" y="496">提交失败：回滚权威变更</text>
+  <text class="small" x="920" y="516">索引失败：保留内容并标 dirty</text>
+  <text class="small" x="920" y="536">operation_get 可查询最终状态</text>
+</svg>

@@ -32,10 +32,14 @@ README_PNGS = (
 )
 README_ZH_SVGS = (
     ROOT / "docs" / "assets" / "readme" / "data-architecture.svg",
+    ROOT / "docs" / "assets" / "readme" / "mcp-operation.svg",
+    ROOT / "docs" / "assets" / "readme" / "roadmap.svg",
     ROOT / "docs" / "assets" / "readme" / "safe-workflow.svg",
 )
 README_EN_SVGS = (
     ROOT / "docs" / "assets" / "readme" / "data-architecture.en.svg",
+    ROOT / "docs" / "assets" / "readme" / "mcp-operation.en.svg",
+    ROOT / "docs" / "assets" / "readme" / "roadmap.en.svg",
     ROOT / "docs" / "assets" / "readme" / "safe-workflow.en.svg",
 )
 README_AI_BADGE = ROOT / "docs" / "assets" / "readme" / "ai-first-badge.svg"
@@ -96,6 +100,8 @@ def test_readmes_disclose_ai_coding_and_acknowledge_current_studio() -> None:
         assert "src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md" in text
         assert "https://github.com/tauri-apps/tauri" in text
         assert "https://github.com/moodle/moodle" in text
+        assert "mcp-guide.md" in text
+        assert "roadmap.md" in text
         assert "immutable release baseline" not in text
         assert "不可变发布基线" not in text
 

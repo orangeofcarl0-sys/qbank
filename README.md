@@ -154,14 +154,20 @@ qbank validate --format json
 
 ## 数据边界与架构
 
-![qbank 数据架构：Markdown 和逻辑资产是权威数据，SQLite、预览、试卷和导出是可重建投影](docs/assets/readme/data-architecture.svg)
+![qbank 项目结构：维护者、脚本和 coding agent 通过 Studio、CLI 或本地 MCP 进入共享应用核心，再在题库根目录的数据边界内访问权威文件](docs/assets/readme/data-architecture.svg)
 
-- `questions/` 保存权威题目 Markdown；文件名与 front matter ID 必须一致。
-- `assets/` 保存受管本地资源和逻辑资产 manifest；本地路径不得逃逸题库边界。
-- `.qbank/history/` 与 Markdown 写入构成同一权威提交单元。
-- `.qbank/index.sqlite` 是只读命令使用的可重建搜索投影。
-- `papers/` 保存试卷定义，`exports/` 保存最终产物，`build/` 保存临时输出。
-- JSON Schema 由 Pydantic 模型生成，不维护手写副本。
+图中的层次也是源码依赖方向：
+
+1. `apps/studio/`、`src/qbank/commands/`、`src/qbank/mcp/` 与 `qbank.legacy_qt` 是并列的
+   presentation adapter；
+2. 它们共同调用 `src/qbank/application/`、领域模型和基础设施端口，不复制题目规则；
+3. `$qbank` 与 `$qbank-digitize` 只向 agent 提供操作指引和授权协议，不直接访问题库；
+4. 共享核心只在已确认的题库根目录内操作权威文件。
+
+题库根目录中，`questions/` 保存权威题目 Markdown，`assets/` 保存受管资源与 manifest，
+`qbank.yaml`、taxonomy、views 和 papers 保存项目定义，`.qbank/history/` 与权威写入共同
+提交。`.qbank/index.sqlite`、预览、构建目录和导出产物均可重建或重新生成。JSON Schema
+由 Pydantic 模型生成，不维护手写副本。
 
 HTTP、HTTPS 和 `//host` 图片允许引用，但校验与构建会产生 `external_asset` warning；绝对路径、
 `file:`、`data:` 和越界路径会被拒绝。Jinja 模板在沙箱环境中执行，但自定义模板仍属于用户
@@ -243,10 +249,32 @@ qbank codex integration-status --format json
 PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_decision_packet`，再交回
 `$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
 同步是相互独立的状态。完整职责、安装、更新和备份语义见
-[Codex 接入指南](docs/zh-CN/codex-integration.md)。MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不
-影响 CLI、Studio 或 Skill。MCP 写入与 CLI、Studio 共用仓库级跨进程锁，并将两阶段
-operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可查询原状态，重复 commit
-只返回首次提交结果，不会重复写入。
+[Codex 接入指南](docs/zh-CN/codex-integration.md)。
+
+MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不影响 CLI、Studio 或 Skill。它是绑定一个
+本地题库的 STDIO 协议适配器，不是远程后端：读取工具直接调用共享应用服务，写入必须先
+调用 `*_prepare` 获取差异、有效期和 `repository_revision`，经审阅后再调用
+`operation_commit`。仓库在两步之间变化时提交会拒绝；服务重启或响应丢失后可通过
+`operation_get` 查询原状态。完整的安装方式、工具与资源目录、读写示例、状态诊断和安全
+边界见[MCP 使用指南](docs/zh-CN/mcp-guide.md)。
+
+![qbank MCP 读取与两阶段写入：agent host 通过 STDIO 调用共享应用服务，写入必须先 prepare 再 commit](docs/assets/readme/mcp-operation.svg)
+
+## 路线图
+
+![qbank 路线图：从统一题库核心，扩展到更多 agent 互操作测试、OCR 候选中间层、完整电子化流程和 MCP 可观测性](docs/assets/readme/roadmap.svg)
+
+后续方向集中在三条相互依赖的工作线上：
+
+- 为更多支持本地工具协议的 agent host 建立真实配置、工具发现、授权、冲突与恢复测试；
+- 在文档、图片和 PDF 与 qbank 交换格式之间建立可替换的 OCR/版面候选中间层，保留页码、
+  区域、置信度和来源；
+- 把 `$qbank-digitize` 的字段策略与样本校准连接到分题、分类映射、公式/图片处理、人工
+  审阅、draft 导入和批次验收的完整流程。
+
+OCR 不会直接写入权威 Markdown；任何低置信度或无法确认的内容仍保留为候选或 `draft`。
+各方向以公开合成样本、确定性契约和失败恢复证据为完成条件，不承诺具体日期。详细范围与
+验收原则见[项目路线图](docs/zh-CN/roadmap.md)。
 
 ## 文档索引
 
@@ -258,6 +286,8 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 | [Studio 用户文档](docs/zh-CN/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
 | [单仓库开发指南](docs/monorepo-development.md) | 目录结构、三级检查、变更影响和统一构建 |
 | [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
+| [MCP 使用指南](docs/zh-CN/mcp-guide.md) | MCP 定位、安装、工具与资源、两阶段写入、诊断和安全边界 |
+| [项目路线图](docs/zh-CN/roadmap.md) | 多 agent 测试、OCR 中间层、完整电子化与 MCP 后续方向 |
 | [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
 | [0.2.0 兼容性参考](docs/zh-CN/compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、错误码和 capability manifest |

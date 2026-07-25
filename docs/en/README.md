@@ -11,6 +11,8 @@
 | [Studio desktop editor](desktop-editor.md) | Installation, window model, editing, filters, assets, and failure states |
 | [Installation and upgrade](installation.md) | CLI, Studio, verification, upgrades, and removal |
 | [Codex and MCP integration](codex-integration.md) | Skills, cross-project context, MCP installation, and authorization |
+| [MCP guide](mcp-guide.md) | MCP role, tools and resources, two-phase writes, diagnostics, and recovery |
+| [Project roadmap](roadmap.md) | Multi-agent interoperability, OCR mediation, complete digitization, and future MCP work |
 | [0.3.0-beta.1 compatibility matrix](compatibility-0.3.0-beta.1.md) | Software, Protocol, Schema, entry points, and migration |
 | [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md) | Unsigned beta, filesystem, and external dependency boundaries |
 | [0.2.0 compatibility reference](compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |

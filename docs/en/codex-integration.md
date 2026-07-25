@@ -98,6 +98,11 @@ Codex services, and Codex services do not depend on Qt.
 
 ## Optional local MCP
 
+MCP is a local STDIO adapter bound to one bank. It shares the application core with CLI and Studio,
+is not a remote backend, and does not replace the context and authority rules in the Skills. See the
+[MCP guide](mcp-guide.md) for setup, the tool and resource catalog, read ordering, two-phase writes,
+status diagnostics, and recovery examples.
+
 ```powershell
 pip install "qbank[mcp]"
 qbank codex install-mcp --project --dry-run --format json
@@ -118,3 +123,7 @@ reports `DEGRADED` instead.
 
 qbank currently provides no embedded Studio chat, model API wrapper, resource subscriptions, or
 complex prompt-template system.
+
+See the [project roadmap](roadmap.md) for planned agent-host interoperability, an OCR candidate
+layer, and the complete digitization workflow. These are future directions, not current-release
+capabilities.

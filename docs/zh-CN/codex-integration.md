@@ -93,6 +93,10 @@ Studio 与 Codex 保持模块隔离：两者并列调用应用服务，桌面控
 
 ## 可选本地 MCP
 
+MCP 是绑定单一题库的本地 STDIO 适配器。它与 CLI、Studio 共用应用核心，不是远程后端，
+也不替代 Skill 中的上下文和授权规则。完整的安装、工具与资源目录、读取顺序、两阶段写入、
+状态诊断和恢复示例见[MCP 使用指南](mcp-guide.md)。
+
 ```powershell
 pip install "qbank[mcp]"
 qbank codex install-mcp --project --dry-run --format json
@@ -110,3 +114,6 @@ qbank codex mcp-check --format json
 和 Skill，只会使 `integration-status` 报告 `DEGRADED`。
 
 当前不提供 Studio 内嵌聊天、模型 API 封装、资源订阅或复杂 Prompt 模板。
+
+更多 agent host 互操作、OCR 候选中间层和完整电子化流程的计划见[项目路线图](roadmap.md)；
+这些内容是未来方向，不是当前版本已经提供的能力。

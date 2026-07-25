@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">qbank local MCP reads and two-phase writes</title>
+  <desc id="desc">An agent host connects to local qbank MCP over standard input and output. Read tools call shared application services directly. Write tools first prepare a diff and repository revision for review, then commit. Commit rechecks the revision under the project lock and refuses expired or changed operations.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.surface{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.mcp{fill:#e7f0f7;stroke:#7195b0;stroke-width:1.8}.core{fill:#dfeaf3;stroke:#668ba8;stroke-width:1.8}.state{fill:#fff4dc;stroke:#b58b48;stroke-width:1.5}.authority{fill:#e8f1eb;stroke:#73917c;stroke-width:1.7}.line{fill:none;stroke:#70899c;stroke-width:2;marker-end:url(#arrow)}.return{fill:none;stroke:#8b9aa6;stroke-width:1.7;stroke-dasharray:6 5;marker-end:url(#arrow)}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.surface{fill:#282f36;stroke:#46515b}.mcp{fill:#293d4c;stroke:#739bb8}.core{fill:#29475c;stroke:#80a8c4}.state{fill:#3d3526;stroke:#c09a58}.authority{fill:#293c32;stroke:#79a087}.line{stroke:#7f9bb1}.return{stroke:#8293a0}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="610" rx="18"/>
+  <text class="title" x="48" y="52">MCP is a local tool protocol, not another question-bank backend</text>
+  <text class="body" x="48" y="80">The agent host calls the same services as Studio and CLI over STDIO; qbank receives no model API key and uploads no bank data.</text>
+
+  <rect class="surface" x="48" y="124" width="230" height="98" rx="10"/>
+  <text class="label" x="68" y="150">Agent host</text>
+  <text class="heading" x="68" y="178">Codex or MCP client</text>
+  <text class="small" x="68" y="201">Chooses tools, interprets results, requests authority</text>
+  <path class="line" d="M278 173H332"/>
+  <text class="small" x="287" y="160">STDIO</text>
+  <rect class="mcp" x="332" y="124" width="236" height="98" rx="10"/>
+  <text class="label" x="352" y="150">qbank mcp</text>
+  <text class="heading" x="352" y="178">Protocol adapter</text>
+  <text class="small" x="352" y="201">Tools, resources, parameters, errors</text>
+  <path class="line" d="M568 173H622"/>
+  <rect class="core" x="622" y="124" width="254" height="98" rx="10"/>
+  <text class="label" x="642" y="150">Shared core</text>
+  <text class="heading" x="642" y="178">Application services</text>
+  <text class="small" x="642" y="201">Repository, validation, transaction, history, index</text>
+  <path class="line" d="M876 173H930"/>
+  <rect class="authority" x="930" y="124" width="222" height="98" rx="10"/>
+  <text class="label" x="950" y="150">Local bank</text>
+  <text class="heading" x="950" y="178">Authoritative files</text>
+  <text class="small" x="950" y="201">Markdown · assets · definitions</text>
+
+  <text class="label" x="48" y="274">Read: one call, no writes</text>
+  <rect class="surface" x="48" y="292" width="252" height="84" rx="9"/>
+  <text class="heading" x="68" y="320">1 · Discover or narrow scope</text>
+  <text class="small" x="68" y="343">resources/list · question_search</text>
+  <text class="small" x="68" y="360">repository_status · schema_get</text>
+  <path class="line" d="M300 334H342"/>
+  <rect class="surface" x="342" y="292" width="252" height="84" rx="9"/>
+  <text class="heading" x="362" y="320">2 · Read a known object</text>
+  <text class="small" x="362" y="343">question_get · taxonomy_get</text>
+  <text class="small" x="362" y="360">paper_get · asset_get</text>
+  <path class="line" d="M594 334H636"/>
+  <rect class="surface" x="636" y="292" width="516" height="84" rx="9"/>
+  <text class="heading" x="656" y="320">3 · Return typed content and diagnostics</text>
+  <text class="small" x="656" y="343">MCP only translates protocol; reads keep the same containment, index-health, and source-file rules.</text>
+  <text class="small" x="656" y="360">Search broadly first and get full records only when needed.</text>
+
+  <text class="label" x="48" y="426">Write: prepare and commit are separate, explicit steps</text>
+  <rect class="state" x="48" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="68" y="472">1 · *_prepare</text>
+  <text class="small" x="68" y="496">Validate input; create diff and diagnostics</text>
+  <text class="small" x="68" y="516">Record operation_id, expiry, revision</text>
+  <text class="small" x="68" y="536">No authoritative write yet</text>
+  <path class="line" d="M292 500H332"/>
+  <rect class="surface" x="332" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="352" y="472">2 · Review and authorize</text>
+  <text class="small" x="352" y="496">Check target, diff, warnings, and scope</text>
+  <text class="small" x="352" y="516">Changed or expired: prepare again</text>
+  <text class="small" x="352" y="536">Rejected: operation_cancel</text>
+  <path class="line" d="M576 500H616"/>
+  <rect class="mcp" x="616" y="444" width="244" height="112" rx="9"/>
+  <text class="heading" x="636" y="472">3 · operation_commit</text>
+  <text class="small" x="636" y="496">Recheck revision and expiry under lock</text>
+  <text class="small" x="636" y="516">Atomically commit authority and history</text>
+  <text class="small" x="636" y="536">Repeated commit returns first result</text>
+  <path class="line" d="M860 500H900"/>
+  <rect class="authority" x="900" y="444" width="252" height="112" rx="9"/>
+  <text class="heading" x="920" y="472">4 · Validate and sync projection</text>
+  <text class="small" x="920" y="496">Commit failure: roll back authority</text>
+  <text class="small" x="920" y="516">Index failure: keep content, mark dirty</text>
+  <text class="small" x="920" y="536">operation_get reports final state</text>
+</svg>

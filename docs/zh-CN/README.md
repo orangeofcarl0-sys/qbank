@@ -11,6 +11,8 @@
 | [Studio 桌面编辑器](desktop-editor.md) | 安装、窗口结构、编辑、筛选、资源和失败状态 |
 | [安装与升级](installation.md) | CLI、Studio、校验、升级和卸载 |
 | [Codex 与 MCP 接入](codex-integration.md) | Skill、跨项目上下文、MCP 安装与授权 |
+| [MCP 使用指南](mcp-guide.md) | MCP 定位、工具与资源、两阶段写入、诊断与恢复 |
+| [项目路线图](roadmap.md) | 多 agent 互操作、OCR 中间层、完整电子化与 MCP 后续方向 |
 | [0.3.0-beta.1 兼容矩阵](compatibility-0.3.0-beta.1.md) | 软件、Protocol、Schema、入口与迁移关系 |
 | [0.3.0-beta.1 已知限制](known-limitations-0.3.0-beta.1.md) | unsigned beta、文件系统与外部依赖边界 |
 | [0.2.0 兼容性参考](compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、诊断码与 capability |

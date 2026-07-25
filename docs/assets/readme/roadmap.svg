@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">qbank 方向性路线图</title>
+  <desc id="desc">路线图从当前的文件题库与受控入口基础出发，依次加强多 agent 互操作测试、文档图片 PDF 到候选题目的 OCR 中间层、完整电子化审阅流水线，以及 MCP 易用性与可观测性。各阶段以可复现证据为准，不承诺具体日期。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
+    <style>
+      .bg{fill:#f6f7f5}.phase{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.now{fill:#e7f0f7;stroke:#7195b0;stroke-width:1.8}.future{fill:#f0f2f4;stroke:#a9b3bb;stroke-width:1.4}.track{fill:none;stroke:#7890a3;stroke-width:2;marker-end:url(#arrow)}.dot{fill:#658aa6}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.phase{fill:#282f36;stroke:#46515b}.now{fill:#29475c;stroke:#80a8c4}.future{fill:#252c32;stroke:#4c5862}.track{stroke:#809caf}.dot{fill:#80a8c4}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="680" rx="18"/>
+  <text class="title" x="48" y="52">从可靠题库核心走向可审阅的电子化流水线</text>
+  <text class="body" x="48" y="80">方向按依赖关系排列；每一阶段先以公开合成样本、契约测试和失败恢复证据验收。</text>
+
+  <path class="track" d="M94 132H1110"/>
+  <circle class="dot" cx="168" cy="132" r="7"/><circle class="dot" cx="438" cy="132" r="7"/>
+  <circle class="dot" cx="708" cy="132" r="7"/><circle class="dot" cx="978" cy="132" r="7"/>
+
+  <rect class="now" x="48" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="68" y="184">当前基础</text>
+  <text class="heading" x="68" y="214">统一数据与操作边界</text>
+  <text class="body" x="68" y="243">Markdown / 资产为权威</text>
+  <text class="body" x="68" y="267">Studio · CLI · Skill · MCP</text>
+  <text class="body" x="68" y="291">dry-run · 校验 · 回滚</text>
+  <text class="small" x="68" y="315">已有能力，继续维护</text>
+
+  <rect class="phase" x="318" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="338" y="184">方向 A</text>
+  <text class="heading" x="338" y="214">更多 agent 互操作</text>
+  <text class="body" x="338" y="243">通用 MCP 客户端配置样例</text>
+  <text class="body" x="338" y="267">工具发现与授权契约测试</text>
+  <text class="body" x="338" y="291">跨项目交接与失败恢复 fixture</text>
+  <text class="small" x="338" y="315">不把单一 host 行为写入核心</text>
+
+  <rect class="phase" x="588" y="158" width="240" height="174" rx="11"/>
+  <text class="label" x="608" y="184">方向 B</text>
+  <text class="heading" x="608" y="214">OCR 中间层</text>
+  <text class="body" x="608" y="243">PDF · 图片 · 文档来源登记</text>
+  <text class="body" x="608" y="267">可替换 OCR adapter 与置信度</text>
+  <text class="body" x="608" y="291">页码、区域、公式与图片来源</text>
+  <text class="small" x="608" y="315">先产候选，不直接写权威题目</text>
+
+  <rect class="phase" x="858" y="158" width="294" height="174" rx="11"/>
+  <text class="label" x="878" y="184">方向 C</text>
+  <text class="heading" x="878" y="214">完整电子化实现</text>
+  <text class="body" x="878" y="243">分题 → 分类映射 → 人工校准</text>
+  <text class="body" x="878" y="267">草稿导入 → 资产绑定 → 验证</text>
+  <text class="body" x="878" y="291">批次验收、恢复与质量报告</text>
+  <text class="small" x="878" y="315">不确定内容始终保留为 draft</text>
+
+  <text class="label" x="48" y="382">贯穿各阶段 · MCP 可理解性与可观测性</text>
+  <rect class="future" x="48" y="400" width="1104" height="92" rx="10"/>
+  <text class="heading" x="72" y="430">面向使用者</text>
+  <text class="body" x="72" y="457">独立安装说明 · 工具/资源目录 · 读取示例 · prepare/commit 图解 · 状态诊断 · 客户端配置</text>
+  <text class="heading" x="72" y="480">面向维护者</text>
+  <text class="body" x="208" y="480">capability manifest 一致性 · 客户端契约测试 · operation 生命周期 · 超时/冲突/重启恢复证据</text>
+
+  <text class="label" x="48" y="540">进入下一阶段的共同门槛</text>
+  <rect class="future" x="48" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="68" y="586">公开合成样本</text><text class="small" x="68" y="609">不使用真实试题或用户数据</text>
+  <rect class="future" x="318" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="338" y="586">确定性契约</text><text class="small" x="338" y="609">输入、输出、错误与版本边界</text>
+  <rect class="future" x="588" y="558" width="250" height="72" rx="9"/>
+  <text class="heading" x="608" y="586">人工可审阅</text><text class="small" x="608" y="609">候选、差异、来源与置信度可见</text>
+  <rect class="future" x="858" y="558" width="294" height="72" rx="9"/>
+  <text class="heading" x="878" y="586">失败可恢复</text><text class="small" x="878" y="609">零部分写入、可重试、可验证</text>
+  <text class="small" x="48" y="657">路线图表达优先级与依赖，不构成发布日期或兼容性承诺。</text>
+</svg>

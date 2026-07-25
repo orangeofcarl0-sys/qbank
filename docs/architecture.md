@@ -24,6 +24,16 @@ presentation (CLI / MCP / Studio / Legacy Qt) -> application -> domain
 ports are bound to the Markdown repository, SQLite index, validation, and other
 concrete adapters.
 
+The public project map below shows the same boundary using concrete repository
+directories and runtime entry points:
+
+![qbank project structure from users and agents through peer presentation adapters and the shared core to authoritative and rebuildable bank data](assets/readme/data-architecture.en.svg)
+
+Skills are guidance artifacts, not runtime data adapters. An agent follows a Skill
+and then chooses CLI or MCP; it never reaches the Markdown repository through the
+Skill itself. Modern Studio, CLI, MCP, and Legacy are peer adapters, not nested
+products or independent backends.
+
 ## Layers and responsibilities
 
 ### Domain

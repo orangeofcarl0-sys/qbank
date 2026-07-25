@@ -133,16 +133,25 @@ qbank validate --format json
 Do not edit `questions/**/*.md` directly by default and never edit `.qbank/index.sqlite` manually.
 Ordinary writes and `--upsert` do not overwrite damaged Markdown.
 
-## Data boundary
+## Data boundary and architecture
 
-![qbank architecture connecting Studio, CLI, MCP, and Codex guidance to shared services, authoritative files, and rebuildable projections](docs/assets/readme/data-architecture.en.svg)
+![qbank project structure: maintainers, scripts, and coding agents enter the shared application core through Studio, CLI, or local MCP, then access authoritative files within the bank-root data boundary](docs/assets/readme/data-architecture.en.svg)
 
-- `questions/` contains authoritative question Markdown.
-- `assets/` contains managed local resources and logical-asset manifests.
-- `.qbank/history/` commits with Markdown as one authority unit.
-- `.qbank/index.sqlite` is a rebuildable search projection.
-- `papers/` contains definitions; `exports/` contains final output; `build/` contains temporary output.
-- JSON Schema is generated from Pydantic models rather than maintained separately.
+The layers in the diagram also describe source dependency direction:
+
+1. `apps/studio/`, `src/qbank/commands/`, `src/qbank/mcp/`, and `qbank.legacy_qt` are peer
+   presentation adapters.
+2. They call `src/qbank/application/`, domain models, and infrastructure ports without duplicating
+   question rules.
+3. `$qbank` and `$qbank-digitize` provide agent guidance and authority protocol; they never access
+   a bank directly.
+4. The shared core operates authoritative files only inside a confirmed bank root.
+
+Within that root, `questions/` contains authoritative question Markdown, `assets/` contains managed
+resources and manifests, `qbank.yaml`, taxonomy, views, and papers contain project definitions, and
+`.qbank/history/` commits with authoritative mutations. `.qbank/index.sqlite`, previews, build
+directories, and exports are rebuildable or regenerable. Pydantic models generate JSON Schema; no
+handwritten second copy is maintained.
 
 HTTP, HTTPS, and `//host` images are allowed with `external_asset` warnings. Absolute, `file:`,
 `data:`, and escaping paths are rejected. Jinja templates execute in a sandbox, but custom templates
@@ -187,9 +196,33 @@ qbank codex install-mcp --project --dry-run --format json
 qbank codex integration-status --format json
 ```
 
-MCP writes use a revision-checked prepare/commit protocol. Prepared operations persist under
-`.qbank/mcp-operations/`; replaying a committed operation returns its first result without writing
-twice. See the [Codex and MCP guide](docs/en/codex-integration.md).
+MCP requires the separate `qbank[mcp]` extra. Its absence or lack of registration does not affect
+CLI, Studio, or Skills. It is a local STDIO adapter bound to one bank, not a remote backend: read
+tools call shared application services, while every write first calls `*_prepare` to receive a
+diff, expiry, and `repository_revision`, then calls `operation_commit` after review. Commit refuses
+a repository that changed between the calls, and `operation_get` recovers durable state after
+restart or response loss. See the [MCP guide](docs/en/mcp-guide.md) for setup, the tool and resource
+catalog, complete read/write examples, diagnostics, and the security boundary.
+
+![qbank MCP reads and two-phase writes: an agent host calls shared application services over STDIO, and every write prepares before commit](docs/assets/readme/mcp-operation.en.svg)
+
+## Roadmap
+
+![qbank roadmap from the unified bank core to broader agent interoperability, an OCR candidate layer, a complete digitization workflow, and MCP observability](docs/assets/readme/roadmap.en.svg)
+
+Planned work follows three dependent directions:
+
+- test real configuration, discovery, authority, conflict, and recovery with more agent hosts that
+  support local tool protocols;
+- build a replaceable OCR/layout candidate layer between documents, images, PDF, and qbank exchange
+  formats while retaining page, region, confidence, and provenance;
+- connect `$qbank-digitize` field policy and sample calibration to segmentation, taxonomy mapping,
+  formula/figure handling, human review, draft import, and batch acceptance.
+
+OCR will never write authoritative Markdown directly; low-confidence or unconfirmed content remains
+a candidate or `draft`. Completion requires public synthetic fixtures, deterministic contracts,
+and failure-recovery evidence rather than a promised date. See the
+[project roadmap](docs/en/roadmap.md) for scope and acceptance criteria.
 
 ## Documentation
 
@@ -201,6 +234,8 @@ twice. See the [Codex and MCP guide](docs/en/codex-integration.md).
 | [Studio guide](docs/en/desktop-editor.md) | Desktop interaction and resource behavior |
 | [Monorepo development](docs/monorepo-development.md) | Repository layout, tiered checks, impact mapping, and unified builds |
 | [Codex and MCP](docs/en/codex-integration.md) | Skills, cross-project context, MCP, and authorization |
+| [MCP guide](docs/en/mcp-guide.md) | MCP role, setup, tools and resources, two-phase writes, diagnostics, and security |
+| [Project roadmap](docs/en/roadmap.md) | Multi-agent tests, OCR mediation, complete digitization, and future MCP work |
 | [0.2.0 compatibility reference](docs/en/compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |
 | [Compatibility policy](docs/en/compatibility-policy.md) | Stable interfaces and release rules |
 | [0.2.0 known limitations](docs/en/known-limitations-0.2.0.md) | Filesystem, transaction, performance, and product limits |
