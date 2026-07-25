@@ -1,0 +1,42 @@
+schema_version: "1.0"
+asset_id: ipe-figure
+question_id: OPT-SYN-0001
+role: figure
+status: reviewed
+preferred_editor: source-ipe
+preferred_render: render-svg
+representations:
+  - representation_id: source-ipe
+    format: ipe
+    path: source.ipe
+    purpose: editable-source
+    editable: true
+    stale: false
+    content_hash: 927b397688bb78f0104157f0b7a6c89f1666f00dd540884daf0afc028fbf50fa
+  - representation_id: render-svg
+    format: svg
+    path: render.svg
+    purpose: render
+    editable: false
+    derived_from: source-ipe
+    stale: false
+    content_hash: 4dd0549ae1561dd7dc4dd71c25a2aba9e9ae969e3aad3945a913dfc96ceb0366
+  - representation_id: render-png
+    format: png
+    path: render.png
+    purpose: render
+    editable: false
+    derived_from: source-ipe
+    stale: false
+    content_hash: df41e04ec9a8cb41fe2b188cfb83514ceaf3377e27c500834af32a5903cc20b4
+  - representation_id: render-pdf
+    format: pdf
+    path: render.pdf
+    purpose: render
+    editable: false
+    derived_from: source-ipe
+    stale: false
+    content_hash: 0466c20d3f65efbfb1576e0fee91e10868ed20b6883ebff23e585c925af6faae
+provenance:
+  type: synthetic
+review_notes: Public synthetic Ipe fixture generated for Studio acceptance tests.

@@ -1,0 +1,30 @@
+schema_version: "1.0"
+paths:
+  questions: questions
+  assets: assets
+  papers: papers
+  templates: templates
+  exports: exports
+  build: build
+  state: .qbank
+defaults:
+  language: zh-CN
+  status: draft
+  subject: uncategorized
+export:
+  pandoc_command: pandoc
+  reference_docx: templates/reference.docx
+index:
+  enabled: true
+assets:
+  editors:
+    ipe:
+      command:
+    text:
+      command:
+  renderers:
+    ipe:
+      iperender:
+      ipetoipe:
+  require_final_for_paper: false
+  download_max_bytes: 52428800

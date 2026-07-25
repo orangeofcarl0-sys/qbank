@@ -1,0 +1,8 @@
+schema_version: "1.0"
+tags:
+  - slug: interference
+    name_zh: 干涉
+    status: active
+  - slug: linear-algebra
+    name_zh: 线性代数
+    status: active

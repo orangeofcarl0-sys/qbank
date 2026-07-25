@@ -11,7 +11,7 @@ the question bank.
 The dependency direction is inward:
 
 ```text
-presentation (CLI) -> application -> domain
+presentation (CLI / MCP / Studio / Legacy Qt) -> application -> domain
                               ^
                               |
                   infrastructure adapters
@@ -83,13 +83,18 @@ arguments into typed requests, call application/use-case APIs, and render
 human or JSON output. Commands must not scan Markdown files, execute SQL, or
 construct SQLite repositories.
 
-`qbank.desktop` is a second, optional presentation adapter. Its Qt Widgets
-shell embeds an offline CodeMirror 6 bundle and a `QWebEngineView`; narrow
-`QWebChannel` bridges carry source changes and a closed set of asset action
-names. The Qt layer never writes question Markdown, asset manifests, history,
-or SQLite directly. `DesktopController` calls the same project, question,
-asset, paper, validation, and rendering services composed by `bootstrap`.
-There is no HTTP backend and no desktop-specific persistence model.
+The modern QBank Studio lives under `apps/studio/`. Its Tauri WebView owns only
+presentation state and communicates with `qbank.studio_sidecar` through Studio
+Protocol v1. The sidecar translates fixed JSON-RPC methods into the same
+application services composed by `bootstrap`; it does not define a second
+Question model, Schema, lock, transaction, history store, or index.
+
+`qbank.legacy_qt` is the retained QBank Studio Legacy presentation adapter. Its
+Qt Widgets shell embeds an offline CodeMirror 6 bundle and a `QWebEngineView`;
+narrow `QWebChannel` bridges carry source changes and a closed set of asset
+actions. Legacy Qt and the modern Studio share repository formats and
+application semantics. Neither has an HTTP backend or desktop-specific
+persistence model.
 
 ### Bootstrap
 
@@ -168,6 +173,11 @@ Ruff complexity limits, the AST cycle test, deptry, and branch-coverage gates
 are complementary controls. Architecture changes must update this document,
 an ADR when the decision is durable, and the executable contracts in the same
 change.
+
+The repository uses native Python, npm, and Cargo tools rather than a monorepo
+framework. `scripts/change-impact.json` selects fast or integration checks, and
+`scripts/build.py` binds the Python wheel, bundled sidecar, Studio installer,
+and portable archive to one Git commit and the three dependency locks.
 
 ## Extension seams
 

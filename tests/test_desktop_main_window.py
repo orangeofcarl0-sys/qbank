@@ -27,10 +27,10 @@ from pytestqt.qtbot import QtBot
 
 from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
-from qbank.desktop.controller import DesktopController
-from qbank.desktop.main_window import DesktopMainWindow
-from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesDialog
-from qbank.desktop.question_dialog import QuestionIdentity, QuestionIdentityDialog
+from qbank.legacy_qt.controller import DesktopController
+from qbank.legacy_qt.main_window import DesktopMainWindow
+from qbank.legacy_qt.preferences_dialog import StudioPreferences, StudioPreferencesDialog
+from qbank.legacy_qt.question_dialog import QuestionIdentity, QuestionIdentityDialog
 from qbank.models import (
     AssetCapabilities,
     DesktopAssetItem,
@@ -154,7 +154,7 @@ def test_main_toolbar_is_compact_and_preferences_apply_immediately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "qbank.desktop.main_window.load_studio_preferences",
+        "qbank.legacy_qt.main_window.load_studio_preferences",
         lambda theme: StudioPreferences(theme=theme),
     )
     window, _controller = _window(project, question, qtbot)
@@ -203,7 +203,7 @@ def test_main_toolbar_is_compact_and_preferences_apply_immediately(
         "get_preferences",
         select_preferences,
     )
-    monkeypatch.setattr("qbank.desktop.main_window.save_studio_preferences", saved.append)
+    monkeypatch.setattr("qbank.legacy_qt.main_window.save_studio_preferences", saved.append)
 
     window._show_preferences()
 
@@ -964,7 +964,7 @@ def test_main_window_remaining_editor_and_dialog_decisions(  # noqa: PLR0915
             show_project_path=True,
         )
         patch.setattr(StudioPreferencesDialog, "get_preferences", lambda *_args: selected)
-        patch.setattr("qbank.desktop.main_window.save_studio_preferences", lambda _value: None)
+        patch.setattr("qbank.legacy_qt.main_window.save_studio_preferences", lambda _value: None)
         window._show_preferences()
         assert window.theme_name == "dark" and not window.drawer.isVisible()
 

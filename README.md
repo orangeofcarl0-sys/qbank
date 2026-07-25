@@ -6,7 +6,8 @@
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **版本状态：** `0.2.0` 是当前冻结的发布基线，要求 Python 3.11 或更高版本。
+> **版本状态：** `v0.2.0` 是不可变发布基线；`main` 现进入统一的 `0.3.0b1`
+> 开发线，对外显示为 `0.3.0-beta.1`。Question、Asset、Paper Schema 仍为 `1.0`。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
 <picture>
@@ -18,9 +19,10 @@
 
 | 使用入口 | 适用场景 | 启动方式 |
 | --- | --- | --- |
-| Studio | 日常浏览、编辑、标签整理、资源管理和组卷 | `qbank desktop` |
+| QBank Studio | 日常浏览、编辑、标签整理、资源管理和组卷 | Windows 安装器或便携包 |
 | CLI | 批量导入、校验、查询、导出和自动化 | `qbank --help` |
 | Codex Skill / MCP | 让 Codex 在相同数据边界内协作 | `qbank codex integration-status --format json` |
+| QBank Studio Legacy | Qt 维护回退，仅处理严重兼容、安全或数据损坏问题 | `qbank desktop` |
 
 ## 项目定位
 
@@ -40,9 +42,10 @@ qbank 面向希望将题目长期保存在普通文件中，同时让桌面编�
 - 导出 Markdown、HTML、JSON、JSONL、纯文本和 DOCX；
 - 通过 Studio、CLI、Codex Skill 与可选 MCP 复用同一应用服务和事务边界。
 
-## Studio 桌面编辑器
+## QBank Studio 桌面编辑器
 
-Studio 是可选的本地 Qt 桌面界面，不依赖 Web 后端，也不维护第二份题库数据。界面采用紧凑的
+QBank Studio 是位于同一仓库 `apps/studio/` 的现代 Tauri presentation adapter，可独立
+打包和安装，但不维护第二份题库实现。界面采用紧凑的
 两栏半布局：左侧用于题库导航与筛选，中部用于 Markdown/TeX 源码和实时预览，右侧用于
 题目属性、资源、来源和历史记录。
 
@@ -53,19 +56,34 @@ Studio 是可选的本地 Qt 桌面界面，不依赖 Web 后端，也不维护�
 
 <p align="center"><sub>深色模式保持编辑器、预览和详情面板的一致语义，并显示资源能力与状态。</sub></p>
 
-安装并启动 Studio：
+开发环境启动现代 Studio：
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -U pip setuptools wheel
-pip install -e ".[desktop]"
-qbank desktop
+python scripts/check.py fast --scope studio
+Set-Location apps\studio
+npm ci
+npm run tauri dev
 ```
 
-Windows 上建议使用标准 CPython 环境，以避免其他 Python 发行版附带的 Qt DLL 与 PySide6
-冲突。完整交互说明见 [Studio 用户文档](docs/zh-CN/desktop-editor.md)，视觉规范见
+Qt 客户端已明确更名为 QBank Studio Legacy，并继续通过 `qbank desktop` 启动；两者共享
+相同题库格式、锁、事务、历史和索引，不执行不可逆迁移。完整交互说明见
+[Studio 用户文档](docs/zh-CN/desktop-editor.md)，统一构建方式见
+[单仓库开发指南](docs/monorepo-development.md)，视觉规范见
 [Studio 设计系统](docs/ui/design-system.md)。
+
+## 统一仓库开发
+
+Python 包、CLI、MCP、Skill、Studio sidecar、Tauri 应用和 Qt Legacy 位于同一 Git 仓库。
+普通改动先运行受影响模块的 fast 检查；只有 Protocol、写入、编辑器、权限或安装边界发生
+变化时运行 integration；release 仅用于版本冻结和正式发布。
+
+```powershell
+python scripts/check.py fast
+python scripts/check.py integration
+python scripts/build.py wheel
+python scripts/build.py studio
+python scripts/build.py all
+```
 
 ## 快速开始
 
@@ -229,6 +247,7 @@ operation 保存在 `.qbank/mcp-operations/`；服务重启或响应丢失后可
 | [用户指南](docs/zh-CN/user-guide.md) | 初始化、数据格式、写入、查询、标签、资产、组卷、导出与诊断 |
 | [CLI 命令参考](docs/zh-CN/cli-reference.md) | 公共命令清单、用途和自动化边界 |
 | [Studio 用户文档](docs/zh-CN/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
+| [单仓库开发指南](docs/monorepo-development.md) | 目录结构、三级检查、变更影响和统一构建 |
 | [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
 | [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |

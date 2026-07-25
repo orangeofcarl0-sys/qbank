@@ -59,9 +59,9 @@ def _run(options: CaptureOptions) -> int:
 
     from qbank.bootstrap import create_project_services
     from qbank.context import ProjectContext
-    from qbank.desktop.controller import DesktopController, InteractiveRenderer
-    from qbank.desktop.main_window import DesktopMainWindow
-    from qbank.desktop.preferences_dialog import StudioPreferences, save_studio_preferences
+    from qbank.legacy_qt.controller import DesktopController, InteractiveRenderer
+    from qbank.legacy_qt.main_window import DesktopMainWindow
+    from qbank.legacy_qt.preferences_dialog import StudioPreferences, save_studio_preferences
     from qbank.presentation.studio.design.palette import ThemeName
     from qbank.presentation.studio.design.stylesheet import apply_theme
 
@@ -130,8 +130,8 @@ def _show_state(
     tab: int,
 ):
     """Configure one interaction state and return the widget to capture."""
-    from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesDialog
-    from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
+    from qbank.legacy_qt.preferences_dialog import StudioPreferences, StudioPreferencesDialog
+    from qbank.legacy_qt.tag_dialogs import TagManagerDialog, TagOverviewDialog
     from qbank.models import QueryFilters
     from qbank.presentation.studio.design.palette import ThemeName
 

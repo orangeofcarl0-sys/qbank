@@ -19,6 +19,7 @@
 | `docs/*/known-limitations-0.2.0.md` | 部署者 | 冻结版本限制 | 0.2.x 限制澄清 |
 | `docs/localization.md` | 文档维护者 | 语言范围、编写与同步门禁 | 支持语言或本地化范围 |
 | `docs/architecture.md` | 维护者 | 分层、数据和事务边界 | 架构边界 |
+| `docs/monorepo-development.md` | 开发者 | Studio/CLI/MCP/Legacy 目录、三级检查与统一构建 | 仓库结构、版本或构建入口 |
 | `docs/adr/` | 维护者 | 重要决定及其后果 | 架构、权威源、事务、安全、依赖 |
 | `docs/features/` | 产品与实现人员 | 单项功能的完整契约 | 功能生命周期状态 |
 | `.agents/skills/qbank/` | Codex | 确定性操作协议 | 工作流、命令、授权 |

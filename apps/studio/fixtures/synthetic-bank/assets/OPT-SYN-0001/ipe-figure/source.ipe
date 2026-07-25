@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!DOCTYPE ipe SYSTEM "ipe.dtd">
+<ipe version="70218" creator="QBank Studio synthetic fixture">
+<info created="D:20260101000000" modified="D:20260101000000"/>
+<page>
+<layer name="alpha"/>
+<view layers="alpha" active="alpha"/>
+<path layer="alpha" stroke="0.24 0.45 0.65" fill="0.90 0.94 0.97" pen="1.2" join="1">
+32 32 m
+224 32 l
+224 144 l
+32 144 l
+h
+</path>
+<path layer="alpha" stroke="0.18 0.38 0.58" pen="2.4" cap="1">
+48 88 m
+72 120 96 120 120 88 c
+144 56 168 56 208 88 c
+</path>
+<path layer="alpha" stroke="0.70 0.42 0.20" pen="1.6" cap="1">
+48 88 m
+80 56 112 56 144 88 c
+176 120 192 112 208 88 c
+</path>
+</page>
+</ipe>

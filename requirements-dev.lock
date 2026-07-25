@@ -28,6 +28,7 @@ iniconfig==2.3.0
 Jinja2==3.1.6
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+pyinstaller==6.19.0
 librt==0.13.0
 license-expression==30.4.4
 markdown-it-py==4.2.0

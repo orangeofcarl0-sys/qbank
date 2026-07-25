@@ -4,18 +4,33 @@
 
 ## 范围与安装
 
-Studio 是现有 qbank 应用的可选本地 Qt 展示层，不是另一套题库实现。Markdown 仍是权威数据，
-SQLite 仍可重建；题目、taxonomy、试卷和资产写入与 CLI 共用类型化服务、事务、校验、历史和
-项目锁。
+QBank Studio 是同一 qbank 仓库中 `apps/studio/` 下的现代 Tauri presentation adapter，
+可独立打包和安装，但不是另一套题库实现。Markdown 仍是权威数据，SQLite 仍可重建；题目、
+taxonomy、试卷和资产写入通过 `qbank.studio_sidecar` 调用与 CLI、MCP 相同的类型化服务、
+事务、校验、历史和项目锁。
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
+python scripts/check.py fast --scope studio
+Set-Location apps\studio
+npm ci
+npm run tauri dev
+```
+
+正式使用应选择同一提交生成的 Windows 安装器或便携包。Studio Protocol 保持 `1.0`；
+Python 包版本为 `0.3.0b1`，界面对外显示 `0.3.0-beta.1`，数据 Schema 仍为 `1.0`。
+
+## QBank Studio Legacy
+
+原 Qt 客户端已更名为 QBank Studio Legacy，并继续通过以下命令启动：
+
+```powershell
 pip install -e ".[desktop]"
 qbank desktop
 ```
 
-Windows 建议使用标准 CPython，避免其他 Python 发行版附带的 Qt DLL 与 PySide6 冲突。
+Legacy 只接受数据损坏、安全或严重兼容性修复。它与现代 Studio 使用相同题库格式、锁、
+事务、历史和索引，不要求也不执行不可逆题库迁移。Windows 运行 Legacy 时建议使用标准
+CPython，避免其他 Python 发行版附带的 Qt DLL 与 PySide6 冲突。
 
 ## 窗口与编辑模型
 
@@ -50,7 +65,7 @@ dirty 状态、标题标记、Inspector、源码快照和预览 generation 保�
 
 ## 资产与预览
 
-CodeMirror 6 随 wheel 提供，可离线编辑；MathJax 沿用现有 CDN 策略。预览只读，Markdown
+Vditor、MathJax 资源与现代 Studio 应用一起打包，可离线编辑和渲染；预览只读，Markdown
 原始 HTML 继续禁用。
 
 新图片绑定在 Markdown 中使用 `qbank-asset:<asset-id>`，在 TeX 中使用

@@ -228,7 +228,7 @@ def _filesystem_semantics_check(root: Path) -> DoctorCheck:
             "filesystem_semantics",
             "WARN",
             "; ".join(reasons)
-            + "; qbank 0.2.0 does not guarantee multi-machine or network-share locking",
+            + "; qbank does not guarantee multi-machine or network-share locking",
         )
     return _check(
         "filesystem_semantics",

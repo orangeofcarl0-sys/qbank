@@ -156,5 +156,9 @@ class StudioProjectAdapter:
             assets=self.assets,
         )
 
-    def _paper_path(self, path: Path) -> Path:
+    def paper_path(self, path: Path) -> Path:
+        """Resolve a paper path through the shared paper application service."""
         return self.papers.resolve(path)
+
+    def _paper_path(self, path: Path) -> Path:
+        return self.paper_path(path)

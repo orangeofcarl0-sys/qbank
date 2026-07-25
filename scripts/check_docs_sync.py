@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +47,11 @@ PUBLIC_FILES = (
     "docs/features/_template.md",
     "docs/features/capability-matrix.md",
     "docs/features/bilingual-documentation.md",
+    "docs/features/unified-studio-monorepo.md",
+    "docs/adr/0006-unified-studio-monorepo.md",
+    "docs/monorepo-development.md",
+    "protocol/README.md",
+    "protocol/studio-protocol-v1.json",
 )
 LOCALIZED_DOCUMENTS = (
     "README.md",
@@ -79,8 +86,19 @@ PUBLIC_TEXT_ROOTS = (
     ".agents/skills/qbank-digitize",
     "examples",
 )
-SOURCE_PREFIXES = ("src/qbank/",)
-INTERFACE_PREFIXES = ("src/qbank/commands/", "src/qbank/mcp/")
+SOURCE_PREFIXES = (
+    "src/qbank/",
+    "apps/studio/",
+    "protocol/",
+    "scripts/build.py",
+    "scripts/check.py",
+)
+INTERFACE_PREFIXES = (
+    "src/qbank/commands/",
+    "src/qbank/mcp/",
+    "src/qbank/studio_sidecar/",
+    "protocol/",
+)
 INTERFACE_FILES = {"src/qbank/cli.py", "src/qbank/codex_manifest.py"}
 SCHEMA_PREFIXES = ("schemas/", "src/qbank/models/")
 SCHEMA_FILES = {
@@ -96,6 +114,7 @@ DOC_FILES = {
     "CONTRIBUTING.md",
     "SECURITY.md",
     "AGENTS.md",
+    "docs/monorepo-development.md",
 }
 PRIVATE_PATTERN = re.compile(
     r"(?i)(?:[A-Z]:[\\/](?:Users|project|Program Files|tools)[\\/][^\s`'\"<>]*|"
@@ -322,6 +341,44 @@ def _public_data_safety(root: Path) -> Check:
     return _check("public-data-safety", unsafe, "no machine paths or private identity found")
 
 
+def _monorepo_contract(root: Path) -> Check:
+    failures: list[str] = []
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    package = json.loads((root / "apps/studio/package.json").read_text(encoding="utf-8"))
+    tauri = json.loads((root / "apps/studio/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+    protocol = json.loads((root / "protocol/studio-protocol-v1.json").read_text(encoding="utf-8"))
+    if project["project"]["version"] != "0.3.0b1":
+        failures.append("Python package is not 0.3.0b1")
+    if package["version"] != "0.3.0-beta.1" or tauri["version"] != "0.3.0-beta.1":
+        failures.append("Studio display versions are not 0.3.0-beta.1")
+    if protocol["protocolVersion"] != "1.0":
+        failures.append("Studio Protocol is not 1.0")
+    for relative in (
+        "src/qbank/studio_sidecar",
+        "src/qbank/legacy_qt",
+        "apps/studio/src",
+        "apps/studio/src-tauri",
+        "apps/studio/tests",
+        "scripts/check.py",
+        "scripts/build.py",
+        "scripts/change-impact.json",
+    ):
+        if not (root / relative).exists():
+            failures.append(f"missing monorepo path: {relative}")
+    guide = (root / "docs/monorepo-development.md").read_text(encoding="utf-8")
+    for command in (
+        "python scripts/check.py fast",
+        "python scripts/check.py integration",
+        "python scripts/check.py release",
+        "python scripts/build.py wheel",
+        "python scripts/build.py studio",
+        "python scripts/build.py all",
+    ):
+        if command not in guide:
+            failures.append(f"undocumented monorepo command: {command}")
+    return _check("studio-monorepo-contract", failures, "versions, paths, and entry points agree")
+
+
 def _run(root: Path, args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root / "src")
@@ -440,6 +497,7 @@ def run_checks(root: Path, *, base: str | None = None, skip_examples: bool = Fal
         _cli_documentation(root, leaves),
         *_manifest_consistency(root, nodes),
         *_skill_consistency(root),
+        _monorepo_contract(root),
         _public_data_safety(root),
         _delta_policy(root, base),
     ]

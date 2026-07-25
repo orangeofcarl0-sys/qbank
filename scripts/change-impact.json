@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "scopes": {
+    "core": [
+      "pyproject.toml",
+      "requirements-dev.lock",
+      "src/qbank/application/**",
+      "src/qbank/domain/**",
+      "src/qbank/infrastructure/**",
+      "src/qbank/models/**",
+      "src/qbank/*.py",
+      "tests/test_architecture_*.py",
+      "tests/test_cli.py"
+    ],
+    "legacy": [
+      "src/qbank/legacy_qt/**",
+      "src/qbank/presentation/studio/**",
+      "tests/test_desktop*.py",
+      "tests/test_studio*.py",
+      "scripts/capture-ui.py"
+    ],
+    "sidecar": [
+      "src/qbank/studio_sidecar/**",
+      "tests/studio_sidecar/**",
+      "protocol/**"
+    ],
+    "studio": [
+      "apps/studio/src/**",
+      "apps/studio/tests/**",
+      "apps/studio/package.json",
+      "apps/studio/package-lock.json",
+      "apps/studio/vite.config.ts"
+    ],
+    "build": [
+      "apps/studio/src-tauri/**",
+      "apps/studio/scripts/**",
+      "scripts/build.py",
+      "scripts/check.py",
+      "scripts/change-impact.json"
+    ],
+    "docs": [
+      "README.md",
+      "README.en.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "docs/**"
+    ]
+  },
+  "integrationTriggers": {
+    "protocol": ["protocol/**", "src/qbank/studio_sidecar/**"],
+    "writing": [
+      "src/qbank/application/**",
+      "src/qbank/transaction.py",
+      "src/qbank/repository.py",
+      "src/qbank/search_index.py"
+    ],
+    "editor": [
+      "apps/studio/src/editor-buffer.ts",
+      "apps/studio/src/markdown.ts",
+      "apps/studio/src/secure-preview.ts",
+      "apps/studio/src/studio-app.ts"
+    ],
+    "permissions": [
+      "apps/studio/src-tauri/capabilities/**",
+      "apps/studio/src-tauri/tauri.conf.json"
+    ],
+    "installation": [
+      "apps/studio/src-tauri/**",
+      "apps/studio/scripts/**",
+      "scripts/build.py"
+    ]
+  },
+  "evidenceReuse": {
+    "requiredBindings": [
+      "gitCommit",
+      "requirements-dev.lock",
+      "apps/studio/package-lock.json",
+      "apps/studio/src-tauri/Cargo.lock",
+      "artifactSha256"
+    ],
+    "rule": "Do not regenerate unchanged release evidence when every binding still matches."
+  }
+}

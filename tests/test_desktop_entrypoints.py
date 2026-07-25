@@ -15,8 +15,8 @@ def test_desktop_qt_composition_handles_owned_and_existing_applications(
     project: tuple[Path, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import qbank.desktop as desktop_package
-    import qbank.desktop.qt as desktop_qt
+    import qbank.legacy_qt as desktop_package
+    import qbank.legacy_qt.qt as desktop_qt
 
     root, _config = project
     events: list[object] = []

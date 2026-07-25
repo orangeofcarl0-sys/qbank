@@ -1,0 +1,37 @@
+# {{ paper.title }}
+{% if paper.subtitle %}
+## {{ paper.subtitle }}
+{% endif %}
+{% if total_score %}
+
+总分：{{ total_score|number }} 分
+{% endif %}
+
+{% for section in sections %}
+## {{ section.title }}
+
+{% for item in section.questions %}
+### {{ loop.index }}. {{ item.question.title }}{% if show_scores %}（{{ item.score|number }} 分）{% endif %}{% if show_ids %} `{{ item.question.id }}`{% endif %}
+
+{{ item.question.stem_md }}
+
+{% if item.question.options_md %}{{ item.question.options_md }}
+
+{% endif %}
+{% if include_answers %}#### 答案
+
+{{ item.question.answer_md or "（未提供）" }}
+
+{% endif %}
+{% if include_solutions %}#### 解析
+
+{{ item.question.solution_md or "（未提供）" }}
+
+{% endif %}
+{% if include_rubric %}#### 评分要点
+
+{{ item.question.rubric_md or "（未提供）" }}
+
+{% endif %}
+{% endfor %}
+{% endfor %}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="260" viewBox="0 0 720 260">
+  <rect width="720" height="260" rx="16" fill="#f7f9fc"/>
+  <path d="M30 130 C90 30 150 230 210 130 S330 30 390 130 S510 230 570 130 S660 30 690 130"
+        fill="none" stroke="#3974a8" stroke-width="5"/>
+  <path d="M30 130 C90 230 150 30 210 130 S330 230 390 130 S510 30 570 130 S660 230 690 130"
+        fill="none" stroke="#85a9cf" stroke-width="4"/>
+  <text x="360" y="235" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="18" fill="#394654">QBank Studio synthetic asset</text>
+</svg>

@@ -4,20 +4,36 @@
 
 ## Scope and installation
 
-Studio is the optional local Qt presentation for the existing qbank application, not a second
-question-bank implementation. Markdown remains authoritative, SQLite remains rebuildable, and
-question, taxonomy, paper, and asset mutations use the same typed services, transactions,
-validation, history, and project lock as the CLI.
+QBank Studio is the modern Tauri presentation adapter under `apps/studio/` in the same qbank
+repository. It can be packaged and installed independently, but it is not a second question-bank
+implementation. Markdown remains authoritative and SQLite remains rebuildable. Through
+`qbank.studio_sidecar`, question, taxonomy, paper, and asset mutations use the same typed services,
+transactions, validation, history, and project lock as the CLI and MCP.
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
+python scripts/check.py fast --scope studio
+Set-Location apps\studio
+npm ci
+npm run tauri dev
+```
+
+Production use should use the Windows installer or portable archive built from the same commit.
+Studio Protocol remains at `1.0`; the Python package is `0.3.0b1`, the product displays
+`0.3.0-beta.1`, and the data Schemas remain at `1.0`.
+
+## QBank Studio Legacy
+
+The former Qt client is now QBank Studio Legacy and remains available through:
+
+```powershell
 pip install -e ".[desktop]"
 qbank desktop
 ```
 
-Standard CPython is recommended on Windows because Qt DLLs bundled by another Python distribution
-can conflict with PySide6.
+Legacy accepts only data-loss, security, or severe compatibility fixes. It shares repository
+formats, locks, transactions, history, and indexes with the modern Studio and performs no
+irreversible migration. Standard CPython is recommended for Legacy on Windows because Qt DLLs
+bundled by another Python distribution can conflict with PySide6.
 
 ## Window and editing model
 
@@ -61,8 +77,8 @@ original error.
 
 ## Assets and preview
 
-CodeMirror 6 is bundled in the wheel and works offline. MathJax follows the existing CDN policy.
-Preview is read-only and raw HTML in Markdown remains disabled.
+Vditor and MathJax resources are bundled with the modern Studio and work offline. Preview is
+read-only and raw HTML in Markdown remains disabled.
 
 New image bindings use `qbank-asset:<asset-id>` in Markdown or `\qbankasset{<asset-id>}` in TeX.
 Local thumbnails open only after containment and existence checks. External HTTP/HTTPS resources are

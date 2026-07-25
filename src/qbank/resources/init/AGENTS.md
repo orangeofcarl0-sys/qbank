@@ -1,5 +1,13 @@
 # qbank agent rules
 
+- QBank Studio is the modern presentation adapter in `apps/studio/`, not a separate product or
+  repository. Its sidecar lives in `qbank.studio_sidecar` and must reuse qbank application services.
+- `qbank desktop` launches QBank Studio Legacy from `qbank.legacy_qt`. Legacy accepts only
+  data-loss, security, or severe compatibility fixes.
+- Use `python scripts/check.py fast` for ordinary changes, `integration` only for affected
+  boundaries, and `release` only for a version freeze or publication.
+- Build wheel and Studio artifacts through `python scripts/build.py`; artifacts from one release
+  candidate must bind to the same Git commit and dependency locks.
 - Markdown under `questions/` is the authoritative question data.
 - Before acting across projects, identify the target qbank root, source locations, and
   authorization; run qbank commands with the target root as the working directory.

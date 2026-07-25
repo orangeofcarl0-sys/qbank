@@ -16,7 +16,8 @@
 
 ## Maintainer material
 
-- [Architecture](../architecture.md) and [architecture decision records](../adr/)
+- [Architecture](../architecture.md), [monorepo development](../monorepo-development.md), and
+  [architecture decision records](../adr/)
 - [Capability matrix](../features/capability-matrix.md)
 - [Documentation maintenance policy](../maintenance-policy.md),
   [feature lifecycle](../feature-lifecycle.md), and [documentation map](../documentation-map.md)

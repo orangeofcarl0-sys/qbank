@@ -16,7 +16,7 @@
 
 ## 维护者资料
 
-- [架构](../architecture.md)与[架构决策记录](../adr/)
+- [架构](../architecture.md)、[单仓库开发指南](../monorepo-development.md)与[架构决策记录](../adr/)
 - [能力矩阵](../features/capability-matrix.md)
 - [文档维护策略](../maintenance-policy.md)、[功能生命周期](../feature-lifecycle.md)与
   [文档地图](../documentation-map.md)

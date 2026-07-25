@@ -30,24 +30,30 @@ Codex Skill、配置、Schema、错误码、迁移说明、测试、示例、截
 
 ## 本地检查
 
-提交前运行：
+普通改动先运行基于变更影响映射的 fast 检查：
 
 ```powershell
-python scripts/check_docs_sync.py
-ruff format --check .
-ruff check .
-pyright
-mypy src/qbank
-lint-imports
-deptry .
-pytest --cov=qbank --cov-branch --cov-fail-under=90
-pip check
-pip-audit
-git diff --check
+python scripts/check.py fast
 ```
 
-Studio 视觉或交互变更还必须遵循仓库级 `$qbank-ui-design` Skill，并完成浅色、深色以及
-100%/125% 缩放验收。发布准备必须遵循 `$oss-readiness` 和 `$release-preparation`。
+Protocol、sidecar、权威写入、Vditor、MathJax、Tauri 权限或安装边界改变时运行：
+
+```powershell
+python scripts/check.py integration
+```
+
+`python scripts/check.py release` 只用于版本冻结和正式发布。变更影响映射和证据复用规则见
+[单仓库开发指南](docs/monorepo-development.md)。Studio 视觉或交互变更还必须遵循仓库级
+`$qbank-ui-design` Skill，并完成浅色、深色以及 100%/125% 缩放验收。发布准备必须遵循
+`$oss-readiness` 和 `$release-preparation`。
+
+统一制品入口为：
+
+```powershell
+python scripts/build.py wheel
+python scripts/build.py studio
+python scripts/build.py all
+```
 
 ## 兼容性与版本
 

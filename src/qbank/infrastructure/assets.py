@@ -386,7 +386,7 @@ class AssetInputAdapter:
         representation: AssetPackageRepresentation,
     ) -> tuple[bytes, AssetFormat, str]:
         url = cast(str, representation.url)
-        request = urllib.request.Request(url, headers={"User-Agent": "qbank/0.2.0"})
+        request = urllib.request.Request(url, headers={"User-Agent": "qbank/0.3.0b1"})
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 content = response.read(self.max_bytes + 1)

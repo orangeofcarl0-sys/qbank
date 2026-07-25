@@ -10,8 +10,8 @@ import pytest
 
 from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
-from qbank.desktop.controller import DesktopController, _format_from_data_uri
 from qbank.errors import DataValidationError
+from qbank.legacy_qt.controller import DesktopController, _format_from_data_uri
 from qbank.models import (
     AssetFormat,
     AssetPackage,

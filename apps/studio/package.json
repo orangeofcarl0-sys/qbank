@@ -1,0 +1,44 @@
+{
+  "name": "qbank-studio",
+  "private": true,
+  "version": "0.3.0-beta.1",
+  "description": "Tauri presentation adapter for the qbank monorepo",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude tests/browser/**",
+    "test:browser": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "sidecar:test": "python -m pytest ../../tests/studio_sidecar ../../protocol/tests",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "diff-match-patch": "^1.0.5",
+    "vditor": "3.11.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@tauri-apps/cli": "^2.10.0",
+    "@types/diff-match-patch": "^1.0.36",
+    "@types/node": "^22.19.11",
+    "@vitest/coverage-v8": "^4.0.18",
+    "bytemd": "^1.22.0",
+    "eslint": "^9.39.2",
+    "playwright": "^1.58.2",
+    "typescript": "~5.6.2",
+    "typescript-eslint": "^8.53.1",
+    "vite": "^6.0.3",
+    "vite-plugin-static-copy": "^3.2.0",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8"
+  }
+}

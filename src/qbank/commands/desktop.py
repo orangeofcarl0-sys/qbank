@@ -17,9 +17,9 @@ def desktop_command(
         typer.Option("--project", help="qbank project root; defaults to upward discovery."),
     ] = None,
 ) -> None:
-    """Launch the PySide6 Markdown/TeX question editor."""
+    """Launch QBank Studio Legacy, the retained PySide6 fallback."""
     try:
-        from qbank.desktop import launch
+        from qbank.legacy_qt import launch
 
         code = launch(project.resolve() if project is not None else None)
         if code:

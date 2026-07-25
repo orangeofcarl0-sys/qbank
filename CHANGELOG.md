@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Unified the modern Tauri QBank Studio, Studio Protocol v1, Python sidecar, CLI, MCP,
+  Skills, and QBank Studio Legacy in one repository and one `0.3.0b1` development line.
+- Added root `fast`, `integration`, and `release` verification tiers with a deterministic
+  change-impact map so unchanged release evidence is not regenerated without cause.
+- Added root wheel, Studio, and combined build entry points. Wheel, installer, portable
+  archive, dependency-lock hashes, and SHA-256 manifest now bind to one Git commit.
+- Renamed the retained Qt presentation to QBank Studio Legacy. It continues to use the
+  same qbank application services and accepts only data-loss, security, or severe
+  compatibility fixes.
 - Added separate Simplified Chinese and English README and user-documentation trees, stable
   language-selection pages for existing links, and a localization policy that prevents mixed prose.
 - Extended the documentation gate to require locale pairs, cross-language navigation, language

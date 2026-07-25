@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qbank"
-version = "0.2.0"
+version = "0.3.0b1"
 description = "A transparent, local-first Markdown question bank CLI"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,7 +32,9 @@ dev = [
   "deptry>=0.23,<1",
   "hatchling>=1.25,<2",
   "import-linter>=2.8,<3",
+  "jsonschema>=4.23,<5",
   "pip-audit>=2.9,<3",
+  "pyinstaller>=6.11,<7",
   "mypy>=1.11,<2",
   "mcp>=1.28.1,<2",
   "pytest>=8.2,<10",
@@ -48,6 +50,7 @@ studio-dev = [
 
 [project.scripts]
 qbank = "qbank.cli:app"
+qbank-studio-sidecar = "qbank.studio_sidecar.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/qbank"]
@@ -94,6 +97,7 @@ max-statements = 40
 
 [tool.ruff.lint.per-file-ignores]
 "src/qbank/commands/*.py" = ["PLR0913"]
+"src/qbank/studio_sidecar/application.py" = ["C901", "PLR0912", "PLR0915"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -148,7 +152,8 @@ forbidden_modules = [
   "qbank.cli",
   "qbank.bootstrap",
   "qbank.presentation",
-  "qbank.desktop",
+  "qbank.legacy_qt",
+  "qbank.studio_sidecar",
   "qbank.services.codex",
   "typer",
   "rich",
@@ -161,7 +166,8 @@ type = "forbidden"
 source_modules = ["qbank.application"]
 forbidden_modules = [
   "qbank.presentation",
-  "qbank.desktop",
+  "qbank.legacy_qt",
+  "qbank.studio_sidecar",
   "qbank.bootstrap",
   "qbank.commands",
   "qbank.cli",
@@ -176,7 +182,8 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Studio presentation does not depend on storage, CLI, or infrastructure adapters"
 type = "forbidden"
-source_modules = ["qbank.presentation"]
+source_modules = ["qbank.presentation", "qbank.legacy_qt"]
+allow_indirect_imports = true
 forbidden_modules = [
   "qbank.infrastructure",
   "qbank.repository",
@@ -190,6 +197,23 @@ forbidden_modules = [
   "sqlite3",
   "typer",
   "rich",
+]
+
+[[tool.importlinter.contracts]]
+name = "Studio sidecar is independent from other presentation adapters"
+type = "forbidden"
+source_modules = ["qbank.studio_sidecar"]
+forbidden_modules = [
+  "qbank.commands",
+  "qbank.cli",
+  "qbank.mcp",
+  "qbank.presentation",
+  "qbank.legacy_qt",
+  "qbank.services.codex",
+  "qbank.services.mcp_config",
+  "typer",
+  "rich",
+  "PySide6",
 ]
 
 [[tool.importlinter.contracts]]
@@ -215,7 +239,15 @@ forbidden_modules = ["qbank.repository", "qbank.search_index", "sqlite3"]
 name = "Infrastructure adapters do not depend on presentation"
 type = "forbidden"
 source_modules = ["qbank.infrastructure"]
-forbidden_modules = ["qbank.commands", "qbank.cli", "typer", "rich"]
+forbidden_modules = [
+  "qbank.commands",
+  "qbank.cli",
+  "qbank.presentation",
+  "qbank.legacy_qt",
+  "qbank.studio_sidecar",
+  "typer",
+  "rich",
+]
 
 [[tool.importlinter.contracts]]
 name = "Application, domain, and presentation follow inward dependencies"

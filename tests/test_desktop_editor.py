@@ -15,10 +15,10 @@ from qbank.assets import stable_legacy_asset_id
 from qbank.bootstrap import create_project_services
 from qbank.cli import app
 from qbank.context import ProjectContext
-from qbank.desktop.controller import DesktopController
 from qbank.domain import RenderedAsset
 from qbank.errors import ConflictError, DataValidationError, QuestionNotFoundError
 from qbank.infrastructure.assets import AssetInputAdapter, FileAssetRepository
+from qbank.legacy_qt.controller import DesktopController
 from qbank.models import (
     AssetFormat,
     AssetPackage,
@@ -416,7 +416,7 @@ def test_asset_rollback_failure_preserves_original_exception(
 
 def test_desktop_resources_embed_codemirror_and_closed_asset_actions() -> None:
     root = Path(__file__).parents[1] / "src/qbank/resources/desktop"
-    main_window = (Path(__file__).parents[1] / "src/qbank/desktop/main_window.py").read_text(
+    main_window = (Path(__file__).parents[1] / "src/qbank/legacy_qt/main_window.py").read_text(
         encoding="utf-8"
     )
     bundle = (root / "codemirror.bundle.js").read_text(encoding="utf-8")
@@ -744,19 +744,19 @@ def test_desktop_command_maps_launch_results_and_missing_optional_dependency(
     runner: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import qbank.desktop
+    import qbank.legacy_qt
 
-    monkeypatch.setattr(qbank.desktop, "launch", lambda project=None: 0)
+    monkeypatch.setattr(qbank.legacy_qt, "launch", lambda project=None: 0)
     assert runner.invoke(app, ["desktop"]).exit_code == 0
 
-    monkeypatch.setattr(qbank.desktop, "launch", lambda project=None: 4)
+    monkeypatch.setattr(qbank.legacy_qt, "launch", lambda project=None: 4)
     assert runner.invoke(app, ["desktop"]).exit_code == 4
 
     def missing(project: Path | None = None) -> int:
         del project
         raise ModuleNotFoundError("No module named PySide6", name="PySide6")
 
-    monkeypatch.setattr(qbank.desktop, "launch", missing)
+    monkeypatch.setattr(qbank.legacy_qt, "launch", missing)
     result = runner.invoke(app, ["desktop"])
     assert result.exit_code == 7
     assert "install qbank with the 'desktop' extra" in result.stderr

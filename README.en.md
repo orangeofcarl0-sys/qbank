@@ -7,9 +7,9 @@ Questions are durable Markdown files with YAML front matter; JSON and JSONL are 
 SQLite is only a rebuildable search projection; and `paper.yaml` describes reviewable, reproducible
 papers.
 
-> **Version status:** `0.2.0` is the current frozen release baseline and requires Python 3.11 or
-> later. Markdown is the sole authority for question content; indexes, previews, and exports are
-> rebuildable.
+> **Version status:** `v0.2.0` is the immutable release baseline. `main` now uses the unified
+> `0.3.0b1` development line, displayed as `0.3.0-beta.1`. Question, Asset, and Paper Schemas
+> remain at `1.0`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/studio-main-dark.png">
@@ -18,9 +18,10 @@ papers.
 
 | Interface | Best for | Start with |
 | --- | --- | --- |
-| Studio | Browsing, editing, tags, assets, and paper composition | `qbank desktop` |
+| QBank Studio | Browsing, editing, tags, assets, and paper composition | Windows installer or portable archive |
 | CLI | Batch import, validation, queries, export, and automation | `qbank --help` |
 | Codex Skill / MCP | Codex collaboration under the same data boundary | `qbank codex integration-status --format json` |
+| QBank Studio Legacy | Qt fallback for severe compatibility, security, or data-loss defects | `qbank desktop` |
 
 ## Purpose and capabilities
 
@@ -30,24 +31,42 @@ rules. It provides structured questions, deterministic validation, filters and f
 managed assets, reproducible paper variants, and multiple export formats. It is not an online exam
 service, account system, learning-record store, automatic grader, OCR engine, or embedded model service.
 
-## Studio desktop editor
+## QBank Studio desktop editor
 
-Studio is an optional local Qt application with no Web backend and no second question store. The
-left column provides navigation and filters, the center provides source and live preview, and the
-right Inspector provides properties, assets, provenance, and history.
+QBank Studio is the modern Tauri presentation adapter under `apps/studio/`. It can be packaged and
+installed independently, but it does not maintain a second question-bank implementation. The left
+column provides navigation and filters, the center provides source and live preview, and the right
+Inspector provides properties, assets, provenance, and history.
 
 ![Studio asset and question details in dark mode](docs/assets/readme/studio-assets-dark.png)
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -U pip setuptools wheel
-pip install -e ".[desktop]"
-qbank desktop
+python scripts/check.py fast --scope studio
+Set-Location apps\studio
+npm ci
+npm run tauri dev
 ```
 
-On Windows, standard CPython avoids common Qt DLL conflicts from other Python distributions. See
-the [Studio guide](docs/en/desktop-editor.md) and [design system](docs/ui/design-system.md).
+The Qt client is now named QBank Studio Legacy and remains available through `qbank desktop`.
+Both clients share repository formats, locks, transactions, history, and indexes without an
+irreversible migration. See the [Studio guide](docs/en/desktop-editor.md), the
+[monorepo development guide](docs/monorepo-development.md), and the
+[design system](docs/ui/design-system.md).
+
+## Unified repository development
+
+The Python package, CLI, MCP, Skills, Studio sidecar, Tauri app, and Qt Legacy client live in one
+Git repository. Ordinary changes run affected fast checks. Integration checks run only when
+Protocol, writes, editor, permissions, or installation boundaries change. Release checks are
+reserved for a version freeze or formal publication.
+
+```powershell
+python scripts/check.py fast
+python scripts/check.py integration
+python scripts/build.py wheel
+python scripts/build.py studio
+python scripts/build.py all
+```
 
 ## Quick start
 
@@ -158,6 +177,7 @@ twice. See the [Codex and MCP guide](docs/en/codex-integration.md).
 | [User guide](docs/en/user-guide.md) | Daily data and command workflows |
 | [CLI reference](docs/en/cli-reference.md) | Public commands and automation boundaries |
 | [Studio guide](docs/en/desktop-editor.md) | Desktop interaction and resource behavior |
+| [Monorepo development](docs/monorepo-development.md) | Repository layout, tiered checks, impact mapping, and unified builds |
 | [Codex and MCP](docs/en/codex-integration.md) | Skills, cross-project context, MCP, and authorization |
 | [0.2.0 compatibility baseline](docs/en/compatibility-0.2.0.md) | Frozen CLI, Schema, MCP, diagnostics, and capabilities |
 | [Compatibility policy](docs/en/compatibility-policy.md) | Stable interfaces and release rules |

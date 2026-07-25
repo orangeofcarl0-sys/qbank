@@ -26,20 +26,20 @@ from PySide6.QtWidgets import (
 )
 from pytestqt.qtbot import QtBot
 
-from qbank.desktop.bridges import PreviewBridge
-from qbank.desktop.main_window import (
+from qbank.legacy_qt.bridges import PreviewBridge
+from qbank.legacy_qt.main_window import (
     DesktopMainWindow,
     changed_fields_count,
     preview_result_is_current,
     snapshot_is_dirty,
 )
-from qbank.desktop.preferences_dialog import (
+from qbank.legacy_qt.preferences_dialog import (
     StudioPreferences,
     StudioPreferencesForm,
     load_studio_preferences,
     save_studio_preferences,
 )
-from qbank.desktop.widgets import (
+from qbank.legacy_qt.widgets import (
     AssetCard,
     DetailDrawer,
     EmptyState,

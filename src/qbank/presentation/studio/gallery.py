@@ -26,9 +26,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from qbank.desktop.preferences_dialog import StudioPreferences, StudioPreferencesForm
-from qbank.desktop.question_dialog import QuestionIdentityForm
-from qbank.desktop.widgets import (
+from qbank.legacy_qt.preferences_dialog import StudioPreferences, StudioPreferencesForm
+from qbank.legacy_qt.question_dialog import QuestionIdentityForm
+from qbank.legacy_qt.widgets import (
     InspectorSummary,
     MetadataPanel,
     NavigationPane,

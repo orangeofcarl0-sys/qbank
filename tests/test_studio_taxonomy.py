@@ -25,9 +25,9 @@ from pytestqt.qtbot import QtBot
 
 from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
-from qbank.desktop.controller import DesktopController
-from qbank.desktop.tag_dialogs import TagManagerDialog, TagOverviewDialog
-from qbank.desktop.widgets import NavigationPane, TopicTagEditor
+from qbank.legacy_qt.controller import DesktopController
+from qbank.legacy_qt.tag_dialogs import TagManagerDialog, TagOverviewDialog
+from qbank.legacy_qt.widgets import NavigationPane, TopicTagEditor
 from qbank.models import (
     DesktopQuestionSummary,
     QueryFilters,

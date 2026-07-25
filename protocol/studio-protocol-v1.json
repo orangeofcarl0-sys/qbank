@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbank.local/protocol/studio-v1.json",
+  "title": "QBank Studio Protocol v1",
+  "description": "JSON-RPC 2.0 messages exchanged as one UTF-8 JSON object per stdio line.",
+  "protocolVersion": "1.0",
+  "transport": "json-rpc-2.0-over-stdio-lines",
+  "type": "object",
+  "required": ["protocolVersion", "transport", "methods"],
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "transport": { "const": "json-rpc-2.0-over-stdio-lines" },
+    "methods": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/method" },
+      "minItems": 29
+    }
+  },
+  "$defs": {
+    "method": {
+      "type": "object",
+      "required": ["name", "access", "params", "result"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "access": { "enum": ["read", "write", "lifecycle"] },
+        "params": { "type": "object" },
+        "result": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "methods": [
+    { "name": "initialize", "access": "lifecycle", "params": {}, "result": { "type": "object" } },
+    { "name": "repository.open", "access": "lifecycle", "params": { "root": "string" }, "result": { "type": "object" } },
+    { "name": "repository.status", "access": "read", "params": {}, "result": { "type": "object" } },
+    { "name": "question.search", "access": "read", "params": { "text": "string", "limit": "integer" }, "result": { "type": "array" } },
+    { "name": "question.list", "access": "read", "params": { "offset": "integer", "limit": "integer", "subject": "string", "chapter": "string", "topics": "array", "excludedTopics": "array", "topicMode": "and|or", "type": "string", "status": "string", "difficultyMin": "integer", "difficultyMax": "integer", "language": "string", "year": "integer", "text": "string" }, "result": { "type": "array" } },
+    { "name": "question.get", "access": "read", "params": { "id": "string" }, "result": { "type": "object" } },
+    { "name": "question.validate", "access": "read", "params": { "id": "string", "source": "string" }, "result": { "type": "object" } },
+    { "name": "question.save", "access": "write", "params": { "id": "string", "source": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.update", "access": "write", "params": { "id": "string", "set": "object", "topics": "array", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.create", "access": "write", "params": { "id": "string", "title": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.copy", "access": "write", "params": { "sourceId": "string", "newId": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.import", "access": "write", "params": { "path": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.delete", "access": "write", "params": { "id": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "question.bulkUpdate", "access": "write", "params": { "questionIds": "array", "set": "object", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "taxonomy.list", "access": "read", "params": {}, "result": { "type": "array" } },
+    { "name": "taxonomy.suggest", "access": "read", "params": { "text": "string", "limit": "integer" }, "result": { "type": "array" } },
+    { "name": "taxonomy.overview", "access": "read", "params": { "topN": "integer" }, "result": { "type": "object" } },
+    { "name": "taxonomy.update", "access": "write", "params": { "tag": "object", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "taxonomy.rename", "access": "write", "params": { "old": "string", "new": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "taxonomy.merge", "access": "write", "params": { "source": "string", "target": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "taxonomy.delete", "access": "write", "params": { "value": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "taxonomy.bulkEdit", "access": "write", "params": { "questionIds": "array", "add": "array", "remove": "array", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "view.list", "access": "read", "params": {}, "result": { "type": "array" } },
+    { "name": "view.save", "access": "write", "params": { "name": "string", "filters": "object", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "view.rename", "access": "write", "params": { "old": "string", "new": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "view.delete", "access": "write", "params": { "name": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "view.apply", "access": "read", "params": { "name": "string" }, "result": { "type": "array" } },
+    { "name": "asset.list", "access": "read", "params": { "questionId": "string" }, "result": { "type": "array" } },
+    { "name": "asset.open", "access": "write", "params": { "questionId": "string", "assetId": "string", "action": "string", "expectedRevision": "string for edit_ipe" }, "result": { "type": "object" } },
+    { "name": "asset.create", "access": "write", "params": { "questionId": "string", "assetId": "string", "mediaType": "string", "dataBase64": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "asset.replace", "access": "write", "params": { "questionId": "string", "assetId": "string", "mediaType": "string", "dataBase64": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "asset.render", "access": "write", "params": { "questionId": "string", "assetId": "string", "formats": "array", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "asset.reconcile", "access": "write", "params": { "questionId": "string", "assetId": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "history.list", "access": "read", "params": { "questionId": "string" }, "result": { "type": "array" } },
+    { "name": "paper.list", "access": "read", "params": {}, "result": { "type": "array" } },
+    { "name": "paper.get", "access": "read", "params": { "path": "string" }, "result": { "type": "object" } },
+    { "name": "paper.create", "access": "write", "params": { "path": "string", "title": "string", "questionIds": "array", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "paper.save", "access": "write", "params": { "path": "string", "paper": "object", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "paper.addQuestions", "access": "write", "params": { "path": "string", "questionIds": "array", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "paper.validate", "access": "read", "params": { "path": "string" }, "result": { "type": "object" } },
+    { "name": "paper.build", "access": "write", "params": { "path": "string", "format": "md|html|docx", "output": "string|null", "options": "object", "expectedRevision": "string" }, "result": { "type": "object" } },
+    { "name": "application.shutdown", "access": "lifecycle", "params": {}, "result": { "type": "object" } }
+  ]
+}

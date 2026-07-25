@@ -1,0 +1,17 @@
+schema_version: "1.0"
+asset_id: diagram-1
+question_id: OPT-SYN-0001
+role: figure
+status: final
+preferred_render: render-svg
+representations:
+  - representation_id: render-svg
+    format: svg
+    path: render-svg.svg
+    purpose: render
+    editable: false
+    stale: false
+    content_hash: 8d3038654b4446ee98238b9048d6a206e4998f16fd04718abecca52139fd44eb
+provenance:
+  type: synthetic
+review_notes: Public synthetic fixture.

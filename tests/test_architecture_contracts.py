@@ -334,7 +334,7 @@ def test_cli_usage_uses_only_public_click_apis() -> None:
 
 def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> None:
     package_root = Path(__file__).parents[1] / "src/qbank"
-    presentation_roots = [package_root / "desktop", package_root / "presentation"]
+    presentation_roots = [package_root / "legacy_qt", package_root / "presentation"]
     source = "\n".join(
         path.read_text(encoding="utf-8")
         for root in presentation_roots
@@ -355,7 +355,7 @@ def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> No
 
 
 def test_desktop_controller_delegates_project_workflows() -> None:
-    source = (Path(__file__).parents[1] / "src/qbank/desktop/controller.py").read_text(
+    source = (Path(__file__).parents[1] / "src/qbank/legacy_qt/controller.py").read_text(
         encoding="utf-8"
     )
     for forbidden in (

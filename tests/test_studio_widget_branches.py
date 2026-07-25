@@ -14,7 +14,7 @@ from PySide6.QtGui import QFocusEvent, QKeyEvent
 from PySide6.QtWidgets import QLineEdit, QListWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
-from qbank.desktop.widgets import (
+from qbank.legacy_qt.widgets import (
     DetailDrawer,
     FacetFilterPanel,
     FriendlyValueEdit,
