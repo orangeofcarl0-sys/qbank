@@ -2,7 +2,7 @@
 
 [简体中文](../zh-CN/user-guide.md) · [English documentation](README.md)
 
-This guide covers the qbank `0.3.0-beta.1` project layout, data boundaries, and primary
+This guide covers the qbank `0.3.0-beta.2` project layout, data boundaries, and primary
 command-line workflows. Data Schemas remain at `1.0`. Run each command with `--help` for its
 complete option contract and see the [installation guide](installation.md) for deployment.
 

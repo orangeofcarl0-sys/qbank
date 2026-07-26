@@ -184,8 +184,10 @@ natural-language messages alone; inspect the code, operation state, and reposito
 - There is no embedded Studio chat, model wrapper, account system, or API-key management.
 - qbank generates its own project configuration first; setup templates and interoperability tests
   for more MCP agent hosts remain on the [roadmap](roadmap.md).
-- MCP does not perform OCR. Document, image, and PDF digitization will produce reviewable
-  candidates before qbank's deterministic import and validation stages.
+- MCP does not perform OCR. The lightweight workflow consumes existing MinerU output in the
+  source project, lets AI and `$qbank-digitize` generate Question JSONL, Asset packages, and a
+  `review.md` containing only unresolved items, then uses existing two-phase MCP writes and
+  validation.
 
 The machine-authoritative inventory is mirrored in the
 [capability matrix](../features/capability-matrix.md). See the

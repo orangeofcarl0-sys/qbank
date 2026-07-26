@@ -102,6 +102,7 @@ def test_readmes_disclose_ai_coding_and_acknowledge_current_studio() -> None:
         assert "https://github.com/moodle/moodle" in text
         assert "mcp-guide.md" in text
         assert "roadmap.md" in text
+        assert "source-qbank-deliverables.md" in text
         assert "immutable release baseline" not in text
         assert "不可变发布基线" not in text
 

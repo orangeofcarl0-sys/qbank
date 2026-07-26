@@ -1,4 +1,4 @@
 interface:
-  display_name: "qbank PDF Digitization"
-  short_description: "Guide PDF-to-qbank project decisions and calibration"
-  default_prompt: "Use $qbank-digitize to clarify this source-digitization project, produce an approved field and classification profile, and calibrate a representative sample before handing execution to $qbank."
+  display_name: "qbank Source Digitization"
+  short_description: "Organize existing MinerU output into reviewable qbank exchange files"
+  default_prompt: "Use $qbank-digitize to inspect existing MinerU output, produce and check questions.jsonl, embedded Asset packages, and the fixed review.md table, then hand authoritative prepare/commit/validate operations to $qbank."

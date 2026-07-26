@@ -5,8 +5,17 @@ job:
   objective: null
   mode: calibrated_batch
   source_files: []
+  mineru_output: build/digitize/<job-name>/mineru
   target_qbank_root: null
   acceptance_criteria: []
+
+exchange:
+  questions_jsonl: build/digitize/<job-name>/questions.jsonl
+  asset_packages: build/digitize/<job-name>/assets/packages
+  review_file: build/digitize/<job-name>/review.md
+  review_only_uncertain_items: true
+  checker: .agents/skills/qbank-digitize/scripts/check_exchange.py
+  cross_project_binary_policy: embed_base64_or_data_uri
 
 record_unit:
   split_rule: one_numbered_question
@@ -57,5 +66,7 @@ execution_handoff:
   authorization: dry_run_only
   max_questions_per_batch: 50
   partial_imports_allowed: false
+  authoritative_path: mcp_prepare_inspect_commit_validate
+  asset_dependencies_first: true
 
 unresolved_questions: []

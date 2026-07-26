@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import base64
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from qbank.bootstrap import create_project_services
+from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError, QBankError
 from qbank.infrastructure.locking import RepositoryWriteLock
+from qbank.markdown_codec import parse_question_text, render_question
 from qbank.studio_sidecar.application import StudioApplication
 from qbank.studio_sidecar.errors import (
     APPLICATION_ERROR,
@@ -25,7 +29,7 @@ from qbank.studio_sidecar.errors import (
 
 def test_initialize_reports_unified_core_and_protocol() -> None:
     result = StudioApplication().dispatch("initialize", {"studioVersion": "0.1.0"})
-    assert result["coreVersion"] == "0.3.0b1"
+    assert result["coreVersion"] == "0.3.0b2"
     assert result["protocolVersion"] == "1.0"
     assert result["schemaVersions"] == {
         "question": "1.0",
@@ -133,6 +137,12 @@ def test_open_list_search_get_validate_save(synthetic_bank: Path) -> None:
     status = app.dispatch("repository.open", {"root": str(synthetic_bank)})
     assert status["healthy"] is True
     assert status["questionCount"] == 2
+    assert [item["id"] for item in status["questions"]] == [
+        "MATH-SYN-0002",
+        "OPT-SYN-0001",
+    ]
+    assert status["tags"]
+    assert status["views"]
 
     questions = app.dispatch("question.list", {})
     assert [item["id"] for item in questions] == ["MATH-SYN-0002", "OPT-SYN-0001"]
@@ -148,7 +158,6 @@ def test_open_list_search_get_validate_save(synthetic_bank: Path) -> None:
     changed = document["source"].replace("相位差为", "初始相位差为", 1)
     validation = app.dispatch("question.validate", {"id": "OPT-SYN-0001", "source": changed})
     assert validation["ok"] is True
-
     saved = app.dispatch(
         "question.save",
         {
@@ -162,6 +171,134 @@ def test_open_list_search_get_validate_save(synthetic_bank: Path) -> None:
     assert "<!-- synthetic fixture" in saved["source"]
     assert (synthetic_bank / ".qbank" / "history").is_dir()
 
+
+def test_repository_activation_is_atomic_and_index_rebuild_is_explicit(
+    synthetic_bank: Path,
+    tmp_path: Path,
+) -> None:
+    unavailable = tmp_path / "missing-index"
+    shutil.copytree(synthetic_bank, unavailable)
+    (unavailable / ".qbank" / "index.sqlite").unlink()
+    app = StudioApplication()
+    app.dispatch("repository.open", {"root": str(synthetic_bank)})
+
+    with pytest.raises(RpcError) as captured:
+        app.dispatch("repository.open", {"root": str(unavailable)})
+
+    assert captured.value.code == VALIDATION
+    assert captured.value.data == {
+        "diagnosticCode": "index_unavailable",
+        "canRebuildIndex": True,
+    }
+    assert app.repository is not None
+    assert app.repository.context.root == synthetic_bank.resolve()
+    rebuilt = app.dispatch("repository.rebuildIndex", {"root": str(unavailable)})
+    assert rebuilt["indexed"] == 2
+    assert [item["id"] for item in rebuilt["questions"]] == [
+        "MATH-SYN-0002",
+        "OPT-SYN-0001",
+    ]
+    assert app.repository.context.root == unavailable.resolve()
+
+
+def test_failed_index_rebuild_preserves_the_active_repository(
+    synthetic_bank: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unavailable = tmp_path / "failed-rebuild"
+    shutil.copytree(synthetic_bank, unavailable)
+    (unavailable / ".qbank" / "index.sqlite").unlink()
+    app = StudioApplication()
+    app.dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert app.repository is not None
+    service_type = type(app.repository.services.questions)
+
+    def fail_rebuild(_service: object) -> int:
+        raise OSError("synthetic rebuild failure")
+
+    monkeypatch.setattr(service_type, "rebuild_index", fail_rebuild)
+
+    with pytest.raises(RpcError, match="synthetic rebuild failure"):
+        app.dispatch("repository.rebuildIndex", {"root": str(unavailable)})
+
+    assert app.repository is not None
+    assert app.repository.context.root == synthetic_bank.resolve()
+
+
+def test_asset_inventory_exposes_safe_local_external_and_invalid_items(
+    synthetic_bank: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local = synthetic_bank / "assets" / "images" / "local.svg"
+    local.parent.mkdir(parents=True, exist_ok=True)
+    local.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">'
+        '<rect width="20" height="10" fill="#4d7898"/></svg>',
+        encoding="utf-8",
+    )
+    question_path = (
+        synthetic_bank / "questions" / "mathematics" / "MATH-SYN-0002.md"
+    )
+    question, _, _ = parse_question_text(question_path.read_text(encoding="utf-8"))
+    question = question.model_copy(
+        update={
+            "assets": [
+                "assets/images/local.svg",
+                "HTTPS://example.invalid/figure.svg",
+                "../outside.svg",
+            ],
+            "stem_md": (
+                f"{question.stem_md}\n\n![local](assets/images/local.svg)"
+                "\n\n![remote](HTTPS://example.invalid/figure.svg)"
+                "\n\n![invalid](../outside.svg)"
+            ),
+        }
+    )
+    question_path.write_text(render_question(question), encoding="utf-8")
+    context = ProjectContext.from_root(synthetic_bank)
+    create_project_services(context).questions.rebuild_index()
+
+    app = StudioApplication()
+    app.dispatch("repository.open", {"root": str(synthetic_bank)})
+    items = app.dispatch("asset.list", {"questionId": "MATH-SYN-0002"})
+    by_kind = {item["kind"]: item for item in items}
+    assert by_kind["local"]["reference"] == "assets/images/local.svg"
+    assert by_kind["local"]["previewDataUrl"].startswith("data:image/svg+xml;base64,")
+    assert by_kind["local"]["capabilities"]["canOpen"] is True
+    assert by_kind["external"]["previewDataUrl"] is None
+    assert by_kind["external"]["diagnostic"]["code"] == "external_asset"
+    assert by_kind["invalid"]["previewDataUrl"] is None
+    assert by_kind["invalid"]["capabilities"]["canOpen"] is False
+
+    assert app.repository is not None
+    launcher = app.repository.services.assets.launcher
+    opened: list[Path] = []
+    monkeypatch.setattr(
+        launcher,
+        "open_file",
+        lambda path, *, execute: opened.append(path) or ("open", str(path)),
+    )
+    result = app.dispatch(
+        "asset.open",
+        {
+            "questionId": "MATH-SYN-0002",
+            "reference": "assets/images/local.svg",
+            "action": "open_reference",
+        },
+    )
+    assert result["result"]["command"][0] == "open"
+    assert opened[-1] == local.resolve()
+    with pytest.raises(RpcError) as invalid:
+        app.dispatch(
+            "asset.open",
+            {
+                "questionId": "MATH-SYN-0002",
+                "reference": "../outside.svg",
+                "action": "open_reference",
+            },
+        )
+    assert invalid.value.code == INVALID_PARAMS
 
 def test_session_reads_reuse_one_snapshot(
     synthetic_bank: Path, monkeypatch: pytest.MonkeyPatch

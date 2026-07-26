@@ -37,10 +37,19 @@ sidecar 仍只接受固定 JSON-RPC 方法，stdout 只输出协议消息。所�
 应用服务持有项目锁并执行 dry-run、事务、历史和索引同步。Tauri 权限仍只允许启动
 固定 sidecar，不开放任意命令或文件系统访问。
 
+题库切换采用两阶段状态边界：sidecar 先生成包含状态、题目摘要、标签和保存视图的完整
+启动快照，读取全部成功后才切换活动题库；Tauri 前端再一次性激活该快照。索引异常不会在
+只读打开时被静默修复，用户确认后才可调用 Studio Protocol 的
+`repository.rebuildIndex`。重建失败时原题库仍保持活动。
+
+资源分类属于共享应用服务，而非 Tauri 或 Qt presentation adapter。现代 sidecar 只向
+前端返回 logical、local、external、invalid 类型、诊断、受控缩略图与能力，不返回绝对
+路径；打开 reference 前会根据当前题目的资源清单再次验证。
+
 ## 兼容性与迁移
 
-`v0.2.0` tag 永久不变。统一开发线从 Python 版本 `0.3.0b1` 开始，对外显示为
-`0.3.0-beta.1`。现有题库无需迁移；Qt 客户端仅更名为 QBank Studio Legacy，并保留
+`v0.2.0` tag 永久不变。统一开发线从 Python 版本 `0.3.0b2` 开始，对外显示为
+`0.3.0-beta.2`。现有题库无需迁移；Qt 客户端仅更名为 QBank Studio Legacy，并保留
 原 `qbank desktop` 入口。
 
 ## 测试与验收
@@ -48,6 +57,13 @@ sidecar 仍只接受固定 JSON-RPC 方法，stdout 只输出协议消息。所�
 结构归并只要求验证 Python 导入和架构契约、Studio Protocol、Tauri 开发构建、
 sidecar 启动、一个打开—编辑—保存—公式预览—图片操作 smoke，以及同一提交生成
 wheel、安装器和便携包。未改变行为的发布级 UAT 与万题基准不重复执行。
+
+现代 Studio 的浏览器验收还覆盖长文档滚动：中央网格必须受窗口约束，源码与隔离预览的
+滚轮位置互不串动，筛选和 Inspector 在紧凑高度下保持独立滚动，并在浅色、深色与 125%
+缩放下显示可辨识的滚动条。
+
+仓库状态验收覆盖健康切换、失败切换、显式索引恢复、未保存内容三态处理和异步 generation
+竞争；资源验收覆盖本地、外部、非法、越界与缺失引用，以及精确 Markdown 图片节点绑定。
 
 ## 当前限制
 

@@ -22,6 +22,8 @@ from qbank.application.revision import (
     question_projection_revision,
     repository_revision,
 )
+from qbank.asset_references import classify_resource_uri
+from qbank.assets import AssetService, stable_legacy_asset_id
 from qbank.bootstrap import ProjectServices, create_project_services
 from qbank.context import ProjectContext
 from qbank.diagnostics import DiagnosticServices, project_status_in_context
@@ -40,6 +42,7 @@ from qbank.models import (
     AssetPackage,
     AssetPackageRepresentation,
     AssetStatus,
+    DesktopAssetItem,
     IngestOptions,
     Paper,
     PaperBuildOptions,
@@ -119,6 +122,7 @@ class StudioApplication:
         self._methods: dict[str, Callable[[dict[str, Any]], Any]] = {
             "initialize": self.initialize,
             "repository.open": self.repository_open,
+            "repository.rebuildIndex": self.repository_rebuild_index,
             "repository.status": self.repository_status,
             "question.search": self.question_search,
             "question.list": self.question_list,
@@ -183,7 +187,7 @@ class StudioApplication:
             raise RpcError(APPLICATION_ERROR, str(exc)) from exc
 
     def initialize(self, params: dict[str, Any]) -> dict[str, Any]:
-        studio_version = _optional_string(params, "studioVersion", default="0.3.0-beta.1")
+        studio_version = _optional_string(params, "studioVersion", default="0.3.0-beta.2")
         return {
             "studioVersion": studio_version,
             "sidecarVersion": __version__,
@@ -198,20 +202,69 @@ class StudioApplication:
         }
 
     def repository_open(self, params: dict[str, Any]) -> dict[str, Any]:
-        root = Path(_required_string(params, "root")).expanduser().resolve(strict=True)
+        candidate = self._repository_candidate(_required_string(params, "root"))
+        result = self._repository_open_result(candidate)
+        self.repository = candidate
+        self._asset_edit_guards.clear()
+        return result
+
+    def repository_rebuild_index(self, params: dict[str, Any]) -> dict[str, Any]:
+        candidate = self._repository_candidate(_required_string(params, "root"))
+        indexed = candidate.services.questions.rebuild_index()
+        self._refresh_snapshot(candidate)
+        result = self._repository_open_result(candidate)
+        self.repository = candidate
+        self._asset_edit_guards.clear()
+        return {**result, "indexed": indexed}
+
+    def _repository_candidate(self, raw_root: str) -> OpenRepository:
+        root = Path(raw_root).expanduser().resolve(strict=True)
         if not (root / "qbank.yaml").is_file():
             raise RpcError(INVALID_PARAMS, "selected directory is not a qbank repository")
         context = ProjectContext.from_root(root)
         services = with_unicode_safe_assets(context, create_project_services(context))
-        self.repository = OpenRepository(
+        return OpenRepository(
             context=context,
             services=services,
             snapshot=services.repository.scan(),
             revision=repository_revision(context),
             projection_revision=question_projection_revision(context),
         )
-        self._asset_edit_guards.clear()
-        return self._repository_status(self.repository)
+
+    def _repository_open_result(self, opened: OpenRepository) -> dict[str, Any]:
+        try:
+            self._ensure_projection_current(opened)
+            questions = [
+                _summary_hit(item)
+                for item in opened.services.questions.index.query(
+                    QueryFilters(offset=0, limit=20_000)
+                )
+            ]
+        except DataValidationError as exc:
+            diagnostic = str(exc).partition(":")[0]
+            raise RpcError(
+                VALIDATION,
+                str(exc),
+                {
+                    "diagnosticCode": diagnostic,
+                    "canRebuildIndex": diagnostic
+                    in {"index_dirty", "index_stale", "index_unavailable"},
+                },
+            ) from exc
+        tags = [
+            item.model_dump(mode="json", exclude_none=True)
+            for item in opened.services.tags.list_tags()
+        ]
+        views = [
+            item.model_dump(mode="json", exclude_none=True)
+            for item in opened.services.views.list_views()
+        ]
+        return {
+            **self._repository_status(opened),
+            "questions": questions,
+            "tags": tags,
+            "views": views,
+        }
 
     def repository_status(self, _params: dict[str, Any]) -> dict[str, Any]:
         opened = self._opened()
@@ -631,12 +684,21 @@ class StudioApplication:
     def asset_list(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         opened = self._opened()
         question_id = _required_string(params, "questionId")
+        question = opened.snapshot.locate(question_id).question
         manifests = opened.services.assets.list_assets(question_id).assets
-        return [self._asset_item(manifest) for manifest in manifests]
+        history = opened.services.assets.history(question_id).events
+        inventory = AssetService(opened.context, opened.services.assets)
+        return [
+            self._asset_item(opened, item)
+            for item in inventory.desktop_items(question, manifests, history)
+        ]
 
     def asset_open(self, params: dict[str, Any]) -> dict[str, Any]:
         opened = self._opened()
         question_id = _required_string(params, "questionId")
+        reference = _optional_string(params, "reference", default="")
+        if reference:
+            return self._open_asset_reference(opened, question_id, reference, params)
         asset_id = _required_string(params, "assetId")
         action = _optional_string(params, "action", default="open")
         actions = {
@@ -659,6 +721,52 @@ class StudioApplication:
             "dryRun": dry_run.model_dump(mode="json", exclude_none=True),
             "result": result.model_dump(mode="json", exclude_none=True),
             "revision": revision,
+        }
+
+    def _open_asset_reference(
+        self,
+        opened: OpenRepository,
+        question_id: str,
+        reference: str,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        action = _optional_string(params, "action", default="open_reference")
+        if action not in {"open_reference", "reveal_reference"}:
+            raise RpcError(INVALID_PARAMS, f"unsupported resource open action: {action}")
+        question = opened.snapshot.locate(question_id).question
+        manifests = opened.services.assets.list_assets(question_id).assets
+        history = opened.services.assets.history(question_id).events
+        inventory = AssetService(opened.context, opened.services.assets)
+        item = next(
+            (
+                candidate
+                for candidate in inventory.desktop_items(question, manifests, history)
+                if candidate.reference == reference
+            ),
+            None,
+        )
+        if item is None or not item.capabilities.open_reference:
+            raise RpcError(INVALID_PARAMS, "resource is not an openable member of this question")
+        classified = classify_resource_uri(reference)
+        if item.kind == "local" and classified.normalized is not None:
+            path = inventory.source(classified.normalized)
+            inventory.relative_to_assets(classified.normalized)
+            if action == "reveal_reference":
+                dry_run = opened.services.assets.launcher.open_directory(path.parent, execute=False)
+                result = opened.services.assets.launcher.open_directory(path.parent, execute=True)
+            else:
+                dry_run = opened.services.assets.launcher.open_file(path, execute=False)
+                result = opened.services.assets.launcher.open_file(path, execute=True)
+        elif item.kind == "external" and action == "open_reference":
+            url = f"https:{reference}" if reference.startswith("//") else reference
+            dry_run = opened.services.assets.launcher.open_url(url, execute=False)
+            result = opened.services.assets.launcher.open_url(url, execute=True)
+        else:
+            raise RpcError(INVALID_PARAMS, "resource action is not supported for this resource kind")
+        return {
+            "dryRun": {"command": list(dry_run)},
+            "result": {"command": list(result)},
+            "revision": self._refresh_revision(opened),
         }
 
     def asset_create(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -1053,50 +1161,66 @@ class StudioApplication:
             "totalScore": paper.calculated_total,
         }
 
-    def _asset_item(self, manifest: Any) -> dict[str, Any]:
-        opened = self._opened()
-        preferred = manifest.preferred_render
-        representation = next(
-            (item for item in manifest.representations if item.representation_id == preferred),
-            None,
+    def _asset_item(self, opened: OpenRepository, item: DesktopAssetItem) -> dict[str, Any]:
+        manifest = item.manifest
+        preferred = manifest.preferred_render if manifest is not None else None
+        has_ipe = manifest is not None and any(
+            representation.format == AssetFormat.IPE and representation.editable
+            for representation in manifest.representations
         )
-        preview_data_url: str | None = None
-        if representation is not None and representation.path is not None:
-            path = opened.services.assets.repository.representation_path(
-                manifest, representation.representation_id
-            )
-            if path is not None and path.is_file() and path.stat().st_size <= 8 * 1024 * 1024:
-                media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-                preview_data_url = f"data:{media_type};base64," + base64.b64encode(
-                    path.read_bytes()
-                ).decode("ascii")
-        has_ipe = any(
-            item.format == AssetFormat.IPE and item.editable for item in manifest.representations
+        preview_data_url = self._preview_data_url(opened, item.preview_path)
+        diagnostic = (
+            item.diagnostic.model_dump(mode="json", exclude_none=True)
+            if item.diagnostic is not None
+            else None
         )
         return {
-            "assetId": manifest.asset_id,
-            "role": manifest.role,
-            "status": manifest.status.value,
+            "assetId": item.asset_id or stable_legacy_asset_id(item.reference),
+            "kind": item.kind,
+            "reference": item.reference,
+            "displayName": item.display_name,
+            "declared": item.declared,
+            "exists": item.exists,
+            "diagnostic": diagnostic,
+            "role": manifest.role if manifest is not None else "figure",
+            "status": manifest.status.value if manifest is not None else item.kind,
             "preferredRepresentation": preferred,
             "previewDataUrl": preview_data_url,
             "capabilities": {
                 "canEditIpe": has_ipe,
-                "canReplace": True,
-                "canOpen": representation is not None,
-                "canRender": has_ipe,
-                "canReveal": True,
+                "canReplace": item.kind == "logical" and item.capabilities.replace,
+                "canOpen": item.capabilities.open_original or item.capabilities.open_reference,
+                "canRender": item.kind == "logical" and item.capabilities.render,
+                "canReveal": (
+                    item.kind == "logical" and item.capabilities.show_directory
+                )
+                or (item.kind == "local" and item.capabilities.open_reference),
             },
             "representations": [
                 {
-                    "representationId": item.representation_id,
-                    "format": item.format.value,
-                    "stale": item.stale,
-                    "editable": item.editable,
-                    "renderable": item.renderable,
+                    "representationId": representation.representation_id,
+                    "format": representation.format.value,
+                    "stale": representation.stale,
+                    "editable": representation.editable,
+                    "renderable": representation.renderable,
                 }
-                for item in manifest.representations
+                for representation in (manifest.representations if manifest is not None else [])
             ],
         }
+
+    @staticmethod
+    def _preview_data_url(opened: OpenRepository, raw_path: str | None) -> str | None:
+        if raw_path is None:
+            return None
+        try:
+            path = Path(raw_path).resolve(strict=True)
+            path.relative_to(opened.context.paths.assets.resolve(strict=True))
+        except (OSError, ValueError):
+            return None
+        if not path.is_file() or path.stat().st_size > 8 * 1024 * 1024:
+            return None
+        media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        return f"data:{media_type};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
     def _record_asset_edit_guard(
         self,

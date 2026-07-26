@@ -19,7 +19,8 @@
 - Run every write as `--dry-run` first, inspect the result, then perform the write.
 - After every write, run `qbank validate --format json`.
 - Never silently overwrite an existing ID or manually edit `.qbank/index.sqlite`.
-- Put temporary AI output in `build/ai/`.
+- Put ordinary temporary AI output in `build/ai/`.
+- Put source-digitization exchange files in `build/digitize/<job-name>/`.
 - Put final paper definitions in `papers/generated/`.
 - Put final exported artifacts in `exports/`.
 - Codex makes semantic choices; qbank performs deterministic validation and rendering.
@@ -32,6 +33,8 @@
 - Never commit an MCP operation after its `repository_revision` changes. Prepare it again.
 
 Use the repository-scoped `$qbank` Skill for detailed workflows and command guidance.
+Use `$qbank-digitize` for source-extraction exchange preparation and `$qbank-deliver`
+for read-only selection snapshots and fixed-template TeX/PDF construction.
 
 For every Studio visual, theme, component-state, screenshot, or interaction change,
 read and follow the repository-scoped `$qbank-ui-design` Skill before editing UI code.

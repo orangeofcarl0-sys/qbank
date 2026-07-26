@@ -99,7 +99,7 @@ export class TauriRpcBridge implements RpcBridge {
       this.handleExit(`sidecar exited (code ${String(code)}, signal ${String(signal)})`);
     });
     this.child = await command.spawn();
-    return this.request<InitializeResult>("initialize", { studioVersion: "0.3.0-beta.1" });
+    return this.request<InitializeResult>("initialize", { studioVersion: "0.3.0-beta.2" });
   }
 
   private consumeStdout(chunk: string): void {

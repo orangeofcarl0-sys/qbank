@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from qbank.application.service import question_matches
-from qbank.asset_references import AssetKind, classify_resource_uri, extract_image_resources
+from qbank.asset_references import AssetKind, classify_resource_uri
 from qbank.assets import (
     AssetService,
     replace_image_uris,
@@ -22,23 +22,19 @@ from qbank.legacy_qt.state import PaperContext
 from qbank.markdown_codec import parse_sections
 from qbank.models import (
     QUESTION_CONTENT_FIELDS,
-    AssetCapabilities,
     AssetFormat,
     AssetHistoryEntry,
-    AssetManifest,
     AssetMutationResult,
     AssetPackage,
     AssetPackageRepresentation,
     AssetRenderResult,
     AssetStatus,
-    DesktopAssetItem,
     DesktopHistoryEntry,
     DesktopNavigationData,
     DesktopPreviewResult,
     DesktopQuestionDocument,
     DesktopQuestionListResult,
     DesktopQuestionSummary,
-    Diagnostic,
     DiagnosticCode,
     Paper,
     PaperBuildRequest,
@@ -94,7 +90,6 @@ _RENDERABLE_FORMATS = frozenset(
         AssetFormat.URL,
     }
 )
-_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".bmp"})
 
 
 class InteractiveRenderer(Protocol):
@@ -337,177 +332,8 @@ class DesktopController:
             source=question_body_source(question),
             assets=assets,
             history=cast(list[DesktopHistoryEntry | AssetHistoryEntry], history),
-            asset_items=self._desktop_asset_items(question, assets, asset_history),
+            asset_items=self.assets.desktop_items(question, assets, asset_history),
         )
-
-    def _desktop_asset_items(
-        self,
-        question: Question,
-        manifests: list[AssetManifest],
-        history: list[AssetHistoryEntry],
-    ) -> list[DesktopAssetItem]:
-        references = list(question.assets)
-        references.extend(raw for raw in extract_image_resources(question) if raw not in references)
-        by_id = {manifest.asset_id: manifest for manifest in manifests}
-        seen_assets: set[str] = set()
-        items: list[DesktopAssetItem] = []
-        history_ids = {event.asset_id for event in history}
-        for raw in references:
-            item = self._desktop_reference_item(
-                question.id,
-                raw,
-                raw in question.assets,
-                by_id,
-                history_ids,
-            )
-            if item.asset_id is not None and item.kind == "logical":
-                if item.asset_id in seen_assets:
-                    continue
-                seen_assets.add(item.asset_id)
-            items.append(item)
-        for manifest in manifests:
-            if manifest.asset_id in seen_assets:
-                continue
-            items.append(self._logical_asset_item(manifest, history_ids, declared=False))
-        return items
-
-    def _desktop_reference_item(
-        self,
-        question_id: str,
-        raw: str,
-        declared: bool,
-        manifests: Mapping[str, AssetManifest],
-        history_ids: set[str],
-    ) -> DesktopAssetItem:
-        reference = classify_resource_uri(raw)
-        if reference.kind == AssetKind.LOGICAL and reference.asset_id is not None:
-            manifest = manifests.get(reference.asset_id)
-            if manifest is not None:
-                return self._logical_asset_item(manifest, history_ids, declared=declared)
-            return _invalid_asset_item(
-                raw,
-                DiagnosticCode.ASSET_NOT_FOUND,
-                f"logical asset manifest does not exist: {question_id}/{reference.asset_id}",
-                asset_id=reference.asset_id,
-            )
-        if reference.kind == AssetKind.LOCAL and reference.normalized is not None:
-            return self._local_asset_item(raw, reference.normalized, declared)
-        if reference.kind == AssetKind.EXTERNAL:
-            return DesktopAssetItem(
-                kind="external",
-                reference=raw,
-                display_name=raw,
-                asset_id=stable_legacy_asset_id(raw),
-                exists=True,
-                declared=declared,
-                diagnostic=Diagnostic(
-                    severity="warning",
-                    code=DiagnosticCode.EXTERNAL_ASSET,
-                    message=f"external image resource is not stored locally: {raw}",
-                ),
-                capabilities=AssetCapabilities(
-                    replace=True,
-                    open_original=True,
-                    convert=True,
-                    open_reference=True,
-                ),
-            )
-        return _invalid_asset_item(
-            raw,
-            DiagnosticCode.INVALID_RESOURCE_URI,
-            f"invalid image resource URI: {raw}",
-        )
-
-    def _local_asset_item(
-        self,
-        raw: str,
-        normalized: str,
-        declared: bool,
-    ) -> DesktopAssetItem:
-        try:
-            self.assets.relative_to_assets(normalized)
-            path = self.assets.source(normalized)
-        except ValueError:
-            return _invalid_asset_item(
-                raw,
-                DiagnosticCode.ASSET_OUTSIDE_ASSETS,
-                f"local asset is outside the configured assets directory: {raw}",
-            )
-        exists = path.is_file()
-        diagnostic = None
-        if not exists:
-            diagnostic = Diagnostic(
-                code=DiagnosticCode.ASSET_MISSING,
-                message=f"local asset does not exist: {raw}",
-            )
-        return DesktopAssetItem(
-            kind="local",
-            reference=raw,
-            display_name=Path(normalized).name,
-            asset_id=stable_legacy_asset_id(raw),
-            preview_path=str(path) if exists else None,
-            exists=exists,
-            declared=declared,
-            diagnostic=diagnostic,
-            capabilities=AssetCapabilities(
-                edit=exists and path.suffix.casefold() in {".ipe", ".tex"},
-                replace=exists,
-                render=exists and path.suffix.casefold() == ".ipe",
-                open_original=exists,
-                convert=exists,
-                open_reference=exists,
-            ),
-        )
-
-    def _logical_asset_item(
-        self,
-        manifest: AssetManifest,
-        history_ids: set[str],
-        *,
-        declared: bool,
-    ) -> DesktopAssetItem:
-        renderable = [item for item in manifest.representations if item.renderable]
-        capabilities = AssetCapabilities(
-            edit=any(item.editable and item.path is not None for item in manifest.representations),
-            replace=True,
-            render=any(
-                item.editable and item.format == AssetFormat.IPE and item.path is not None
-                for item in manifest.representations
-            ),
-            set_render=len(renderable) > 1,
-            open_original=any(
-                item.purpose in {"original", "reference", "source-context"}
-                or item.derived_from is None
-                for item in manifest.representations
-            ),
-            show_directory=True,
-            restore=manifest.asset_id in history_ids,
-        )
-        return DesktopAssetItem(
-            kind="logical",
-            reference=f"qbank-asset:{manifest.asset_id}",
-            display_name=manifest.asset_id,
-            asset_id=manifest.asset_id,
-            manifest=manifest,
-            preview_path=self._logical_preview_path(manifest),
-            exists=True,
-            declared=declared,
-            capabilities=capabilities,
-        )
-
-    def _logical_preview_path(self, manifest: AssetManifest) -> str | None:
-        preferred = [manifest.preferred_render] if manifest.preferred_render else []
-        candidates = preferred + [
-            item.representation_id for item in manifest.representations if item.renderable
-        ]
-        for representation_id in dict.fromkeys(candidates):
-            path = self.services.assets.repository.representation_path(
-                manifest,
-                representation_id,
-            )
-            if path is not None and path.is_file() and path.suffix.casefold() in _IMAGE_SUFFIXES:
-                return str(path)
-        return None
 
     def validate_source(
         self,
@@ -1074,22 +900,6 @@ def question_body_source(question: Question) -> str:
         for section in QUESTION_SECTIONS
     ]
     return "\n".join(chunks).rstrip() + "\n"
-
-
-def _invalid_asset_item(
-    raw: str,
-    code: DiagnosticCode,
-    message: str,
-    *,
-    asset_id: str | None = None,
-) -> DesktopAssetItem:
-    return DesktopAssetItem(
-        kind="invalid",
-        reference=raw,
-        display_name=raw,
-        asset_id=asset_id,
-        diagnostic=Diagnostic(code=code, message=message),
-    )
 
 
 def _normalized_metadata(metadata: Mapping[str, object] | None) -> dict[str, object]:

@@ -1,12 +1,12 @@
-# qbank 0.3.0-beta.1 known limitations
+# qbank 0.3.0-beta.2 known limitations
 
-[简体中文](../zh-CN/known-limitations-0.3.0-beta.1.md) · [English documentation](README.md)
+[简体中文](../zh-CN/known-limitations-0.3.0-beta.2.md) · [English documentation](README.md)
 
 - Windows Studio artifacts are not code-signed; SmartScreen may warn and SHA-256 verification is
   required.
 - Studio currently ships for Windows x64 and requires a usable Microsoft Edge WebView2 runtime.
 - The portable archive's text README retains legacy “alpha” wording. The executable, manifest,
-  artifact names, and Python package metadata correctly identify `0.3.0-beta.1`.
+  artifact names, and Python package metadata correctly identify `0.3.0-beta.2`.
 - The current safe-preview policy may replace some declared local SVG files with a placeholder.
   Asset mutation, capability checks, and browser-rendering smoke remain unaffected.
 - qbank targets ordinary local filesystems. Network shares, synchronized folders, and multi-host

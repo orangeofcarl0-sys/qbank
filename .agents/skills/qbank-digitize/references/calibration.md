@@ -51,7 +51,12 @@ affected portion of the sample and requires recalibration.
 
 ## Hand off bounded execution
 
-After approval, recommend batches no larger than 50 records unless source complexity
-justifies smaller groups. The decision packet must include profile and mapping paths,
-approved sample IDs, batch bounds, review queue, acceptance criteria, and effective
-authorization. `$qbank` owns dry-run, commit, validation, and result reporting.
+After approval, recommend small batches and reduce their size when formulas, figures,
+or layouts are complex. Generate `questions.jsonl`, existing-Schema Asset packages,
+and a `review.md` containing only unresolved items. Preserve the approved sample and
+policy in the lightweight working files; do not create a decision-packet service.
+
+Use existing qbank MCP operations for authoritative work. Prepare and validate assets
+before dependent questions, inspect every prepared diff, commit only against the
+returned repository revision, and validate after commit. `$qbank` owns exact tool
+guidance and result reporting.

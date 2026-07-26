@@ -12,11 +12,12 @@ sentence-by-sentence equivalence is not required.
 ## 受管范围 / Managed scope
 
 以下内容必须成对维护：语言首页、用户指南、CLI 参考、Studio 指南、Codex/MCP 接入、
-MCP 使用指南、项目路线图、兼容性
+MCP 使用指南、项目路线图、资料到题库再到正式交付物需求、兼容性
 策略、版本兼容性参考和当前版本已知限制。根目录 `README.md` 与 `README.en.md` 也构成一对。
 
 The following must be maintained as locale pairs: locale index, user guide, CLI reference, Studio
-guide, Codex/MCP integration, MCP guide, project roadmap, compatibility policy, release compatibility reference, and
+guide, Codex/MCP integration, MCP guide, project roadmap, source-to-qbank-to-formal-deliverables
+requirements, compatibility policy, release compatibility reference, and
 current-release known limitations. The root `README.md` and `README.en.md` also form a pair.
 Diagrams with explanatory labels use separate Chinese and English SVG files; screenshots may be
 shared when the application state itself is the subject and both pages provide localized

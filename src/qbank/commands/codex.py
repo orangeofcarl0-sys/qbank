@@ -185,7 +185,11 @@ def codex_instructions_command(
 def codex_install_skill_command(
     skill_name: Annotated[
         str,
-        typer.Option("--skill", metavar="qbank|qbank-digitize", help="Select one Skill."),
+        typer.Option(
+            "--skill",
+            metavar="qbank|qbank-digitize|qbank-deliver",
+            help="Select one Skill.",
+        ),
     ] = "qbank",
     user: Annotated[
         bool,
@@ -218,13 +222,15 @@ def codex_install_skill_command(
     """Install or explicitly update one qbank Skill for a selected scope."""
     try:
         require_output_format(output_format, "table", "json")
-        if skill_name not in {"qbank", "qbank-digitize"}:
-            raise DataValidationError("unsupported Skill: expected qbank or qbank-digitize")
+        if skill_name not in {"qbank", "qbank-digitize", "qbank-deliver"}:
+            raise DataValidationError(
+                "unsupported Skill: expected qbank, qbank-digitize, or qbank-deliver"
+            )
         if user and project:
             raise DataValidationError("choose only one of --user or --project")
         scope: Literal["user", "project"] = "project" if project else "user"
         context = discover_context()
-        selected = cast(Literal["qbank", "qbank-digitize"], skill_name)
+        selected = cast(Literal["qbank", "qbank-digitize", "qbank-deliver"], skill_name)
         planned = _install_skill(
             context,
             dry_run=True,
@@ -284,7 +290,7 @@ def _install_skill(
     dry_run: bool,
     scope: Literal["user", "project"],
     update: bool,
-    skill_name: Literal["qbank", "qbank-digitize"],
+    skill_name: Literal["qbank", "qbank-digitize", "qbank-deliver"],
 ) -> SkillInstallResult:
     if skill_name == "qbank" and scope == "user" and not update:
         return install_repository_skill(context, dry_run=dry_run)

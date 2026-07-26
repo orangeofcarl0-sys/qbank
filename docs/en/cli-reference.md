@@ -2,9 +2,9 @@
 
 [简体中文](../zh-CN/cli-reference.md) · [English documentation](README.md)
 
-This page lists the qbank `0.3.0-beta.1` public command entry points. This beta retains the
+This page lists the qbank `0.3.0-beta.2` public command entry points. This beta retains the
 documented 0.2.0 command names. Each command's `--help`, the
-[current compatibility matrix](compatibility-0.3.0-beta.1.md), and the
+[current compatibility matrix](compatibility-0.3.0-beta.2.md), and the
 [0.2.0 compatibility reference](compatibility-0.2.0.md) define options, defaults, and exit codes.
 
 ## Project, diagnostics, and index
@@ -86,7 +86,7 @@ Unattended automation must not silently start `asset edit`, `asset open`, or `pr
 | `qbank codex check` | Check repository, Skill, and Codex CLI readiness |
 | `qbank codex instructions` | Emit integration rules and workflows |
 | `qbank codex integration-status` | Summarize Skill and MCP states |
-| `qbank codex install-skill` | Preview or install a project/user Skill |
+| `qbank codex install-skill` | Preview or install the `qbank`, `qbank-digitize`, or `qbank-deliver` project/user Skill |
 | `qbank codex install-mcp` | Preview or register the local project MCP server |
 | `qbank codex uninstall-mcp` | Preview or remove project MCP registration |
 | `qbank codex mcp-check` | Check MCP installation and configuration |

@@ -64,9 +64,9 @@ export class FixtureRpcBridge implements RpcBridge {
 
   async start(): Promise<InitializeResult> {
     return {
-      studioVersion: "0.3.0-beta.1",
+      studioVersion: "0.3.0-beta.2",
       sidecarVersion: "fixture",
-      coreVersion: "0.3.0b1",
+      coreVersion: "0.3.0b2",
       protocolVersion: "1.0",
       schemaVersions: { question: "1.0", asset: "1.0", paper: "1.0" },
       capabilities: ["fixture"],
@@ -75,6 +75,9 @@ export class FixtureRpcBridge implements RpcBridge {
 
   async request<T>(method: string, params: Record<string, JsonValue> = {}): Promise<T> {
     this.requestLog.push(method);
+    if (method === "repository.open" && params.root === "fixture://broken-bank") {
+      throw new Error("synthetic repository bootstrap failure");
+    }
     const identity = String(params.id ?? params.questionId ?? "");
     if (identity === SLOW_QUESTION.id && ["question.get", "asset.list", "history.list"].includes(method)) {
       await new Promise((resolve) => window.setTimeout(resolve, 180));
@@ -97,12 +100,13 @@ export class FixtureRpcBridge implements RpcBridge {
   }
 
   private result(method: string, params: Record<string, JsonValue>): unknown {
+    const alternate = params.root === "fixture://alternate-bank";
     const repository: RepositoryStatus = {
-      root: "fixture://synthetic-bank",
-      name: "公开合成题库",
+      root: alternate ? "fixture://alternate-bank" : "fixture://synthetic-bank",
+      name: alternate ? "备用合成题库" : "公开合成题库",
       revision: this.revision,
       healthy: true,
-      questionCount: 1,
+      questionCount: alternate ? 1 : 2,
       validationErrors: 0,
       indexDirty: false,
       mathMacros: { qop: "\\operatorname{qbank}" },
@@ -118,6 +122,12 @@ export class FixtureRpcBridge implements RpcBridge {
     };
     const asset: AssetItem = {
       assetId: "diagram-1",
+      kind: "logical",
+      reference: "qbank-asset:diagram-1",
+      displayName: "diagram-1",
+      declared: true,
+      exists: true,
+      diagnostic: null,
       role: "figure",
       status: "final",
       preferredRepresentation: "render-svg",
@@ -133,8 +143,84 @@ export class FixtureRpcBridge implements RpcBridge {
         { representationId: "render-svg", format: "svg", stale: false, editable: false, renderable: true },
       ],
     };
+    const localAsset: AssetItem = {
+      ...asset,
+      assetId: "legacy-local-svg",
+      kind: "local",
+      reference: "assets/images/local.svg",
+      displayName: "local.svg",
+      status: "local",
+      preferredRepresentation: null,
+      capabilities: {
+        canEditIpe: false,
+        canReplace: false,
+        canOpen: true,
+        canRender: false,
+        canReveal: true,
+      },
+      representations: [],
+    };
+    const externalAsset: AssetItem = {
+      ...asset,
+      assetId: "external-reference",
+      kind: "external",
+      reference: "https://example.invalid/figure.svg",
+      displayName: "example.invalid/figure.svg",
+      status: "external",
+      preferredRepresentation: null,
+      previewDataUrl: null,
+      diagnostic: {
+        code: "external_asset",
+        severity: "warning",
+        message: "外部资源不会自动下载。",
+      },
+      capabilities: {
+        canEditIpe: false,
+        canReplace: false,
+        canOpen: true,
+        canRender: false,
+        canReveal: false,
+      },
+      representations: [],
+    };
+    const invalidAsset: AssetItem = {
+      ...asset,
+      assetId: "invalid-reference",
+      kind: "invalid",
+      reference: "../outside.svg",
+      displayName: "outside.svg",
+      status: "invalid",
+      preferredRepresentation: null,
+      previewDataUrl: null,
+      exists: false,
+      diagnostic: {
+        code: "invalid_resource_uri",
+        severity: "error",
+        message: "资源引用越过题库边界，未读取文件。",
+      },
+      capabilities: {
+        canEditIpe: false,
+        canReplace: false,
+        canOpen: false,
+        canRender: false,
+        canReveal: false,
+      },
+      representations: [],
+    };
     switch (method) {
-      case "repository.open": return repository;
+      case "repository.open": return {
+        ...repository,
+        questions: alternate ? [SLOW_QUESTION] : [QUESTION, SLOW_QUESTION],
+        tags: this.result("taxonomy.list", {}),
+        views: this.result("view.list", {}),
+      };
+      case "repository.rebuildIndex": return {
+        ...repository,
+        questions: [QUESTION, SLOW_QUESTION],
+        tags: this.result("taxonomy.list", {}),
+        views: this.result("view.list", {}),
+        indexed: 2,
+      };
       case "repository.status": return repository;
       case "question.list": {
         const rows = [QUESTION, SLOW_QUESTION];
@@ -254,7 +340,7 @@ export class FixtureRpcBridge implements RpcBridge {
         return { ok: true, revision: this.revision, dryRun: { dry_run: true }, result: { dry_run: false } };
       case "asset.list": return String(params.questionId ?? "") === SLOW_QUESTION.id
         ? []
-        : [asset, ...this.createdAssets];
+        : [asset, localAsset, externalAsset, invalidAsset, ...this.createdAssets];
       case "history.list": return [];
       case "asset.open": return { ok: true, revision: this.revision };
       case "asset.replace":

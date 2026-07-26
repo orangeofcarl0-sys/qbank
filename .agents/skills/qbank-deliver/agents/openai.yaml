@@ -1,0 +1,6 @@
+interface:
+  display_name: "qbank 文档交付"
+  short_description: "从 qbank 快照构建可复现的正式中文试卷"
+  default_prompt: "Use $qbank-deliver to select qbank questions through MCP and build a reproducible student, answer, or solution PDF."
+policy:
+  allow_implicit_invocation: true

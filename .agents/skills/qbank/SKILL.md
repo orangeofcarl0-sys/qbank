@@ -46,8 +46,12 @@ conversation context. Do not guess the target repository or write authorization.
 
 ## Route the request
 
-- To define or recalibrate a PDF-to-qbank project, use `$qbank-digitize` first;
-  resume this Skill only after it returns an approved decision packet.
+- To organize or recalibrate extracted source material, use `$qbank-digitize` first;
+  resume this Skill after it returns reviewed `questions.jsonl`, Asset packages, and
+  the unresolved `review.md`.
+- To build a reproducible formal TeX/PDF document from MCP-selected questions, use
+  `$qbank-deliver`; this Skill remains responsible only for repository context and
+  deterministic qbank reads.
 - To organize source documents or batch-import questions, follow Workflow A.
 - To audit or revise existing questions, follow Workflow B.
 - To search and select candidates, follow Workflow C.
@@ -63,7 +67,8 @@ for concrete request-to-command patterns.
 
 ## Preserve evidence
 
-- Put temporary AI exchange files in `build/ai/`.
+- Put ordinary temporary AI exchange files in `build/ai/`.
+- Put source-digitization exchange files in `build/digitize/<job-name>/`.
 - Put generated paper definitions in `papers/generated/`.
 - Put final exports in `exports/`.
 - Preserve source references and source locations.

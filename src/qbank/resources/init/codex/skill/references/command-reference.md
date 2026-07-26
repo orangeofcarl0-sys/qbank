@@ -15,6 +15,8 @@ qbank codex install-skill --user --dry-run --format json
 qbank codex install-skill --project --update --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --project --update --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --project --update --dry-run --format json
 qbank codex integration-status --format json
 qbank codex mcp-check --format json
 qbank codex install-mcp --project --dry-run --format json
@@ -25,9 +27,9 @@ are warnings until an explicit `install-skill --update` is confirmed. Project up
 back up the current Skill under `.qbank/codex-skill-backups/`; user updates use
 `$HOME/.agents/.qbank-backups/skills/qbank/`.
 
-`--skill qbank` is the backward-compatible default. Select `qbank-digitize` only
-for the independent PDF digitization guide; it hands approved execution back to
-the qbank communication and mutation workflow.
+`--skill qbank` is the backward-compatible default. Select `qbank-digitize` for
+source calibration and exchange preparation, or `qbank-deliver` for read-only
+selection snapshots and fixed-template TeX/PDF construction.
 
 When the source task is in another repository, set the execution working directory to
 the target qbank root before running these commands. Do not depend on a prior shell

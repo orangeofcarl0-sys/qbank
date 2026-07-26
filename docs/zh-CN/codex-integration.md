@@ -6,7 +6,7 @@ qbank 通过仓库规则、Skill、本地 CLI 和可选 STDIO MCP 与 Codex 协�
 不调用模型 SDK，也不要求 OpenAI API key。Codex 负责语义判断，qbank 负责确定性校验、事务
 写入和产物生成。
 
-`0.3.0-beta.1` 中 CLI、仓库 Skill、MCP、Studio 和 sidecar 位于同一仓库并复用同一
+`0.3.0-beta.2` 中 CLI、仓库 Skill、MCP、Studio 和 sidecar 位于同一仓库并复用同一
 application services；Studio 不包含另一套业务规则。
 
 ## 三种独立状态
@@ -20,24 +20,27 @@ application services；Studio 不包含另一套业务规则。
 `codex check` 分别报告 `repository_ready`、`codex_cli_ready` 和 `degraded`。兼容字段 `ok`
 只在仓库级必要检查失败时变为 `false`，因此 `ok: true` 不等同于外部 Codex CLI 可执行。
 
-## 两个独立 Skill
+## 三个独立 Skill
 
 | Skill | 职责 | 不负责 |
 | --- | --- | --- |
 | `$qbank` | 题库定位、上下文、权限、CLI 协议、校验和任务交接 | 具体电子化项目如何取舍字段或分类 |
-| `$qbank-digitize` | PDF/扫描件访谈、字段策略、分类表、样本校准和批次验收 | 直接写 Markdown 或重实现事务 |
+| `$qbank-digitize` | 检查已有 MinerU 输出、字段策略、分类表、样本校准和轻量交换文件 | 运行 OCR、直接写 Markdown 或重实现事务 |
+| `$qbank-deliver` | 通过 MCP 冻结只读题目/资产快照，并用原创固定模板构建 TeX/PDF | 修改题库、下载远程资源或执行任意 TeX |
 
-`$qbank-digitize` 是额外领域工具，不是通信协议的改造。它先形成
-`digitization_decision_packet`；用户批准字段策略和代表样本后，再把明确执行范围交回
-`$qbank`。
+`$qbank-digitize` 是额外领域工具，不是通信协议的改造。它生成
+`questions.jsonl`、现有 Schema 的 Asset packages 和只含不确定项的 `review.md`；用户
+批准字段策略和代表样本后，再把明确执行范围交回 `$qbank`。
 
 ```powershell
 qbank codex install-skill --skill qbank --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --dry-run --format json
 ```
 
-PDF 电子化流程为：确认目标题库、来源和权限；检查实际 Schema、样式与分类表；批准字段策略
-和样本；输出决策包；最后由 `$qbank` 执行 Schema 读取、dry-run、写入与验证。
+轻量电子化流程为：在来源项目使用现有 MinerU 输出；确认目标题库、来源和权限；检查实际
+Schema、样式与分类表；批准字段策略和样本；生成 JSONL、资产包和复核清单；最后通过
+现有 MCP 执行 `prepare → inspect → commit → validate`。
 
 ## 跨项目上下文协议
 
@@ -73,6 +76,8 @@ qbank codex install-skill --skill qbank --project --update --dry-run --format js
 qbank codex install-skill --skill qbank --project --update
 qbank codex install-skill --skill qbank-digitize --user --update --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --update
+qbank codex install-skill --skill qbank-deliver --user --update --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --update
 ```
 
 正式更新使用同目录暂存和原子切换并保留备份。源、目标或内部文件含符号链接时拒绝安装。
@@ -115,5 +120,5 @@ qbank codex mcp-check --format json
 
 当前不提供 Studio 内嵌聊天、模型 API 封装、资源订阅或复杂 Prompt 模板。
 
-更多 agent host 互操作、OCR 候选中间层和完整电子化流程的计划见[项目路线图](roadmap.md)；
-这些内容是未来方向，不是当前版本已经提供的能力。
+更多 agent host 互操作、轻量 MinerU 入库和固定 TeX 交付流程见[项目路线图](roadmap.md)。
+qbank 不承诺建设通用 OCR 候选平台、作业系统或完整出版系统。

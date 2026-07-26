@@ -8,10 +8,12 @@
       unreachable, and unknown cases.
 - [ ] A representative sample covers layout, formula, figure, composite, OCR, and answer paths.
 - [ ] Full-corpus execution waits for explicit sample approval.
-- [ ] The decision packet records profile, mapping version, source scope, sample,
-      unresolved review queue, batch bounds, acceptance criteria, and authorization.
+- [ ] The lightweight workspace contains `questions.jsonl`, embedded Asset packages,
+      and a fixed-table `review.md` containing only unresolved items.
+- [ ] `check_exchange.py` returns pure JSON, performs no writes, and rejects path-backed
+      cross-project assets.
 - [ ] qbank commands, writes, validation, and repository handoff are delegated to `$qbank`.
 - [ ] The communication Skill contains only a routing reference, not digitization field logic.
 
 Record the prompt, inspected artifacts, question rounds, profile diff, calibration coverage,
-decision packet, and any unexpected coupling to `$qbank`.
+exchange-check result, and any unexpected coupling to `$qbank`.

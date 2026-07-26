@@ -1,0 +1,17 @@
+version: "1"
+repository_revision: "sha256:replace-with-repository-status"
+template: "qbank-zh-exam-v1"
+variant: "solution"
+document:
+  title: "qbank 合成示例试卷"
+  subject: "示例学科"
+  date: "2026-07-26"
+  duration_minutes: 30
+questions:
+  - id: "DEMO-MATH-0001"
+    score: 10
+    assets: {}
+  - id: "DEMO-FIG-0001"
+    score: 10
+    assets:
+      figure-1: "render-png"

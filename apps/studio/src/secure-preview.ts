@@ -147,8 +147,15 @@ export function guardMathSource(source: string): string {
 
 function previewStyles(theme: "light" | "dark"): string {
   const dark = theme === "dark";
+  const scrollbarTrack = dark ? "#20262c" : "#e3e8ec";
+  const scrollbarThumb = dark ? "#56636e" : "#a7b3be";
+  const scrollbarThumbHover = dark ? "#71818e" : "#7f8e9b";
   return `
-    :root { color-scheme: ${dark ? "dark" : "light"}; font: 14px/1.72 "Segoe UI", system-ui, sans-serif; }
+    :root { min-height:100%; overflow-y:scroll; overscroll-behavior-y:contain; scrollbar-color:${scrollbarThumb} ${scrollbarTrack}; scrollbar-gutter:stable; scrollbar-width:thin; color-scheme: ${dark ? "dark" : "light"}; font: 14px/1.72 "Segoe UI", system-ui, sans-serif; }
+    :root::-webkit-scrollbar { width:10px; height:10px; }
+    :root::-webkit-scrollbar-track { background:${scrollbarTrack}; }
+    :root::-webkit-scrollbar-thumb { min-height:32px; border:2px solid ${scrollbarTrack}; border-radius:999px; background:${scrollbarThumb}; }
+    :root::-webkit-scrollbar-thumb:hover { background:${scrollbarThumbHover}; }
     body { margin: 0; padding: 24px 28px 56px; color: ${dark ? "#d9e0e7" : "#25313c"}; background: ${dark ? "#252b31" : "#fbfaf7"}; overflow-wrap: anywhere; }
     h1,h2,h3,h4 { line-height: 1.35; margin: 1.35em 0 .55em; color: ${dark ? "#f0f3f6" : "#17232e"}; }
     h1 { font-size: 1.55rem; } h2 { font-size: 1.25rem; border-bottom: 1px solid ${dark ? "#3a434c" : "#dfe3e4"}; padding-bottom: .3em; }
@@ -201,10 +208,27 @@ export class SecurePreviewFrame {
   }
 
   render(html: string, theme: "light" | "dark"): void {
+    this.element.ariaBusy = "false";
     this.element.srcdoc = previewDocument(html, theme);
   }
 
   clear(theme: "light" | "dark"): void {
     this.render('<p class="muted">选择一道题目以显示预览。</p>', theme);
   }
+
+  loading(message: string, theme: "light" | "dark"): void {
+    this.element.ariaBusy = "true";
+    this.element.srcdoc = previewDocument(
+      `<p class="preview-status" role="status">${escapePreviewText(message)}</p>`,
+      theme,
+    );
+  }
+
+  error(message: string, theme: "light" | "dark"): void {
+    this.render(`<p class="preview-error">${escapePreviewText(message)}</p>`, theme);
+  }
+}
+
+function escapePreviewText(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

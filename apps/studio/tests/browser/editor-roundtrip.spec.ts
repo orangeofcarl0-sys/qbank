@@ -99,6 +99,22 @@ test("logical asset preview is derived without replacing source reference", asyn
   expect(snapshot.buffer).toContain("qbank-asset:diagram-1");
 });
 
+test("contained local asset references receive safe preview bindings", async ({ page }) => {
+  const source = await page.evaluate(
+    () => window.__QBANK_STUDIO_TEST__.testSnapshot().editor ?? "",
+  );
+  await page.evaluate(
+    (value) => window.__QBANK_STUDIO_TEST__.testSetEditorValue(
+      `${value}\n\n![local fixture](assets/images/local.svg)`,
+    ),
+    source,
+  );
+  await expect(preview(page).locator('img[alt="local fixture"]')).toBeVisible();
+  await expect(page.locator(".asset-local")).toContainText("本地资源");
+  expect(await page.evaluate(() => window.__QBANK_STUDIO_TEST__.testSnapshot().buffer))
+    .toContain("assets/images/local.svg");
+});
+
 test("formula context menu copies the original TeX", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"], {
     origin: "http://127.0.0.1:1420",

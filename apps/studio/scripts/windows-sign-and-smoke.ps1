@@ -82,7 +82,7 @@ foreach ($file in @($sidecar, $main, $installer)) {
   }
 }
 
-$request = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1.0","clientVersion":"0.3.0-beta.1"}}'
+$request = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1.0","clientVersion":"0.3.0-beta.2"}}'
 $response = $request | & $sidecar
 if ($LASTEXITCODE -ne 0 -or $response -notmatch '"protocolVersion":"1.0"') {
   throw "Signed sidecar smoke test failed."

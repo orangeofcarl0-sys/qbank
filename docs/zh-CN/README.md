@@ -12,9 +12,10 @@
 | [安装与升级](installation.md) | CLI、Studio、校验、升级和卸载 |
 | [Codex 与 MCP 接入](codex-integration.md) | Skill、跨项目上下文、MCP 安装与授权 |
 | [MCP 使用指南](mcp-guide.md) | MCP 定位、工具与资源、两阶段写入、诊断与恢复 |
-| [项目路线图](roadmap.md) | 多 agent 互操作、OCR 中间层、完整电子化与 MCP 后续方向 |
-| [0.3.0-beta.1 兼容矩阵](compatibility-0.3.0-beta.1.md) | 软件、Protocol、Schema、入口与迁移关系 |
-| [0.3.0-beta.1 已知限制](known-limitations-0.3.0-beta.1.md) | unsigned beta、文件系统与外部依赖边界 |
+| [项目路线图](roadmap.md) | 多 agent 互操作、轻量资料入库、TeX 交付与 MCP 后续方向 |
+| [资料 → qbank → 正式交付物](source-qbank-deliverables.md) | MinerU、AI、现有 MCP 与固定 TeX 模板组成的轻量工作流 |
+| [0.3.0-beta.2 兼容矩阵](compatibility-0.3.0-beta.2.md) | 软件、Protocol、Schema、入口与迁移关系 |
+| [0.3.0-beta.2 已知限制](known-limitations-0.3.0-beta.2.md) | unsigned beta、文件系统与外部依赖边界 |
 | [0.2.0 兼容性参考](compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、诊断码与 capability |
 | [兼容性策略](compatibility-policy.md) | 稳定接口、版本线、迁移和弃用规则 |
 | [0.2.0 已知限制](known-limitations-0.2.0.md) | 该版本的部署、事务、性能和产品边界 |

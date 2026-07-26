@@ -30,6 +30,17 @@
 - Retain the light preview paper in dark mode when required for document contrast.
 - Preserve semantic roles across themes; never merely invert colors.
 
+## Scrolling
+
+- Keep navigation filters, question results, source, secure preview, and Inspector as independent,
+  height-bounded scroll regions.
+- Wheel input affects the region under the pointer and must not chain into an adjacent pane at a
+  scroll boundary.
+- Use theme-aware stable scrollbars for primary regions; do not rely on transient WebView overlay
+  indicators as the only position or overflow cue.
+- Keep horizontal scrolling local to wide formulas, code, and tables instead of moving the whole
+  workspace.
+
 ## Legacy boundary
 
 Qt `QMenu`, `QMessageBox`, QSS, CodeMirror, and component-gallery instructions apply only when the

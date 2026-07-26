@@ -23,6 +23,7 @@ def test_every_write_method_is_explicitly_classified() -> None:
     contract = json.loads(path.read_text(encoding="utf-8"))
     writes = {item["name"] for item in contract["methods"] if item["access"] == "write"}
     assert writes == {
+        "repository.rebuildIndex",
         "question.save",
         "question.update",
         "question.create",

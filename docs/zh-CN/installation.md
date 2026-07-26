@@ -1,4 +1,4 @@
-# qbank 0.3.0-beta.1 安装与升级
+# qbank 0.3.0-beta.2 安装与升级
 
 [English](../en/installation.md) · [中文文档](README.md)
 
@@ -7,8 +7,8 @@
 从 GitHub Release 下载制品后，将 `checksums.txt` 放在同一目录并核对 SHA-256：
 
 ```powershell
-Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
-Get-FileHash .\QBank-Studio-0.3.0-beta.1-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\qbank-0.3.0b2-py3-none-any.whl -Algorithm SHA256
+Get-FileHash .\QBank-Studio-0.3.0-beta.2-x64-setup.exe -Algorithm SHA256
 ```
 
 本 beta 尚未代码签名，Windows SmartScreen 可能警告。只使用本仓库 Release 中的制品；
@@ -21,7 +21,7 @@ qbank 需要 Python 3.11：
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install .\qbank-0.3.0b1-py3-none-any.whl
+pip install .\qbank-0.3.0b2-py3-none-any.whl
 qbank --help
 qbank schema --format json
 ```
@@ -32,7 +32,7 @@ MCP 是可选组件。需要时安装 `qbank[mcp]`，再按
 
 ## QBank Studio
 
-- 安装器：运行 `QBank-Studio-0.3.0-beta.1-x64-setup.exe`，按当前用户安装。
+- 安装器：运行 `QBank-Studio-0.3.0-beta.2-x64-setup.exe`，按当前用户安装。
 - 便携包：解压整个 ZIP 后运行 `qbank-studio.exe`，不要只复制主程序。
 - Legacy：安装 `qbank[desktop]` 后运行 `qbank desktop`。
 

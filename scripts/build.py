@@ -18,8 +18,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 STUDIO = ROOT / "apps" / "studio"
 OUTPUT = ROOT / "build" / "unified"
-PYTHON_VERSION = "0.3.0b1"
-DISPLAY_VERSION = "0.3.0-beta.1"
+PYTHON_VERSION = "0.3.0b2"
+DISPLAY_VERSION = "0.3.0-beta.2"
 
 
 def command_name(name: str) -> str:

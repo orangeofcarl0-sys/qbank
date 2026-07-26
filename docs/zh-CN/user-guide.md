@@ -2,7 +2,7 @@
 
 [English](../en/user-guide.md) · [中文文档](README.md)
 
-本文说明 qbank `0.3.0-beta.1` 的项目结构、数据边界和主要命令行工作流。数据 Schema
+本文说明 qbank `0.3.0-beta.2` 的项目结构、数据边界和主要命令行工作流。数据 Schema
 仍为 `1.0`；完整参数以各命令的 `--help` 输出为准。安装与升级见
 [安装指南](installation.md)。
 

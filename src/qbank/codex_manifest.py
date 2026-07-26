@@ -646,6 +646,18 @@ DIGITIZE_SKILL_FILES = (
     "assets/classification-map.csv",
     "assets/digitization-profile.yaml",
     "references/calibration.md",
+    "references/exchange-workspace.md",
     "references/field-policy.md",
     "references/intake.md",
+    "scripts/check_exchange.py",
+)
+
+DELIVER_SKILL_FILES = (
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/tex/main.tex",
+    "assets/tex/qbankexam.cls",
+    "references/selection.md",
+    "references/tex-workflow.md",
+    "scripts/build_delivery.py",
 )

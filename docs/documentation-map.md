@@ -17,11 +17,12 @@
 | `docs/*/codex-integration.md` | Codex/MCP 用户 | Skill、MCP、授权和恢复 | manifest、Skill、MCP |
 | `docs/*/mcp-guide.md` | MCP 用户与 agent 集成者 | 安装、工具、资源、两阶段写入、诊断和安全边界 | MCP tool、resource、operation 或配置 |
 | `docs/*/roadmap.md` | 用户与贡献者 | 已有基础、未来方向、依赖与完成标准 | 路线优先级或已实现状态 |
+| `docs/*/source-qbank-deliverables.md` | 数字化与交付用户 | MinerU 交换文件、现有 MCP 入库、selection、TeX、失败和验收 | 来源整理、Asset package、MCP 写入或 TeX 交付边界 |
 | `docs/features/capability-matrix.md` | 集成维护者 | CLI、Studio、MCP 能力映射 | capability manifest 或入口 |
 | `docs/*/compatibility-policy.md` | 集成方 | 稳定接口、迁移和版本规则 | 公共契约 |
-| `docs/*/compatibility-0.3.0-beta.1.md` | beta 用户 | 当前软件、Protocol 与 Schema 矩阵 | 0.3 beta 冻结 |
+| `docs/*/compatibility-0.3.0-beta.2.md` | beta 用户 | 当前软件、Protocol 与 Schema 矩阵 | 0.3 beta 冻结 |
 | `docs/*/known-limitations-0.2.0.md` | 部署者 | 0.2.x 版本限制 | 0.2.x 限制澄清 |
-| `docs/*/known-limitations-0.3.0-beta.1.md` | beta 部署者 | unsigned beta 与运行边界 | beta 限制变化 |
+| `docs/*/known-limitations-0.3.0-beta.2.md` | beta 部署者 | unsigned beta 与运行边界 | beta 限制变化 |
 | `docs/localization.md` | 文档维护者 | 语言范围、编写与同步门禁 | 支持语言或本地化范围 |
 | `docs/architecture.md` | 维护者 | 分层、数据和事务边界 | 架构边界 |
 | `docs/monorepo-development.md` | 开发者 | Studio/CLI/MCP/Legacy 目录、三级检查与统一构建 | 仓库结构、版本或构建入口 |
@@ -30,6 +31,8 @@
 | `docs/adr/` | 维护者 | 重要决定及其后果 | 架构、权威源、事务、安全、依赖 |
 | `docs/features/` | 产品与实现人员 | 单项功能的完整契约 | 功能生命周期状态 |
 | `.agents/skills/qbank/` | Codex | 确定性操作协议 | 工作流、命令、授权 |
+| `.agents/skills/qbank-digitize/` | Codex | 来源整理、字段策略与交换文件检查 | 数字化工作区、校准或 Asset package 约定 |
+| `.agents/skills/qbank-deliver/` | Codex | 只读选择快照与固定 TeX/PDF 构建 | selection、受限 TeX、资产解析或构建行为 |
 
 ## 导航原则
 

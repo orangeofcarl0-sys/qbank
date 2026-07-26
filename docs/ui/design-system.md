@@ -49,6 +49,7 @@ hierarchy before shadows.
 | `apps/studio/src/editor-buffer.ts` | Saved snapshot and dirty-state semantics |
 | `apps/studio/src/advanced-management.ts` | Visible filter, tag, and saved-view presentation state |
 | `apps/studio/tests/browser/visual-acceptance.spec.ts` | Deterministic theme, asset, formula, and scaling evidence |
+| `apps/studio/tests/browser/scrolling.spec.ts` | Long-document, pane-local wheel, and visible-scrollbar behavior |
 
 New modern components must consume the existing semantic tokens. They must not introduce a second
 theme framework, decorative dashboard cards, gradients, frameless-window behavior, or component-
@@ -57,16 +58,27 @@ local global palettes.
 ## Interaction and state rules
 
 - Opening a question and selecting it for batch work remain separate actions.
+- Repository activation replaces repository identity, navigation, editor, preview, Inspector,
+  filters, and batch selection as one state. Failed or cancelled activation preserves the previous
+  state rather than partially clearing the workspace.
 - Source, split, and instant-render modes preserve one authoritative editor buffer.
 - Dirty state compares current content with the last saved snapshot; returning to that snapshot
   clears the dirty indicator.
 - Question, search, and preview generations reject stale asynchronous results.
+- Question loading immediately clears the old preview and Inspector, exposes an accurate busy
+  state, and identifies the target question before asynchronous content arrives.
 - Saved views restore visible, editable filters and never add hidden duplicate constraints.
 - Asset actions remain in a stable menu and derive enabled state from typed asset capabilities.
+- Navigation filters, question results, source, secure preview, and Inspector own independent,
+  height-bounded scroll regions. Wheel input stays in the pane under the pointer, and primary
+  scrollbars remain visible rather than relying on transient WebView overlay indicators.
 - Focus, hover, selected, disabled, loading, empty, warning, error, and success states must remain
   distinguishable without relying on color alone.
-- Destructive choices and filesystem selection use Tauri's platform dialog boundary; ordinary
-  in-workspace menus remain keyboard-accessible HTML controls.
+- Destructive choices and filesystem selection use Tauri's platform dialog boundary. The
+  three-way Save/Discard/Cancel dirty-state decision is a compact modal application dialog so each
+  outcome remains explicit and keyboard accessible.
+- The title bar displays a repository name, never a machine-local path. A complete path may appear
+  in the identity tooltip or clipboard only after an explicit copy action.
 
 ## Preview and asset presentation
 
@@ -75,9 +87,11 @@ offline MathJax. Raw HTML remains disabled. Dark mode intentionally retains a li
 surface; this is a document-viewing decision rather than an incomplete theme transition.
 
 Image cards behave as document objects. They show one preview, identity, preferred representation,
-status, and capability menu. A local preview is shown only after repository containment and
-existence checks. External and invalid resources use explicit warning or error states and are not
-downloaded automatically.
+status, and capability menu. The application service classifies logical, contained local,
+external, and invalid references; presentation adapters do not infer filesystem boundaries. A
+local preview is a bounded data URL produced only after symlink-aware containment and existence
+checks. External and invalid resources use explicit warning or error states and are not downloaded
+automatically. Markdown preview rewriting is limited to exact image-node URI matches.
 
 ## Accessibility
 

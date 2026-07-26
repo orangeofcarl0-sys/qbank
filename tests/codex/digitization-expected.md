@@ -22,5 +22,8 @@ OCR, and hands only a dry-run scope to `$qbank`.
 
 ## Separation invariant
 
-`$qbank-digitize` produces the domain decision packet. `$qbank` remains responsible for
-target discovery, authorization, CLI commands, mutations, validation, and handoff.
+`$qbank-digitize` produces only `questions.jsonl`, existing-Schema Asset packages, a
+fixed-table `review.md`, and a read-only JSON validation report. `$qbank` remains
+responsible for target discovery, authorization, mutations, validation, and handoff.
+Cross-project local binaries are embedded in packages and never represented by source
+workspace paths.

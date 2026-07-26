@@ -315,20 +315,16 @@ def test_desktop_asset_items_classify_and_contain_every_reference(
 
     outside = tmp_path / "outside.png"
     outside.write_bytes(b"outside")
-    escaped = controller._desktop_reference_item(
-        question.id,
-        "../outside.png",
-        True,
-        {},
-        set(),
-    )
-    absolute = controller._desktop_reference_item(
-        question.id,
-        str(outside),
-        True,
-        {},
-        set(),
-    )
+    escaped = controller.assets.desktop_items(
+        question.model_copy(update={"assets": ["../outside.png"]}),
+        [],
+        [],
+    )[0]
+    absolute = controller.assets.desktop_items(
+        question.model_copy(update={"assets": [str(outside)]}),
+        [],
+        [],
+    )[0]
     assert escaped.kind == absolute.kind == "invalid"
     assert escaped.preview_path is None and absolute.preview_path is None
     assert not escaped.capabilities.open_reference
@@ -339,13 +335,11 @@ def test_desktop_asset_items_classify_and_contain_every_reference(
     except OSError:
         pass
     else:
-        symlinked = controller._desktop_reference_item(
-            question.id,
-            "assets/images/escape.png",
-            True,
-            {},
-            set(),
-        )
+        symlinked = controller.assets.desktop_items(
+            question.model_copy(update={"assets": ["assets/images/escape.png"]}),
+            [],
+            [],
+        )[0]
         assert symlinked.kind == "invalid"
         assert symlinked.preview_path is None
 

@@ -177,8 +177,9 @@ MCP 的结构化错误保留 qbank 稳定诊断码。不要根据自然语言错
 - 不提供 Studio 内嵌聊天、模型封装、账号或 API key 管理；
 - 配置示例首先由 qbank 自身生成；更多 MCP agent host 的安装模板与互操作测试仍在
   [路线图](roadmap.md)中；
-- MCP 不负责 OCR。文档、图片和 PDF 的电子化将先经过可审阅的候选中间层，再交给 qbank
-  的确定性导入与验证流程。
+- MCP 不负责 OCR。轻量工作流复用来源项目已有的 MinerU 输出，由 AI 与
+  `$qbank-digitize` 生成 Question JSONL、Asset packages 和只含不确定项的
+  `review.md`，再交给现有 MCP 两阶段写入与验证。
 
 机器权威能力清单见[能力矩阵](../features/capability-matrix.md)；Skill、跨项目授权与
 `$qbank-digitize` 的职责见[Codex 接入指南](codex-integration.md)。

@@ -1,4 +1,4 @@
-# qbank 0.3.0-beta.1 installation and upgrade
+# qbank 0.3.0-beta.2 installation and upgrade
 
 [简体中文](../zh-CN/installation.md) · [English documentation](README.md)
 
@@ -7,8 +7,8 @@
 Download artifacts and `checksums.txt` from the same GitHub Release, then compare SHA-256:
 
 ```powershell
-Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
-Get-FileHash .\QBank-Studio-0.3.0-beta.1-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\qbank-0.3.0b2-py3-none-any.whl -Algorithm SHA256
+Get-FileHash .\QBank-Studio-0.3.0-beta.2-x64-setup.exe -Algorithm SHA256
 ```
 
 This beta is not code-signed and Windows SmartScreen may warn. Use only artifacts from this
@@ -21,7 +21,7 @@ qbank requires Python 3.11:
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install .\qbank-0.3.0b1-py3-none-any.whl
+pip install .\qbank-0.3.0b2-py3-none-any.whl
 qbank --help
 qbank schema --format json
 ```
@@ -32,7 +32,7 @@ Skills work independently and do not require a local Codex CLI.
 
 ## QBank Studio
 
-- Installer: run `QBank-Studio-0.3.0-beta.1-x64-setup.exe` for a per-user installation.
+- Installer: run `QBank-Studio-0.3.0-beta.2-x64-setup.exe` for a per-user installation.
 - Portable: extract the complete ZIP and run `qbank-studio.exe`; do not copy only the executable.
 - Legacy: install `qbank[desktop]` and run `qbank desktop`.
 

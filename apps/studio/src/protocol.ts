@@ -1,3 +1,5 @@
+import type { SavedView, TagUsage } from "./advanced-management";
+
 export const STUDIO_PROTOCOL_VERSION = "1.0" as const;
 
 export type JsonValue =
@@ -34,6 +36,13 @@ export interface RepositoryStatus {
   indexDirty: boolean;
   mathMacros: Record<string, string | [string, number]>;
   studioWarnings: string[];
+}
+
+export interface RepositoryOpenResult extends RepositoryStatus {
+  questions: QuestionSummary[];
+  tags: TagUsage[];
+  views: SavedView[];
+  indexed?: number;
 }
 
 export interface QuestionSummary {
@@ -78,6 +87,12 @@ export interface AssetRepresentation {
 
 export interface AssetItem {
   assetId: string;
+  kind: "logical" | "local" | "external" | "invalid";
+  reference: string;
+  displayName: string;
+  declared: boolean;
+  exists: boolean;
+  diagnostic: Diagnostic | null;
   role: string;
   status: string;
   preferredRepresentation: string | null;

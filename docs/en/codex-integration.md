@@ -6,7 +6,7 @@ qbank collaborates with Codex through repository rules, Skills, the local CLI, a
 STDIO MCP server. It embeds no chat UI, calls no model SDK, and requires no OpenAI API key. Codex
 makes semantic decisions; qbank provides deterministic validation, transactions, and rendering.
 
-In `0.3.0-beta.1`, the CLI, repository Skills, MCP, Studio, and sidecar live in one repository and
+In `0.3.0-beta.2`, the CLI, repository Skills, MCP, Studio, and sidecar live in one repository and
 reuse the same application services; Studio does not contain a second business implementation.
 
 ## Three independent states
@@ -21,25 +21,29 @@ reuse the same application services; Studio does not contain a second business i
 `ok` field becomes false only for required repository checks, so `ok: true` does not mean the
 external Codex CLI is runnable.
 
-## Two independent Skills
+## Three independent Skills
 
 | Skill | Responsible for | Not responsible for |
 | --- | --- | --- |
 | `$qbank` | Bank location, context, authorization, CLI protocol, validation, and handoff | Choosing fields or taxonomy for a particular digitization project |
-| `$qbank-digitize` | PDF/scan interview, field policy, classification tables, sample calibration, and batch acceptance | Writing Markdown directly or reimplementing qbank transactions |
+| `$qbank-digitize` | Existing MinerU-output inspection, field policy, classification tables, sample calibration, and lightweight exchange files | Running OCR, writing Markdown directly, or reimplementing qbank transactions |
+| `$qbank-deliver` | Freeze read-only question and asset snapshots through MCP and build TeX/PDF with an original fixed template | Mutating the bank, downloading remote assets, or running arbitrary TeX |
 
 `$qbank-digitize` is an additional domain tool, not a replacement communication protocol. It first
-produces a `digitization_decision_packet`. After the user approves field policy and representative
-samples, execution returns to `$qbank`.
+produces `questions.jsonl`, existing-Schema Asset packages, and a `review.md` containing only
+unresolved items. After the user approves field policy and representative samples, execution
+returns to `$qbank`.
 
 ```powershell
 qbank codex install-skill --skill qbank --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --dry-run --format json
 ```
 
-A PDF project therefore confirms bank, sources, and authority; inspects the real Schema, layouts,
-and classification table; approves policy and calibration samples; records the decision packet; and
-only then uses `$qbank` for Schema reads, dry-runs, committed writes, and validation.
+A lightweight digitization project consumes existing MinerU output in the source project, confirms
+the bank, sources, and authority, inspects the live Schemas and classification table, approves
+policy and calibration samples, creates JSONL, asset packages, and the review list, and then uses
+existing MCP for `prepare → inspect → commit → validate`.
 
 ## Cross-project context protocol
 
@@ -77,6 +81,8 @@ qbank codex install-skill --skill qbank --project --update --dry-run --format js
 qbank codex install-skill --skill qbank --project --update
 qbank codex install-skill --skill qbank-digitize --user --update --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --update
+qbank codex install-skill --skill qbank-deliver --user --update --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --update
 ```
 
 Committed updates stage and atomically switch directories while retaining a backup. Symbolic links
@@ -124,6 +130,6 @@ reports `DEGRADED` instead.
 qbank currently provides no embedded Studio chat, model API wrapper, resource subscriptions, or
 complex prompt-template system.
 
-See the [project roadmap](roadmap.md) for planned agent-host interoperability, an OCR candidate
-layer, and the complete digitization workflow. These are future directions, not current-release
-capabilities.
+See the [project roadmap](roadmap.md) for agent-host interoperability, lightweight MinerU
+ingestion, and fixed-TeX delivery workflows. qbank does not promise a generic OCR candidate
+platform, job system, or complete publishing system.

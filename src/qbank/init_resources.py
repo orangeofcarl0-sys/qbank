@@ -78,12 +78,48 @@ STATIC_INIT_RESOURCES = (
         PurePosixPath("init/codex/qbank-digitize/references/calibration.md"),
     ),
     ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/references/exchange-workspace.md"),
+        PurePosixPath("init/codex/qbank-digitize/references/exchange-workspace.md"),
+    ),
+    ManagedResource(
         PurePosixPath(".agents/skills/qbank-digitize/assets/digitization-profile.yaml"),
         PurePosixPath("init/codex/qbank-digitize/assets/digitization-profile.yaml"),
     ),
     ManagedResource(
         PurePosixPath(".agents/skills/qbank-digitize/assets/classification-map.csv"),
         PurePosixPath("init/codex/qbank-digitize/assets/classification-map.csv"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-digitize/scripts/check_exchange.py"),
+        PurePosixPath("init/codex/qbank-digitize/scripts/check_exchange.py"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/SKILL.md"),
+        PurePosixPath("init/codex/qbank-deliver/SKILL.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/agents/openai.yaml"),
+        PurePosixPath("init/codex/qbank-deliver/agents/openai.yaml"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/references/selection.md"),
+        PurePosixPath("init/codex/qbank-deliver/references/selection.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/references/tex-workflow.md"),
+        PurePosixPath("init/codex/qbank-deliver/references/tex-workflow.md"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/scripts/build_delivery.py"),
+        PurePosixPath("init/codex/qbank-deliver/scripts/build_delivery.py"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/assets/tex/main.tex"),
+        PurePosixPath("init/codex/qbank-deliver/assets/tex/main.tex"),
+    ),
+    ManagedResource(
+        PurePosixPath(".agents/skills/qbank-deliver/assets/tex/qbankexam.cls"),
+        PurePosixPath("init/codex/qbank-deliver/assets/tex/qbankexam.cls"),
     ),
     ManagedResource(
         PurePosixPath("qbank.yaml"),

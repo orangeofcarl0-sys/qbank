@@ -13,3 +13,8 @@
 ```text
 使用 $qbank-digitize 快速整理这 3 页扫描题。没有答案，只需要可检索草稿。
 ```
+
+```text
+使用 $qbank-digitize 检查 build/digitize/demo。确认 questions.jsonl、Base64 资产包和
+固定 review 表格可交给 qbank MCP；不要写目标题库。
+```

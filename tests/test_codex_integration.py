@@ -16,6 +16,7 @@ from qbank.codex_manifest import (
     COMPLETION_HANDOFF_FIELDS,
     CONTEXT_AUTHORIZATION_MODES,
     CONTEXT_REQUIRED_FIELDS,
+    DELIVER_SKILL_FILES,
     DIGITIZE_SKILL_FILES,
     INTEGRATION_REVISION,
     REQUIRED_COMMANDS,
@@ -52,12 +53,24 @@ def test_repository_contains_required_codex_artifacts() -> None:
         ".agents/skills/qbank-digitize/references/intake.md",
         ".agents/skills/qbank-digitize/references/field-policy.md",
         ".agents/skills/qbank-digitize/references/calibration.md",
+        ".agents/skills/qbank-digitize/references/exchange-workspace.md",
+        ".agents/skills/qbank-digitize/scripts/check_exchange.py",
+        ".agents/skills/qbank-deliver/SKILL.md",
+        ".agents/skills/qbank-deliver/agents/openai.yaml",
+        ".agents/skills/qbank-deliver/assets/tex/main.tex",
+        ".agents/skills/qbank-deliver/assets/tex/qbankexam.cls",
+        ".agents/skills/qbank-deliver/references/selection.md",
+        ".agents/skills/qbank-deliver/references/tex-workflow.md",
+        ".agents/skills/qbank-deliver/scripts/build_delivery.py",
         "tests/codex/discovery-prompts.md",
         "tests/codex/expected-workflows.md",
         "tests/codex/manual-test-checklist.md",
         "tests/codex/digitization-prompts.md",
         "tests/codex/digitization-expected.md",
         "tests/codex/digitization-manual-checklist.md",
+        "tests/codex/delivery-prompts.md",
+        "tests/codex/delivery-expected.md",
+        "tests/codex/delivery-manual-checklist.md",
     ]
     assert all((root / path).is_file() for path in required)
 
@@ -99,6 +112,13 @@ def test_repository_skill_matches_packaged_canonical_tree() -> None:
             packaged_digitize / relative
         ).read_bytes()
 
+    repository_deliver = root / ".agents/skills/qbank-deliver"
+    packaged_deliver = root / "src/qbank/resources/init/codex/qbank-deliver"
+    for relative in DELIVER_SKILL_FILES:
+        assert (repository_deliver / relative).read_bytes() == (
+            packaged_deliver / relative
+        ).read_bytes()
+
 
 def test_skill_frontmatter_and_openai_metadata_are_discoverable() -> None:
     root = Path(__file__).parents[1] / ".agents/skills/qbank"
@@ -125,6 +145,10 @@ def test_digitize_skill_is_domain_specific_and_composes_with_qbank() -> None:
     assert "classification-table" in metadata["description"]
     assert "$qbank" in digitize
     assert "Do not redefine qbank commands" in digitize
+    assert "existing MinerU" in digitize
+    assert "questions.jsonl" in digitize
+    assert "review.md" in digitize
+    assert "Candidate database" in digitize
     assert "$qbank-digitize" in communication
     assert "field_policy" not in communication
     assert "calibrated_batch" not in communication
@@ -138,6 +162,10 @@ def test_digitize_skill_is_domain_specific_and_composes_with_qbank() -> None:
     assert profile["classification"]["unknown_policy"] == "review_required"
     assert profile["calibration"]["approval_required"] is True
     assert profile["execution_handoff"]["authorization"] == "dry_run_only"
+    assert profile["exchange"]["review_only_uncertain_items"] is True
+    assert profile["execution_handoff"]["authoritative_path"] == (
+        "mcp_prepare_inspect_commit_validate"
+    )
 
     interface = load_yaml((digitize_root / "agents/openai.yaml").read_text(encoding="utf-8"))
     assert isinstance(interface, dict)
@@ -155,6 +183,7 @@ def test_codex_check_warns_not_fails_when_codex_cli_is_absent(
     result = check_codex_integration(
         ProjectContext.from_config(root, config),
         command_probe=lambda _parts: True,
+        user_skill=root / "missing-user-skill",
     )
     codex_check = next(check for check in result.checks if check.name == "codex_cli")
     assert result.ok
@@ -359,6 +388,39 @@ def test_digitize_skill_installs_independently_from_communication_skill(
     } == canonical_skill_contents("qbank-digitize")
 
 
+def test_deliver_skill_installs_independently(
+    project: tuple[Path, Any],
+    tmp_path: Path,
+) -> None:
+    root, config = project
+    context = ProjectContext.from_config(root, config)
+    home = tmp_path / "home"
+    destination = home / ".agents/skills/qbank-deliver"
+
+    planned = install_repository_skill(
+        context,
+        dry_run=True,
+        home=home,
+        skill_name="qbank-deliver",
+    )
+    assert planned.action == "plan"
+    assert planned.destination == str(destination)
+    assert planned.files == len(DELIVER_SKILL_FILES)
+
+    installed = install_repository_skill(
+        context,
+        dry_run=False,
+        home=home,
+        skill_name="qbank-deliver",
+    )
+    assert installed.action == "installed"
+    assert {
+        path.relative_to(destination).as_posix(): path.read_bytes()
+        for path in destination.rglob("*")
+        if path.is_file()
+    } == canonical_skill_contents("qbank-deliver")
+
+
 def test_skill_install_requires_repository_source(
     project: tuple[Path, Any],
     tmp_path: Path,
@@ -479,7 +541,7 @@ def test_codex_cli_human_check_and_error_boundaries(
         ["codex", "install-skill", "--skill", "unknown", "--dry-run"],
     )
     assert invalid_skill.exit_code == 3
-    assert "expected qbank or qbank-digitize" in invalid_skill.stderr
+    assert "expected qbank, qbank-digitize, or qbank-deliver" in invalid_skill.stderr
 
 
 def test_digitize_skill_cli_selects_independent_source(
@@ -525,6 +587,25 @@ def test_digitize_skill_cli_selects_independent_source(
     assert result.exit_code == 0
     assert Path(payload["destination"]).name == "qbank-digitize"
     assert payload["files"] == len(DIGITIZE_SKILL_FILES)
+    assert not home.exists()
+
+    deliver = runner.invoke(
+        app,
+        [
+            "codex",
+            "install-skill",
+            "--skill",
+            "qbank-deliver",
+            "--user",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    deliver_payload = json.loads(deliver.stdout)
+    assert deliver.exit_code == 0
+    assert Path(deliver_payload["destination"]).name == "qbank-deliver"
+    assert deliver_payload["files"] == len(DELIVER_SKILL_FILES)
     assert not home.exists()
 
 

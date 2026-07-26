@@ -32,6 +32,7 @@
   "methods": [
     { "name": "initialize", "access": "lifecycle", "params": {}, "result": { "type": "object" } },
     { "name": "repository.open", "access": "lifecycle", "params": { "root": "string" }, "result": { "type": "object" } },
+    { "name": "repository.rebuildIndex", "access": "write", "params": { "root": "string" }, "result": { "type": "object" } },
     { "name": "repository.status", "access": "read", "params": {}, "result": { "type": "object" } },
     { "name": "question.search", "access": "read", "params": { "text": "string", "limit": "integer" }, "result": { "type": "array" } },
     { "name": "question.list", "access": "read", "params": { "offset": "integer", "limit": "integer", "subject": "string", "chapter": "string", "topics": "array", "excludedTopics": "array", "topicMode": "and|or", "type": "string", "status": "string", "difficultyMin": "integer", "difficultyMax": "integer", "language": "string", "year": "integer", "text": "string" }, "result": { "type": "array" } },
@@ -58,7 +59,7 @@
     { "name": "view.delete", "access": "write", "params": { "name": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
     { "name": "view.apply", "access": "read", "params": { "name": "string" }, "result": { "type": "array" } },
     { "name": "asset.list", "access": "read", "params": { "questionId": "string" }, "result": { "type": "array" } },
-    { "name": "asset.open", "access": "write", "params": { "questionId": "string", "assetId": "string", "action": "string", "expectedRevision": "string for edit_ipe" }, "result": { "type": "object" } },
+    { "name": "asset.open", "access": "write", "params": { "questionId": "string", "assetId": "string", "reference": "string for validated local or external resources", "action": "string", "expectedRevision": "string for edit_ipe" }, "result": { "type": "object" } },
     { "name": "asset.create", "access": "write", "params": { "questionId": "string", "assetId": "string", "mediaType": "string", "dataBase64": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
     { "name": "asset.replace", "access": "write", "params": { "questionId": "string", "assetId": "string", "mediaType": "string", "dataBase64": "string", "expectedRevision": "string" }, "result": { "type": "object" } },
     { "name": "asset.render", "access": "write", "params": { "questionId": "string", "assetId": "string", "formats": "array", "expectedRevision": "string" }, "result": { "type": "object" } },

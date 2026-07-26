@@ -17,6 +17,6 @@ mod tests {
     #[test]
     fn product_identity_is_stable() {
         assert_eq!(env!("CARGO_PKG_NAME"), "qbank-studio");
-        assert_eq!(env!("CARGO_PKG_VERSION"), "0.3.0-beta.1");
+        assert_eq!(env!("CARGO_PKG_VERSION"), "0.3.0-beta.2");
     }
 }

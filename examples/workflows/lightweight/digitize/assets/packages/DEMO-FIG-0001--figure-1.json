@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "question_id": "DEMO-FIG-0001",
+  "asset_id": "figure-1",
+  "role": "question-figure",
+  "representations": [
+    {
+      "representation_id": "render-png",
+      "format": "png",
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "purpose": "render",
+      "editable": false,
+      "metadata": {
+        "origin": "public synthetic fixture"
+      }
+    }
+  ],
+  "provenance": {
+    "source": "synthetic-source.pdf",
+    "page": 2,
+    "generated": true
+  },
+  "suggested_render": "render-png",
+  "status": "raw",
+  "review_notes": "Synthetic fixture; no external source material."
+}

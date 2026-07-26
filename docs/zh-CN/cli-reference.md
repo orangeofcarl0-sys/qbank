@@ -2,8 +2,8 @@
 
 [English](../en/cli-reference.md) · [中文文档](README.md)
 
-本文列出 qbank `0.3.0-beta.1` 的公共命令入口。本 beta 保留 0.2.0 已记录的命令名称；
-参数、默认值和退出码以各命令的 `--help`、[当前兼容矩阵](compatibility-0.3.0-beta.1.md)
+本文列出 qbank `0.3.0-beta.2` 的公共命令入口。本 beta 保留 0.2.0 已记录的命令名称；
+参数、默认值和退出码以各命令的 `--help`、[当前兼容矩阵](compatibility-0.3.0-beta.2.md)
 及[0.2.0 兼容性参考](compatibility-0.2.0.md)为准。
 
 ## 项目、诊断与索引
@@ -85,7 +85,7 @@
 | `qbank codex check` | 检查仓库、Skill 和 Codex CLI 就绪状态 |
 | `qbank codex instructions` | 输出集成规则和工作流 |
 | `qbank codex integration-status` | 汇总 Skill 与 MCP 状态 |
-| `qbank codex install-skill` | 预演或安装项目/用户 Skill |
+| `qbank codex install-skill` | 预演或安装 `qbank`、`qbank-digitize` 或 `qbank-deliver` 项目/用户 Skill |
 | `qbank codex install-mcp` | 预演或注册本地项目 MCP |
 | `qbank codex uninstall-mcp` | 预演或移除项目 MCP 注册 |
 | `qbank codex mcp-check` | 检查 MCP 安装和配置 |

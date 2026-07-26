@@ -1,7 +1,7 @@
 import { ask, open, save as chooseSavePath } from "@tauri-apps/plugin-dialog";
 import { diff_match_patch } from "diff-match-patch";
 import Vditor from "vditor";
-import { TauriRpcBridge } from "./bridge";
+import { SidecarRpcError, TauriRpcBridge } from "./bridge";
 import { EditorBuffer, type EditorMode } from "./editor-buffer";
 import { icon } from "./icons";
 import {
@@ -42,6 +42,7 @@ import type {
   QuestionDocument,
   QuestionMutationResult,
   QuestionSummary,
+  RepositoryOpenResult,
   RepositoryStatus,
   RpcBridge,
   SaveResult,
@@ -122,6 +123,7 @@ export class StudioApp {
   private previewGeneration = 0;
   private previewTimer = 0;
   private searchTimer = 0;
+  private repositoryGeneration = 0;
 
   constructor(
     private readonly root: HTMLElement,
@@ -161,8 +163,8 @@ export class StudioApp {
   /** Deterministic browser-harness input using the same Vditor API as production. */
   testSetEditorValue(source: string): void {
     if (!this.editorReady) return;
-    this.editor?.setValue(source, true);
     this.applyEditorProjection(source);
+    this.editor?.setValue(source, true);
     this.scheduleSecurePreview();
   }
 
@@ -175,8 +177,8 @@ export class StudioApp {
     this.root.innerHTML = `
       <div class="app-shell" data-theme="light">
         <header class="titlebar">
-          <div class="brand"><span class="brand-mark">Q</span><strong>QBank Studio</strong><span class="version">0.3.0-beta.1</span></div>
-          <div class="repository-identity"><span class="repository-copy"><strong id="repository-name">未打开题库</strong><small id="repository-path"></small></span><span id="repository-health" class="health neutral">等待连接</span></div>
+          <div class="brand"><span class="brand-mark">Q</span><strong>QBank Studio</strong><span class="version">0.3.0-beta.2</span></div>
+          <div class="repository-identity"><button id="copy-repository-path" class="repository-copy" type="button" disabled title="复制题库路径"><strong id="repository-name">未打开题库</strong><small id="repository-path">选择题库后可复制路径</small></button><span id="repository-health" class="health neutral">等待连接</span></div>
           <button id="theme-toggle" class="icon-button" aria-label="切换浅色或深色主题" title="切换主题">${icon("sun")}</button>
         </header>
         <div class="workspace">
@@ -296,6 +298,17 @@ export class StudioApp {
             <div class="dialog-actions"><button value="cancel">取消</button><button class="primary-button" value="confirm">继续</button></div>
           </form>
         </dialog>
+        <dialog id="dirty-state-dialog" class="native-like-dialog compact-dialog">
+          <form method="dialog">
+            <h2>未保存的修改</h2>
+            <p id="dirty-state-description" class="muted">继续前需要处理当前题目的修改。</p>
+            <div class="dialog-actions three-actions">
+              <button value="cancel">取消</button>
+              <button value="discard">放弃修改</button>
+              <button class="primary-button" value="save">保存并继续</button>
+            </div>
+          </form>
+        </dialog>
         <dialog id="view-action-dialog" class="native-like-dialog compact-dialog">
           <form method="dialog">
             <h2>管理视图</h2>
@@ -338,6 +351,10 @@ export class StudioApp {
 
   private bindStaticActions(): void {
     this.element("open-repository").addEventListener("click", () => void this.chooseRepository());
+    this.element("copy-repository-path").addEventListener("click", () => {
+      const root = this.state.repository?.root;
+      if (root !== undefined) void this.copyText(root, "题库路径");
+    });
     this.element("theme-toggle").addEventListener("click", () => this.toggleTheme());
     this.element("search-input").addEventListener("input", (event) => {
       window.clearTimeout(this.searchTimer);
@@ -427,51 +444,82 @@ export class StudioApp {
   }
 
   async openRepository(root: string): Promise<void> {
+    if (!(await this.resolveDirtyState("切换题库"))) return;
+    const generation = ++this.repositoryGeneration;
     this.setRepositoryLoading("正在检查题库…", "阶段 1/3 · 配置与索引");
     try {
-      this.state.repository = await this.bridge.request<RepositoryStatus>("repository.open", { root });
-      this.setRepositoryLoading(
-        `正在读取 ${this.state.repository.questionCount} 道题…`,
-        `阶段 2/3 · 索引${this.state.repository.indexDirty ? "待恢复" : "正常"}`,
-      );
-      const [questions, tags, views] = await Promise.all([
-        this.bridge.request<QuestionSummary[]>("question.list", { offset: 0, limit: 20_000 }),
-        this.bridge.request<TagUsage[]>("taxonomy.list"),
-        this.bridge.request<SavedView[]>("view.list"),
-      ]);
-      this.state.questions = questions;
-      this.state.tags = tags;
-      this.state.views = views;
-      this.state.visibleQuestions = this.state.questions;
-      this.state.current = null;
-      this.state.selectedQuestionIds.clear();
-      this.state.currentPaper = null;
-      this.state.filters = normalizeFilters(EMPTY_FILTERS);
-      this.state.searchText = "";
-      this.state.selectedView = "all";
-      this.state.selectedViewBaseline = normalizeFilters(EMPTY_FILTERS);
-      this.state.specialViewIds = null;
-      this.buffer.load("");
-      this.setRepositoryLoading("正在构建导航…", "阶段 3/3 · 分面与标签");
-      this.renderRepository();
-      this.renderSavedViews();
-      this.writeFilterControls();
-      this.renderFilterState();
-      this.renderQuestions();
-      this.setEnabled("search-input", true);
-      for (const id of [
-        "status-filter", "type-filter", "subject-filter", "chapter-filter", "year-filter",
-        "language-filter", "difficulty-min-filter", "difficulty-max-filter", "topic-mode",
-        "tag-filter-search", "saved-view-select", "save-view", "view-menu", "tag-manager",
-        "tag-overview", "new-question", "import-questions", "paper-manager",
-      ]) {
-        this.setEnabled(id, true);
+      let opened: RepositoryOpenResult;
+      try {
+        opened = await this.bridge.request<RepositoryOpenResult>("repository.open", { root });
+      } catch (error) {
+        if (!isRepairableIndexError(error)) throw error;
+        const rebuild = await ask(
+          "该题库的搜索索引缺失、损坏或已过期。是否立即重建索引并打开？",
+          {
+            title: "需要重建搜索索引",
+            kind: "warning",
+            okLabel: "重建并打开",
+            cancelLabel: "取消",
+          },
+        );
+        if (!rebuild || generation !== this.repositoryGeneration) return;
+        this.setRepositoryLoading("正在重建搜索索引…", "阶段 2/3 · 可重建投影");
+        opened = await this.bridge.request<RepositoryOpenResult>("repository.rebuildIndex", {
+          root,
+        });
       }
-      this.toast(`已打开 ${this.state.repository.name}`, "success");
+      if (generation !== this.repositoryGeneration) return;
+      this.setRepositoryLoading(
+        `正在读取 ${opened.questionCount} 道题…`,
+        `阶段 2/3 · 索引${opened.indexDirty ? "待恢复" : "正常"}`,
+      );
+      this.setRepositoryLoading("正在构建导航…", "阶段 3/3 · 分面与标签");
+      this.activateRepository(opened);
+      this.toast(
+        opened.indexed === undefined
+          ? `已打开 ${opened.name}`
+          : `已重建 ${opened.indexed} 条索引并打开 ${opened.name}`,
+        "success",
+      );
     } catch (error) {
+      if (generation !== this.repositoryGeneration) return;
       this.toast(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      this.setRepositoryLoading("", "");
+      if (generation === this.repositoryGeneration) {
+        this.setRepositoryLoading("", "");
+        this.renderQuestions();
+      }
+    }
+  }
+
+  private activateRepository(opened: RepositoryOpenResult): void {
+    this.state.repository = opened;
+    this.state.questions = opened.questions;
+    this.state.tags = opened.tags;
+    this.state.views = opened.views;
+    this.state.visibleQuestions = opened.questions;
+    this.state.selectedQuestionIds.clear();
+    this.state.currentPaper = null;
+    this.state.filters = normalizeFilters(EMPTY_FILTERS);
+    this.state.searchText = "";
+    this.state.selectedView = "all";
+    this.state.selectedViewBaseline = normalizeFilters(EMPTY_FILTERS);
+    this.state.specialViewIds = null;
+    this.resetCurrentDocument("从左侧选择题目");
+    this.renderRepository();
+    this.renderSavedViews();
+    this.writeFilterControls();
+    this.renderFilterState();
+    this.renderQuestions();
+    this.setEnabled("search-input", true);
+    for (const id of [
+      "status-filter", "type-filter", "subject-filter", "chapter-filter", "year-filter",
+      "language-filter", "difficulty-min-filter", "difficulty-max-filter", "topic-mode",
+      "tag-filter-search", "saved-view-select", "save-view", "view-menu", "tag-manager",
+      "tag-overview", "new-question", "import-questions", "paper-manager",
+      "copy-repository-path",
+    ]) {
+      this.setEnabled(id, true);
     }
   }
 
@@ -1472,28 +1520,15 @@ export class StudioApp {
 
   private async selectQuestion(questionId: string): Promise<void> {
     if (this.state.current?.question.id === questionId && !this.state.loading) return;
-    if (this.buffer.snapshot().dirty) {
-      const discard = await ask("当前题目尚未保存。放弃修改并切换题目吗？", {
-        title: "未保存的修改",
-        kind: "warning",
-        okLabel: "放弃并切换",
-        cancelLabel: "继续编辑",
-      });
-      if (!discard) return;
-    }
-    this.state.current = null;
-    this.state.assets = [];
-    this.state.history = [];
-    this.previewBindings.clear();
-    this.editor?.destroy();
-    this.editor = null;
-    this.editorReady = false;
-    this.element("vditor").innerHTML = "";
-    const loading = this.buffer.load("");
+    if (!(await this.resolveDirtyState("切换题目"))) return;
+    this.resetCurrentDocument("");
+    const loading = this.buffer.snapshot();
     const generation = loading.generation;
     this.setLoading(true, `正在加载 ${questionId}…`);
     this.element("document-title").textContent = questionId;
     this.element("document-identity").textContent = "正在读取权威 Markdown 与资产…";
+    this.renderInspectorLoading();
+    this.preview?.loading(`正在加载 ${questionId}…`, this.state.theme);
     try {
       const [document, assets, history] = await Promise.all([
         this.bridge.request<QuestionDocument>("question.get", { id: questionId }),
@@ -1505,20 +1540,72 @@ export class StudioApp {
       this.state.assets = assets;
       this.state.history = history;
       this.state.validation = null;
-      this.previewBindings = new Map(
-        assets.flatMap((item) =>
-          item.previewDataUrl === null ? [] : [[item.assetId, item.previewDataUrl] as const],
-        ),
-      );
+      this.updatePreviewBindings(assets);
       this.buffer.markSaved(document.source);
       this.renderCurrentDocument();
     } catch (error) {
       if (this.buffer.isCurrent(generation)) {
-        this.toast(error instanceof Error ? error.message : String(error), "error");
+        const message = error instanceof Error ? error.message : String(error);
+        this.renderQuestionLoadError(questionId, message);
+        this.toast(message, "error");
       }
     } finally {
       if (this.buffer.isCurrent(generation)) this.setLoading(false);
     }
+  }
+
+  private resetCurrentDocument(emptyMessage: string): void {
+    this.state.current = null;
+    this.state.assets = [];
+    this.state.history = [];
+    this.state.validation = null;
+    this.previewBindings.clear();
+    this.previewGeneration += 1;
+    if (this.previewTimer !== 0) window.clearTimeout(this.previewTimer);
+    this.previewTimer = 0;
+    this.editorGeneration += 1;
+    this.editor?.destroy();
+    this.editor = null;
+    this.editorReady = false;
+    this.element("vditor").innerHTML = "";
+    this.buffer.load("");
+    this.element("editor-frame").classList.add("empty");
+    this.element("editor-empty").hidden = false;
+    this.element("editor-empty").textContent = emptyMessage;
+    this.element("document-title").textContent = "选择一道题目";
+    this.element("document-identity").textContent = "源码是权威缓冲区，预览不会改写 Markdown。";
+    this.element("inspector-id").textContent = "—";
+    this.element("metadata-form").innerHTML = '<p class="muted">未加载</p>';
+    this.element("asset-list").innerHTML = '<p class="muted">未加载</p>';
+    this.element("history-list").innerHTML = '<p class="muted">未加载</p>';
+    this.element("validation-badge").textContent = "尚未校验";
+    this.element("validation-badge").className = "validation-badge neutral";
+    this.element("diagnostic-bar").hidden = true;
+    this.element("diagnostic-bar").innerHTML = "";
+    this.preview?.clear(this.state.theme);
+    this.updateDirty(false);
+  }
+
+  private renderInspectorLoading(): void {
+    this.element("inspector-id").textContent = "读取中";
+    this.element("metadata-form").innerHTML = '<p class="muted">正在读取题目属性…</p>';
+    this.element("asset-list").innerHTML = '<p class="muted">正在检查资源边界…</p>';
+    this.element("history-list").innerHTML = '<p class="muted">正在读取历史…</p>';
+  }
+
+  private renderQuestionLoadError(questionId: string, message: string): void {
+    this.state.current = null;
+    this.element("editor-frame").classList.add("empty");
+    this.element("editor-empty").hidden = false;
+    this.element("editor-empty").textContent = `无法读取 ${questionId}`;
+    this.element("document-title").textContent = questionId;
+    this.element("document-identity").textContent = message;
+    this.element("inspector-id").textContent = "错误";
+    this.element("metadata-form").innerHTML =
+      `<p class="inline-error">${escapeHtml(message)}</p>`;
+    this.element("asset-list").innerHTML = '<p class="muted">题目未加载，未读取资源。</p>';
+    this.element("history-list").innerHTML = '<p class="muted">题目未加载。</p>';
+    this.preview?.error(message, this.state.theme);
   }
 
   private createEditor(source: string): void {
@@ -1615,11 +1702,16 @@ export class StudioApp {
   }
 
   private rewritePreviewHtml(html: string): string {
-    let value = rewriteBackslashMathHtml(html, this.buffer.snapshot().source);
-    for (const [assetId, dataUrl] of this.previewBindings) {
-      value = value.replaceAll(`qbank-asset:${assetId}`, dataUrl);
+    const value = rewriteBackslashMathHtml(html, this.buffer.snapshot().source);
+    if (this.previewBindings.size === 0) return value;
+    const parsed = new DOMParser().parseFromString(value, "text/html");
+    for (const image of parsed.body.querySelectorAll<HTMLImageElement>("img[src]")) {
+      const source = image.getAttribute("src");
+      if (source === null) continue;
+      const binding = this.previewBindings.get(source);
+      if (binding !== undefined) image.setAttribute("src", binding);
     }
-    return value;
+    return parsed.body.innerHTML;
   }
 
   private async renderSecurePreview(): Promise<void> {
@@ -1631,11 +1723,15 @@ export class StudioApp {
     const source = guardMathSource(bodyForPreview(this.buffer.snapshot().source));
     const formulaCount = (source.match(/\$\$|\\\[|\\\(|(?<!\$)\$(?!\$)/g) ?? []).length;
     const progress = this.element("preview-progress");
-    progress.hidden = formulaCount < 12;
+    preview.element.ariaBusy = "true";
+    progress.hidden = true;
     const progressLabel = progress.querySelector("span:last-child");
     if (progressLabel !== null) {
       progressLabel.textContent = `正在渐进渲染 ${formulaCount} 个公式…`;
     }
+    const progressDelay = window.setTimeout(() => {
+      if (generation === this.previewGeneration) progress.hidden = false;
+    }, 140);
     try {
       const html = await Vditor.md2html(source, {
         cdn: `${window.location.origin}/vendor/vditor`,
@@ -1660,7 +1756,11 @@ export class StudioApp {
       const message = error instanceof Error ? error.message : String(error);
       preview.render(`<p class="preview-error">预览失败：${escapeHtml(message)}</p>`, this.state.theme);
     } finally {
-      if (generation === this.previewGeneration) progress.hidden = true;
+      window.clearTimeout(progressDelay);
+      if (generation === this.previewGeneration) {
+        progress.hidden = true;
+        preview.element.ariaBusy = "false";
+      }
     }
   }
 
@@ -1739,12 +1839,13 @@ export class StudioApp {
     }
   }
 
-  private async save(): Promise<void> {
+  private async save(): Promise<boolean> {
     const current = this.state.current;
     const snapshot = this.buffer.snapshot();
-    if (current === null || !snapshot.dirty) return;
+    if (current === null) return false;
+    if (!snapshot.dirty) return true;
     const validation = await this.validate();
-    if (validation === null || !validation.ok) return;
+    if (validation === null || !validation.ok) return false;
     this.setEnabled("save", false);
     try {
       const result = await this.bridge.request<SaveResult>("question.save", {
@@ -1754,7 +1855,7 @@ export class StudioApp {
       });
       if (!result.ok) {
         this.renderValidation(result);
-        return;
+        return false;
       }
       this.buffer.markSaved(result.source);
       current.source = result.source;
@@ -1763,33 +1864,80 @@ export class StudioApp {
       this.updateDirty(false);
       this.toast(result.indexUpdated ? "题目已保存" : "题目已保存；索引需要重建", result.indexUpdated ? "success" : "warning");
       await this.refreshInspector(current.question.id as string);
+      return true;
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
+      return false;
     } finally {
       this.updateDirty(this.buffer.snapshot().dirty);
     }
   }
 
+  private async resolveDirtyState(action: string): Promise<boolean> {
+    if (!this.buffer.snapshot().dirty) return true;
+    const dialog = this.element("dirty-state-dialog") as HTMLDialogElement;
+    this.element("dirty-state-description").textContent =
+      `${action}前需要处理当前题目的未保存修改。`;
+    dialog.returnValue = "cancel";
+    dialog.showModal();
+    const choice = await new Promise<string>((resolve) => {
+      dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true });
+    });
+    if (choice === "save") return this.save();
+    if (choice !== "discard") return false;
+    const questionId = this.state.current?.question.id;
+    if (typeof questionId !== "string") return false;
+    return this.reloadCurrentQuestion(questionId, true);
+  }
+
   private async refreshInspector(questionId: string, refreshPreview = false): Promise<void> {
-    const [document, assets, history] = await Promise.all([
-      this.bridge.request<QuestionDocument>("question.get", { id: questionId }),
-      this.bridge.request<AssetItem[]>("asset.list", { questionId }),
-      this.bridge.request<HistoryEntry[]>("history.list", { questionId }),
-    ]);
-    if (this.state.current?.question.id !== questionId) return;
-    this.state.current.question = document.question;
-    this.state.current.revision = document.revision;
-    this.state.assets = assets;
-    this.state.history = history;
-    this.previewBindings = new Map(
-      assets.flatMap((item) =>
-        item.previewDataUrl === null ? [] : [[item.assetId, item.previewDataUrl] as const],
-      ),
-    );
-    this.renderInspector();
-    if (refreshPreview) {
-      const source = this.buffer.snapshot().source;
-      this.createEditor(this.state.mode === "instant" ? bodyForPreview(source) : source);
+    await this.reloadCurrentQuestion(questionId, false, refreshPreview);
+  }
+
+  private async reloadCurrentQuestion(
+    questionId: string,
+    resetSource: boolean,
+    refreshPreview = true,
+  ): Promise<boolean> {
+    try {
+      const [document, assets, history] = await Promise.all([
+        this.bridge.request<QuestionDocument>("question.get", { id: questionId }),
+        this.bridge.request<AssetItem[]>("asset.list", { questionId }),
+        this.bridge.request<HistoryEntry[]>("history.list", { questionId }),
+      ]);
+      if (this.state.current?.question.id !== questionId) return false;
+      if (resetSource) {
+        this.state.current = document;
+        this.buffer.markSaved(document.source);
+      } else {
+        this.state.current.question = document.question;
+        this.state.current.revision = document.revision;
+      }
+      this.state.assets = assets;
+      this.state.history = history;
+      this.updatePreviewBindings(assets);
+      this.renderInspector();
+      if (resetSource || refreshPreview) {
+        const source = this.buffer.snapshot().source;
+        this.createEditor(this.state.mode === "instant" ? bodyForPreview(source) : source);
+      }
+      if (resetSource) this.updateDirty(false);
+      return true;
+    } catch (error) {
+      this.toast(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    }
+  }
+
+  private updatePreviewBindings(assets: AssetItem[]): void {
+    this.previewBindings = new Map();
+    for (const item of assets) {
+      if (item.previewDataUrl === null) continue;
+      this.previewBindings.set(item.reference, item.previewDataUrl);
+      if (item.kind === "logical") {
+        this.previewBindings.set(`qbank-asset:${item.assetId}`, item.previewDataUrl);
+        this.previewBindings.set(`asset:${item.assetId}`, item.previewDataUrl);
+      }
     }
   }
 
@@ -1809,6 +1957,7 @@ export class StudioApp {
   }
 
   private async createAsset(file: File): Promise<void> {
+    if (!(await this.resolveDirtyState("创建图形资产"))) return;
     const current = this.state.current;
     if (current === null) return;
     const snapshot = this.buffer.snapshot();
@@ -1826,23 +1975,20 @@ export class StudioApp {
         expectedRevision: current.revision,
       });
       if (!result.ok) throw new Error("资产创建未通过校验");
-      const loaded = await this.bridge.request<QuestionDocument>("question.get", {
-        id: current.question.id as string,
-      });
-      this.state.current = loaded;
-      this.buffer.markSaved(loaded.source);
-      await this.refreshInspector(current.question.id as string, true);
+      await this.reloadCurrentQuestion(current.question.id as string, true);
       this.toast(`已创建图形资产 ${assetId}`, "success");
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
     }
   }
 
-  private async assetAction(assetId: string, action: string): Promise<void> {
+  private async assetAction(asset: AssetItem, action: string): Promise<void> {
+    if (!(await this.resolveDirtyState("执行资源操作"))) return;
     const current = this.state.current;
     const questionId = current?.question.id;
     if (current === null || typeof questionId !== "string") return;
     const expectedRevision = current.revision;
+    const assetId = asset.assetId;
     try {
       if (action === "replace") {
         const input = document.createElement("input");
@@ -1877,10 +2023,13 @@ export class StudioApp {
           questionId,
           assetId,
           action,
+          reference: asset.kind === "logical" ? "" : asset.reference,
           expectedRevision,
         });
       }
-      await this.refreshInspector(questionId, action === "render" || action === "reconcile");
+      if (action === "render" || action === "reconcile") {
+        await this.reloadCurrentQuestion(questionId, true);
+      }
       this.toast("资产操作已完成", "success");
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
@@ -1898,7 +2047,7 @@ export class StudioApp {
         dataBase64: await fileBase64(file),
         expectedRevision: current.revision,
       });
-      await this.refreshInspector(questionId, true);
+      await this.reloadCurrentQuestion(questionId, true);
       this.toast("已添加新的资源版本", "success");
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
@@ -1982,8 +2131,8 @@ export class StudioApp {
     const repository = this.state.repository;
     if (repository === null) return;
     this.element("repository-name").textContent = repository.name;
-    this.element("repository-path").textContent = repository.root;
-    this.element("repository-path").title = repository.root;
+    this.element("repository-path").textContent = "点击复制完整路径";
+    this.element("copy-repository-path").title = `复制题库路径：${repository.root}`;
     const health = this.element("repository-health");
     health.textContent = repository.healthy ? "健康 · 索引正常" : repository.indexDirty ? "索引待恢复" : "需要检查";
     health.className = `health ${repository.healthy ? "success" : "warning"}`;
@@ -2063,19 +2212,36 @@ export class StudioApp {
     assets.innerHTML = this.state.assets.length === 0 ? '<p class="muted">没有图形资产。可粘贴或拖入图片。</p>' : "";
     for (const asset of this.state.assets) {
       const card = document.createElement("article");
-      card.className = "asset-card";
-      card.innerHTML = `${asset.previewDataUrl === null ? `<div class="asset-placeholder">${icon("image")}</div>` : `<img src="${asset.previewDataUrl}" alt="${escapeHtml(asset.assetId)} 预览" />`}<div class="asset-card-body"><strong>${escapeHtml(asset.assetId)}</strong><span>${escapeHtml(asset.status)} · ${escapeHtml(asset.preferredRepresentation ?? "无首选表示")}</span></div><button class="asset-menu-button" aria-label="${escapeHtml(asset.assetId)} 操作" title="资源操作">${icon("more")}</button><div class="asset-menu" hidden></div>`;
+      card.className = `asset-card asset-${asset.kind}${asset.diagnostic === null ? "" : ` ${asset.diagnostic.severity}`}`;
+      const status = asset.kind === "logical"
+        ? `${asset.status} · ${asset.preferredRepresentation ?? "无首选表示"}`
+        : asset.kind === "local"
+          ? `本地资源 · ${asset.declared ? "已声明" : "仅正文引用"}`
+          : asset.kind === "external"
+            ? "外部资源 · 只读"
+            : "资源引用无效";
+      const diagnostic = asset.diagnostic === null
+        ? ""
+        : `<small class="asset-diagnostic">${escapeHtml(asset.diagnostic.message)}</small>`;
+      card.innerHTML = `${asset.previewDataUrl === null ? `<div class="asset-placeholder">${icon("image")}</div>` : `<img src="${asset.previewDataUrl}" alt="${escapeHtml(asset.displayName)} 预览" />`}<div class="asset-card-body"><strong>${escapeHtml(asset.displayName)}</strong><span>${escapeHtml(status)}</span>${diagnostic}</div><button class="asset-menu-button" aria-label="${escapeHtml(asset.displayName)} 操作" title="资源操作">${icon("more")}</button><div class="asset-menu" hidden></div>`;
       const menu = card.querySelector<HTMLElement>(".asset-menu");
       const menuButton = card.querySelector<HTMLButtonElement>(".asset-menu-button");
       if (menu !== null && menuButton !== null) {
+        const openAction = asset.kind === "logical" ? "open" : "open_reference";
+        const revealAction = asset.kind === "logical" ? "reveal" : "reveal_reference";
+        const openLabel = asset.kind === "external"
+          ? "在浏览器中打开"
+          : asset.kind === "local"
+            ? "打开文件"
+            : "打开原图";
         const actions = [
-          ["open", "打开原图", asset.capabilities.canOpen],
+          [openAction, openLabel, asset.capabilities.canOpen],
           ["edit_ipe", "用 Ipe 编辑", asset.capabilities.canEditIpe],
           ["reconcile", "检测修改并重渲染", asset.capabilities.canEditIpe],
           ["replace", "替换为本地文件", asset.capabilities.canReplace],
           ["replace_clipboard", "从剪贴板替换", asset.capabilities.canReplace],
           ["render", "重新渲染", asset.capabilities.canRender],
-          ["reveal", "在资源管理器中显示", asset.capabilities.canReveal],
+          [revealAction, "在资源管理器中显示", asset.capabilities.canReveal],
         ] as const;
         for (const [action, label, enabled] of actions) {
           const button = document.createElement("button");
@@ -2083,7 +2249,10 @@ export class StudioApp {
           button.disabled = !enabled;
           button.textContent = label;
           button.title = enabled ? label : `${label}：当前资源不支持`;
-          button.addEventListener("click", () => { menu.hidden = true; void this.assetAction(asset.assetId, action); });
+          button.addEventListener("click", () => {
+            menu.hidden = true;
+            void this.assetAction(asset, action);
+          });
           menu.append(button);
         }
         menuButton.addEventListener("click", () => {
@@ -2128,6 +2297,11 @@ export class StudioApp {
     this.state.theme = this.state.theme === "light" ? "dark" : "light";
     this.root.querySelector<HTMLElement>(".app-shell")?.setAttribute("data-theme", this.state.theme);
     this.editor?.setTheme(this.state.theme === "dark" ? "dark" : "classic");
+    if (this.state.current !== null) {
+      this.preview?.loading("正在同步预览主题…", this.state.theme);
+    } else {
+      this.preview?.clear(this.state.theme);
+    }
     void this.renderSecurePreview();
   }
 
@@ -2142,6 +2316,12 @@ export class StudioApp {
   private setRepositoryLoading(message: string, stage: string): void {
     const navigation = this.root.querySelector<HTMLElement>(".navigation");
     navigation?.classList.toggle("repository-loading", Boolean(message));
+    if (navigation !== null) navigation.ariaBusy = String(Boolean(message));
+    const workspace = this.root.querySelector<HTMLElement>(".document-workspace");
+    const inspector = this.root.querySelector<HTMLElement>(".inspector");
+    if (workspace !== null) workspace.inert = Boolean(message);
+    if (inspector !== null) inspector.inert = Boolean(message);
+    this.setEnabled("open-repository", !message);
     if (message) {
       this.element("result-count").textContent = message;
       this.element("connection-status").textContent = stage;
@@ -2203,4 +2383,12 @@ function escapeHtml(value: string): string {
 function formatTimestamp(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function isRepairableIndexError(error: unknown): boolean {
+  if (!(error instanceof SidecarRpcError) || error.data === null || typeof error.data !== "object") {
+    return false;
+  }
+  const data = error.data as { canRebuildIndex?: unknown };
+  return data.canRebuildIndex === true;
 }

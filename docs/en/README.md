@@ -12,9 +12,10 @@
 | [Installation and upgrade](installation.md) | CLI, Studio, verification, upgrades, and removal |
 | [Codex and MCP integration](codex-integration.md) | Skills, cross-project context, MCP installation, and authorization |
 | [MCP guide](mcp-guide.md) | MCP role, tools and resources, two-phase writes, diagnostics, and recovery |
-| [Project roadmap](roadmap.md) | Multi-agent interoperability, OCR mediation, complete digitization, and future MCP work |
-| [0.3.0-beta.1 compatibility matrix](compatibility-0.3.0-beta.1.md) | Software, Protocol, Schema, entry points, and migration |
-| [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md) | Unsigned beta, filesystem, and external dependency boundaries |
+| [Project roadmap](roadmap.md) | Multi-agent interoperability, lightweight source ingestion, TeX delivery, and future MCP work |
+| [Source → qbank → formal deliverables](source-qbank-deliverables.md) | Lightweight MinerU, AI, existing MCP, and fixed-TeX workflow requirements |
+| [0.3.0-beta.2 compatibility matrix](compatibility-0.3.0-beta.2.md) | Software, Protocol, Schema, entry points, and migration |
+| [0.3.0-beta.2 known limitations](known-limitations-0.3.0-beta.2.md) | Unsigned beta, filesystem, and external dependency boundaries |
 | [0.2.0 compatibility reference](compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |
 | [Compatibility policy](compatibility-policy.md) | Stable interfaces, release lines, migration, and deprecation |
 | [0.2.0 known limitations](known-limitations-0.2.0.md) | Deployment, transaction, performance, and product boundaries for that release |

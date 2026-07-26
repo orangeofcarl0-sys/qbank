@@ -2,90 +2,80 @@
 
 [English](../en/roadmap.md) · [中文文档首页](README.md)
 
-本路线图描述 `0.3.x` 之后的优先方向与依赖关系，不承诺发布日期。任何方向进入实现前，都要
-建立独立 feature 文档或 issue 摘要，并按[功能生命周期](../feature-lifecycle.md)完成设计、
-双语文档、测试、兼容性与限制说明。
+本路线图描述 `0.3.x` 之后的优先方向，不承诺发布日期。实施前仍需建立独立 feature 文档
+或 issue 摘要，并按[功能生命周期](../feature-lifecycle.md)完成双语文档、测试、兼容性和
+限制说明。
 
-![qbank 路线图：从统一题库核心，扩展到更多 agent 互操作测试、OCR 候选中间层、完整电子化流程和 MCP 可观测性](../assets/readme/roadmap.svg)
+![qbank 路线图：以统一题库核心为基础，优先验证多 agent 互操作、轻量资料入库和轻量 TeX 交付流程](../assets/readme/roadmap.svg)
 
 ## 当前基础
 
-qbank 已经具备继续扩展所需的数据边界：
+qbank 已具备继续扩展所需的稳定边界：
 
 - Markdown 题目、逻辑资产和项目定义是权威文件；
 - Studio、CLI、Skill 和可选 MCP 共用一个应用核心；
 - 写入采用 dry-run、revision、仓库锁、事务、历史与失败恢复；
-- `$qbank-digitize` 可以在真实电子化项目开始前形成字段策略、分类映射和代表样本；
-- 当前公开示例和测试不包含真实试题或用户数据。
+- MCP 已支持查询、取题、Schema、prepare、commit 和 validate；
+- `$qbank-digitize` 已提供字段策略、分类映射、代表样本与只读交换检查；
+- `$qbank-deliver` 已提供只读快照、受限 TeX、原创中文模板与原子 PDF 构建；
+- 公开示例和测试不包含真实试题或用户数据。
 
 当前版本不包含 OCR 引擎，也不把 OCR 文本直接写入权威题目。
 
 ## 方向 A：更多 agent 与 host 的支持测试
 
-目标不是把某个 agent 产品写进 qbank 核心，而是验证不同 host 能否正确理解同一契约。
+目标是验证不同 host 正确理解同一 qbank 契约，而不是把某个 agent 产品写进核心：
 
-计划内容：
+- 提供经过验证的通用 STDIO MCP 配置与故障排查样例；
+- 覆盖工具发现、Schema 读取、资源读取和两阶段写入；
+- 验证授权缺失、operation 过期、revision 冲突、响应丢失和 server 重启；
+- 使用跨项目 handoff fixture 保留目标题库、来源和写入授权；
+- 记录真实验证过的 host、版本、操作系统与限制。
 
-- 为通用 STDIO MCP host 提供最小项目配置与故障排查样例；
-- 建立工具发现、Schema 读取、资源读取和两阶段写入契约测试；
-- 覆盖授权缺失、operation 过期、revision 冲突、响应丢失和 server 重启；
-- 建立跨项目上下文 handoff fixture，验证目标题库、来源和写入权限不会丢失；
-- 记录经过实际验证的 host、版本、操作系统与限制，未验证项不宣称支持。
+## 方向 B：轻量资料 → qbank
 
-验收重点是协议与数据安全，不是为每个 host 复制一套业务逻辑。
+首个轻量垂直切片已经实现，并优先采用项目侧已有 MinerU 输出：
 
-## 方向 B：文档、图片与 PDF 的 OCR 中间层
+1. MinerU 在来源项目完成提取；
+2. AI 与 `$qbank-digitize` 识别题目边界、公式、答案、分类和图片归属；
+3. 生成 `questions.jsonl`、现有 Schema 的 Asset packages 和只含不确定项的
+   `review.md`；
+4. 使用现有 MCP `prepare → inspect → commit → validate` 写入 qbank；
+5. 不确定内容保持 `draft`，来源文件、页码或范围及原题号保持可追溯。
 
-OCR 属于来源适配与候选生成阶段，不属于 qbank 权威仓储。计划中的中间层应包含：
+不在 qbank 内置 MinerU，不建设通用 Candidate 数据库、作业状态平台或新的 MCP 工具。
 
-- 来源包：文件哈希、文档类型、页码、区域和许可/授权说明；
-- 可替换 OCR adapter：不把单一云服务或本地引擎绑定为核心依赖；
-- 候选块：原文、识别文本、置信度、版面区域、公式、表格和图片引用；
-- provenance：每个字段能够追溯到页码或区域，并区分原文与推断；
-- 分类映射：把项目自有分类表规范化为 qbank subject、chapter、topics 或忽略策略；
-- 校准批次：先审阅有代表性的少量页面，再批准大批处理；
-- 不确定性规则：低置信度、缺答案、边界不明或来源不完整时保持候选或 `draft`。
+## 方向 C：轻量 qbank → 正式交付物
 
-OCR adapter 只能输出候选交换数据，不得直接创建 `questions/**/*.md` 或写逻辑资产目录。
+首个轻量垂直切片已经由 `$qbank-deliver` 实现，交付流程仍留在项目侧：
 
-## 方向 C：完整电子化实现
+1. 通过现有 MCP 查询和读取题目；
+2. AI 与 `$qbank-deliver` 生成明确的 `selection.yaml` 和受限 TeX；
+3. 固定模板负责页面、字体、编号、答案空间和内容版本；
+4. `latexmk` / XeLaTeX 在隔离目录生成 PDF 或其他交付物；
+5. 构建只读 qbank，并检查公式、图片、可读性和答案泄露。
 
-完整实现应把现有 `$qbank-digitize` 决策流程与候选中间层连接成可恢复流水线：
+`selection.yaml` 与 TeX 暂时是项目约定，不成为新的 Paper Schema。完整需求见
+[资料 → qbank → 正式交付物](source-qbank-deliverables.md)。
 
-1. 注册来源与授权；
-2. 解析页面并生成 OCR/版面候选；
-3. 识别题目边界、子问、选项、答案、公式、表格和图片；
-4. 应用经批准的字段与分类策略；
-5. 进行人工样本校准和批次质量检查；
-6. 生成 qbank JSON/JSONL 与资产包；
-7. 通过 `$qbank` 或 MCP prepare 预演；
-8. 审阅差异后提交为 `draft` 或已确认状态；
-9. 执行验证、重复检测、来源完整性检查和批次验收；
-10. 保留可重试状态、失败报告与恢复路径。
+## 远期可选研究
 
-需要单独验证中文/英文混排、数学公式、跨页题目、扫描噪声、复杂表格、图题绑定和答案册对齐。
-在这些证据完成前，不把“PDF 一键入库”作为产品能力。
+`CandidateBlock`、`DigitizationDecisionPacket`、`DeliveryProfile`、完整
+`BuildManifest`、持久化作业平台和自动逐页出版验收不属于当前目标。只有多个独立项目
+证明轻量文件约定不足时，才为具体问题重新提案；qbank 不承诺建设通用 OCR 平台或完整
+出版系统。
 
 ## 贯穿方向：MCP 可理解性与可观测性
 
-MCP 改进与 agent 测试、OCR 和电子化流程并行推进：
-
 - 维护独立的[MCP 使用指南](mcp-guide.md)；
-- 从 capability manifest 生成或校验工具、资源和访问级别说明；
-- 为常见 host 提供经过验证的配置，不维护未经测试的复制粘贴片段；
-- 让 operation 生命周期、revision、expiry、warning 和恢复动作在 host 中可见；
-- 使用公开合成题库运行客户端契约和重启恢复 smoke；
-- 保持 MCP 为可选本地适配器，不让 CLI、Studio 或数据格式依赖特定 agent。
+- 从 capability manifest 校验工具、资源和访问级别说明；
+- 让 operation revision、expiry、warning 和恢复动作在 host 中可见；
+- 使用公开合成题库运行客户端契约与重启恢复 smoke；
+- 保持 MCP 为可选本地适配器，不让 CLI、Studio 或数据格式依赖特定 agent；
+- 数字化和 TeX 构建复用现有工具，不增加任意文件或进程执行能力。
 
 ## 共同完成标准
 
-一项路线图能力只有在满足以下条件后才可标记为 implemented：
-
-- 有用户目标、边界、失败行为、兼容性与迁移结论；
-- 有中文和英文用户文档；
-- 有公开合成 fixture，不含真实试题、路径或用户数据；
-- 有确定性的 Schema、错误码或 Protocol 契约；
-- 有正常、冲突、取消、超时和恢复测试；
-- 数据来源和 AI/OCR 推断可区分；
-- 不确定内容不会被静默提升为已确认事实；
-- README、CHANGELOG、能力矩阵、Skill 和已知限制按实际影响同步。
+一项路线图能力只有在具备明确用户目标、边界、失败行为、双语文档、公开合成 fixture、
+确定性契约和恢复测试后才可标记为 implemented。来源内容与 AI 推断必须可区分，不确定
+内容不得静默提升为已确认事实，且不得为了单个项目扩展 qbank 核心。

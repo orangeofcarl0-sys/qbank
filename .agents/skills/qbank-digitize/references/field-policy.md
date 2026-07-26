@@ -54,7 +54,8 @@ Apply the following rules:
 - Permit multiple topics only when the approved table allows multi-label mapping.
 - Route unmatched and conflicting records to review; never invent an ad hoc tag.
 - Add proposed canonical tags as pending; do not confuse aliases with canonical slugs.
-- Version the normalized mapping and retain the version in the decision packet.
+- Version the normalized mapping when it is reused and retain that version beside
+  `questions.jsonl` or in the small working profile.
 
 The mapping answers “which approved rule produced this value?” Every calibration
 record should expose that rule or state why it is unmatched.

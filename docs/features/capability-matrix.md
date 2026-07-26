@@ -8,7 +8,7 @@ Studio 列现在指 `apps/studio/` 下的现代 QBank Studio。`qbank desktop` �
 QBank Studio Legacy；Legacy 只作为严重兼容、安全或数据损坏回退，不形成独立能力或
 发布路线。两种桌面入口都复用相同 qbank application services。
 
-`0.3.0-beta.1` 冻结值为 Python 包 `0.3.0b1`、Studio Protocol `1.0`，Question、Asset、
+`0.3.0-beta.2` 冻结值为 Python 包 `0.3.0b2`、Studio Protocol `1.0`，Question、Asset、
 Paper Schema `1.0`；本矩阵不引入另一条 Studio 版本线。
 
 | Capability | Workflow | CLI | MCP tool | MCP resource | Access | Studio |

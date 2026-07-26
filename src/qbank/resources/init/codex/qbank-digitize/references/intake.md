@@ -19,7 +19,7 @@ that materially affect the outcome.
 
 | Mode | Recommend when | Consequence |
 | --- | --- | --- |
-| `calibrated_batch` | Normal multi-question project | Profile, stratified sample, approval, bounded batches |
+| `calibrated_batch` | Normal multi-question project | Small profile, stratified sample, approval, bounded exchange files |
 | `quick_capture` | Small uniform source with low reuse | Minimal interview; all records remain draft |
 | `source_faithful` | Archival or high-stakes edition | Preserve wording/evidence; classify conservatively |
 
@@ -58,5 +58,6 @@ only on newly material branches.
 ## Closure
 
 Discovery is complete only when every material lane is observed, answered, assumed
-with consequence, or explicitly deferred. Summarize the decisions in the profile;
-do not rely on conversational memory as the project record.
+with consequence, or explicitly deferred. Summarize the decisions in the small
+working profile or `review.md`; do not rely on conversational memory and do not
+create a database or durable job service for this purpose.

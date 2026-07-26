@@ -16,7 +16,7 @@ Schema、校验与事务规则下工作。
 的 Markdown 文件长期保存；JSON/JSONL 用于交换；SQLite 仅承担可重建的全文检索投影；
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
-> **当前版本：** 当前预发布为 `0.3.0-beta.1`（Python 包 `0.3.0b1`）。
+> **当前版本：** 当前预发布为 `0.3.0-beta.2`（Python 包 `0.3.0b2`）。
 > `0.2.x` 作为上一兼容维护线保留，其中 Qt 桌面端已归入 QBank Studio Legacy；
 > `0.1.x` 不再提供支持。Question、Asset、Paper Schema 仍为 `1.0`。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
@@ -110,11 +110,11 @@ qbank doctor --format json
 从 Release 下载 wheel 时，应先使用同一 Release 中的 `checksums.txt` 核对 SHA-256：
 
 ```powershell
-Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
-pip install .\qbank-0.3.0b1-py3-none-any.whl
+Get-FileHash .\qbank-0.3.0b2-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.3.0b2-py3-none-any.whl
 ```
 
-Windows 桌面用户可下载 `QBank-Studio-0.3.0-beta.1-x64-setup.exe` 或便携 ZIP。安装、
+Windows 桌面用户可下载 `QBank-Studio-0.3.0-beta.2-x64-setup.exe` 或便携 ZIP。安装、
 升级、校验和 Legacy 回退见[安装与升级指南](docs/zh-CN/installation.md)。
 
 参与开发时安装完整质量检查和 Studio 测试依赖：
@@ -161,7 +161,8 @@ qbank validate --format json
 1. `apps/studio/`、`src/qbank/commands/`、`src/qbank/mcp/` 与 `qbank.legacy_qt` 是并列的
    presentation adapter；
 2. 它们共同调用 `src/qbank/application/`、领域模型和基础设施端口，不复制题目规则；
-3. `$qbank` 与 `$qbank-digitize` 只向 agent 提供操作指引和授权协议，不直接访问题库；
+3. `$qbank`、`$qbank-digitize` 与 `$qbank-deliver` 向 agent 提供协议和领域工作流；
+   权威访问仍只经过 CLI/MCP 的共享服务；
 4. 共享核心只在已确认的题库根目录内操作权威文件。
 
 题库根目录中，`questions/` 保存权威题目 Markdown，`assets/` 保存受管资源与 manifest，
@@ -231,9 +232,10 @@ DOCX 由系统 Pandoc 生成；Pandoc 不可用时 Markdown 和 HTML 构建不�
 
 ## Codex 接入
 
-每个新题库包含仓库级 `AGENTS.md`，以及两个职责独立的 Skill：`$qbank` 定义题库定位、
+每个新题库包含仓库级 `AGENTS.md`，以及三个职责独立的 Skill：`$qbank` 定义题库定位、
 授权、CLI 调用、校验和任务交接协议；`$qbank-digitize` 为 PDF、扫描件和分类表项目提供需求
-访谈、字段取舍与代表性样本校准。后者是可选的领域工具，不属于也不替代 `$qbank` 通信层。
+访谈、字段取舍与代表性样本校准；`$qbank-deliver` 从 MCP 只读快照生成受限 TeX 和正式
+PDF。两个领域工具都不属于也不替代 `$qbank` 通信层。
 Codex Desktop、IDE 和 CLI 可以依据这些规则调用本地 qbank 命令，或通过可选的本地 STDIO
 MCP 直接调用同一应用服务；qbank 本身不需要 OpenAI API key，也不嵌入模型 SDK。
 
@@ -242,13 +244,20 @@ qbank codex check --format json
 qbank codex instructions --format markdown
 qbank codex install-skill --skill qbank --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --dry-run --format json
 qbank codex install-mcp --project --dry-run --format json
 qbank codex integration-status --format json
 ```
 
-PDF 电子化项目先由 `$qbank-digitize` 形成经确认的 `digitization_decision_packet`，再交回
-`$qbank` 执行 Schema 读取、dry-run、写入和验证。仓库就绪、Codex CLI 可用和用户级 Skill
-同步是相互独立的状态。完整职责、安装、更新和备份语义见
+资料电子化项目由 `$qbank-digitize` 整理已有 MinerU 输出，生成 `questions.jsonl`、
+Asset packages 和只含不确定项的 `review.md`，再交回 `$qbank` 使用现有 MCP 执行
+prepare、检查、提交和验证。`$qbank-deliver` 使用同一 MCP 的读取工具冻结 Question JSONL
+和 Asset manifest 快照，并通过原创 `qbank-zh-exam-v1` 模板构建学生、答案或解析版 PDF。
+完全合成的
+[轻量闭环示例](examples/workflows/lightweight/README.md)
+可在新目录中演示检查、MCP 入库、查询、快照和 TeX 构建，不读取现有题库。
+仓库就绪、Codex CLI 可用和用户级 Skill 同步是相互独立的
+状态。完整职责、安装、更新和备份语义见
 [Codex 接入指南](docs/zh-CN/codex-integration.md)。
 
 MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不影响 CLI、Studio 或 Skill。它是绑定一个
@@ -262,19 +271,19 @@ MCP 需单独安装 `qbank[mcp]`，其缺失或未注册不影响 CLI、Studio �
 
 ## 路线图
 
-![qbank 路线图：从统一题库核心，扩展到更多 agent 互操作测试、OCR 候选中间层、完整电子化流程和 MCP 可观测性](docs/assets/readme/roadmap.svg)
+![qbank 路线图：以统一题库核心为基础，优先验证多 agent 互操作、轻量资料入库和轻量 TeX 交付流程](docs/assets/readme/roadmap.svg)
 
-后续方向集中在三条相互依赖的工作线上：
+后续方向集中在三条轻量、相互独立的工作线上：
 
 - 为更多支持本地工具协议的 agent host 建立真实配置、工具发现、授权、冲突与恢复测试；
-- 在文档、图片和 PDF 与 qbank 交换格式之间建立可替换的 OCR/版面候选中间层，保留页码、
-  区域、置信度和来源；
-- 把 `$qbank-digitize` 的字段策略与样本校准连接到分题、分类映射、公式/图片处理、人工
-  审阅、draft 导入和批次验收的完整流程。
+- 复用来源项目已有的 MinerU 输出，由 AI 与 `$qbank-digitize` 生成 Question JSONL、
+  Asset packages 和只含不确定项的 `review.md`，再通过现有 MCP 两阶段写入；
+- 通过现有 MCP 查询和取题，由 AI 与 `$qbank-deliver` 生成 `selection.yaml` 和受限 TeX，再由
+  固定模板及 `latexmk` / XeLaTeX 生成 PDF 或其他交付物。
 
-OCR 不会直接写入权威 Markdown；任何低置信度或无法确认的内容仍保留为候选或 `draft`。
-各方向以公开合成样本、确定性契约和失败恢复证据为完成条件，不承诺具体日期。详细范围与
-验收原则见[项目路线图](docs/zh-CN/roadmap.md)。
+qbank 不内置 MinerU，不建设通用 Candidate 数据库、作业状态平台或完整出版系统，也不
+为此修改 Schema、增加 MCP 工具或重构核心。不确定内容保持 `draft`。详细范围与验收
+原则见[项目路线图](docs/zh-CN/roadmap.md)。
 
 ## 文档索引
 
@@ -285,9 +294,10 @@ OCR 不会直接写入权威 Markdown；任何低置信度或无法确认的内�
 | [CLI 命令参考](docs/zh-CN/cli-reference.md) | 公共命令清单、用途和自动化边界 |
 | [Studio 用户文档](docs/zh-CN/desktop-editor.md) | 桌面编辑器结构、交互和资源操作 |
 | [单仓库开发指南](docs/monorepo-development.md) | 目录结构、三级检查、变更影响和统一构建 |
-| [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、PDF 电子化工具、Skill 安装和 Codex CLI |
+| [Codex 接入指南](docs/zh-CN/codex-integration.md) | 通信协议、资料电子化/正式交付 Skill、安装和 Codex CLI |
 | [MCP 使用指南](docs/zh-CN/mcp-guide.md) | MCP 定位、安装、工具与资源、两阶段写入、诊断和安全边界 |
-| [项目路线图](docs/zh-CN/roadmap.md) | 多 agent 测试、OCR 中间层、完整电子化与 MCP 后续方向 |
+| [项目路线图](docs/zh-CN/roadmap.md) | 多 agent 测试、轻量资料入库、TeX 交付与 MCP 后续方向 |
+| [资料 → qbank → 正式交付物](docs/zh-CN/source-qbank-deliverables.md) | MinerU、AI、现有 MCP 与固定 TeX 模板组成的轻量工作流需求 |
 | [能力矩阵](docs/features/capability-matrix.md) | CLI、Studio、MCP 与 Codex capability 对应关系 |
 | [架构文档](docs/architecture.md) | 分层、数据所有权、事务和扩展边界 |
 | [0.2.0 兼容性参考](docs/zh-CN/compatibility-0.2.0.md) | 该版本的 CLI、Schema、MCP、错误码和 capability manifest |
@@ -317,7 +327,7 @@ OCR 不会直接写入权威 Markdown；任何低置信度或无法确认的内�
   仅提供本地题库工具与资源协议。
 
 完整边界与性能说明见
-[0.3.0-beta.1 已知限制](docs/zh-CN/known-limitations-0.3.0-beta.1.md)。
+[0.3.0-beta.2 已知限制](docs/zh-CN/known-limitations-0.3.0-beta.2.md)。
 
 ## 许可证
 

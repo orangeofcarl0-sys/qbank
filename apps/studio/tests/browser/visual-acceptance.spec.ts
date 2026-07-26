@@ -14,7 +14,7 @@ test("capture deterministic light, dark, asset and formula states", async ({ pag
   await page.goto("/?fixture=1");
   await page.getByRole("option", { name: /Round-trip/ }).click();
   await expect(page.frameLocator("#secure-preview").locator("mjx-container").first()).toBeVisible();
-  await expect(page.locator(".asset-card")).toBeVisible();
+  await expect(page.locator(".asset-card").first()).toBeVisible();
   await expect(page.locator("#preview-progress")).toBeHidden();
 
   await page.screenshot({ path: resolve(screenshots, "studio-light.png"), fullPage: true });

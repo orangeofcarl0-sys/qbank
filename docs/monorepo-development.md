@@ -30,8 +30,8 @@ Question、Paper、Schema、项目锁、事务、历史或索引实现。
 
 ## 统一版本
 
-- Python 包版本：`0.3.0b1`
-- 对外产品版本：`0.3.0-beta.1`
+- Python 包版本：`0.3.0b2`
+- 对外产品版本：`0.3.0-beta.2`
 - Studio Protocol：`1.0`
 - Question、Asset、Paper Schema：`1.0`
 - 上一发布线：`v0.2.0`；已发布 tag 保持对应原发布提交

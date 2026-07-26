@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
   <title id="title">qbank directional roadmap</title>
-  <desc id="desc">The roadmap builds on the current file-based bank and controlled entry points, then strengthens multi-agent interoperability tests, an OCR mediation layer from documents images and PDF to question candidates, a complete reviewed digitization pipeline, and MCP usability and observability. Phases depend on reproducible evidence and have no promised dates.</desc>
+  <desc id="desc">The roadmap builds on the current file-based bank and controlled entry points, then prioritizes multi-agent interoperability, lightweight ingestion from existing MinerU output, and deliverables built with fixed TeX templates. qbank does not aim to become a generic OCR or publishing platform.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="context-stroke"/></marker>
     <style>
@@ -9,7 +9,7 @@
     </style>
   </defs>
   <rect class="bg" width="1200" height="680" rx="18"/>
-  <text class="title" x="48" y="52">From a reliable bank core to a reviewable digitization pipeline</text>
+  <text class="title" x="48" y="52">From a reliable bank core to lightweight AI workflows</text>
   <text class="body" x="48" y="80">Directions follow their dependencies; each phase requires synthetic fixtures, contract tests, and failure-recovery evidence.</text>
 
   <path class="track" d="M94 132H1110"/>
@@ -34,19 +34,19 @@
 
   <rect class="phase" x="588" y="158" width="240" height="174" rx="11"/>
   <text class="label" x="608" y="184">Direction B</text>
-  <text class="heading" x="608" y="214">OCR mediation layer</text>
-  <text class="body" x="608" y="243">PDF · image · document sources</text>
-  <text class="body" x="608" y="267">Replaceable adapters and confidence</text>
-  <text class="body" x="608" y="291">Page, region, formula, figure provenance</text>
-  <text class="small" x="608" y="315">Produce candidates, never direct authority</text>
+  <text class="heading" x="608" y="214">MinerU → qbank</text>
+  <text class="body" x="608" y="243">Reuse existing MinerU extraction</text>
+  <text class="body" x="608" y="267">AI organizes JSONL · Asset packages</text>
+  <text class="body" x="608" y="291">MCP prepare · commit · validate</text>
+  <text class="small" x="608" y="315">Uncertainty remains draft</text>
 
   <rect class="phase" x="858" y="158" width="294" height="174" rx="11"/>
   <text class="label" x="878" y="184">Direction C</text>
-  <text class="heading" x="878" y="214">Complete digitization workflow</text>
-  <text class="body" x="878" y="243">Segment → classify → calibrate</text>
-  <text class="body" x="878" y="267">Draft import → assets → validation</text>
-  <text class="body" x="878" y="291">Batch acceptance, recovery, quality report</text>
-  <text class="small" x="878" y="315">Uncertain content remains draft</text>
+  <text class="heading" x="878" y="214">qbank → TeX delivery</text>
+  <text class="body" x="878" y="243">MCP search and question reads</text>
+  <text class="body" x="878" y="267">selection.yaml · fixed TeX template</text>
+  <text class="body" x="878" y="291">latexmk / XeLaTeX → PDF</text>
+  <text class="small" x="878" y="315">Builds keep the bank read-only</text>
 
   <text class="label" x="48" y="382">Cross-cutting · MCP clarity and observability</text>
   <rect class="future" x="48" y="400" width="1104" height="92" rx="10"/>
@@ -61,8 +61,8 @@
   <rect class="future" x="318" y="558" width="250" height="72" rx="9"/>
   <text class="heading" x="338" y="586">Deterministic contracts</text><text class="small" x="338" y="609">Inputs, outputs, errors, versions</text>
   <rect class="future" x="588" y="558" width="250" height="72" rx="9"/>
-  <text class="heading" x="608" y="586">Human review</text><text class="small" x="608" y="609">Candidates, diffs, provenance, confidence</text>
+  <text class="heading" x="608" y="586">Human review</text><text class="small" x="608" y="609">Exchange files, diffs, provenance, issues</text>
   <rect class="future" x="858" y="558" width="294" height="72" rx="9"/>
-  <text class="heading" x="878" y="586">Recoverable failure</text><text class="small" x="878" y="609">No partial authority; retry and verify</text>
+  <text class="heading" x="878" y="586">Recoverable failure</text><text class="small" x="878" y="609">Report partial success; retry and verify</text>
   <text class="small" x="48" y="657">This roadmap communicates priorities and dependencies, not dates or compatibility commitments.</text>
 </svg>

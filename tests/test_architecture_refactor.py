@@ -258,6 +258,31 @@ def test_package_resources_match_mirrors_and_init_output(tmp_path: Path) -> None
         ".agents/skills/qbank-digitize/references/calibration.md": (
             ".agents/skills/qbank-digitize/references/calibration.md"
         ),
+        ".agents/skills/qbank-digitize/references/exchange-workspace.md": (
+            ".agents/skills/qbank-digitize/references/exchange-workspace.md"
+        ),
+        ".agents/skills/qbank-digitize/scripts/check_exchange.py": (
+            ".agents/skills/qbank-digitize/scripts/check_exchange.py"
+        ),
+        ".agents/skills/qbank-deliver/SKILL.md": ".agents/skills/qbank-deliver/SKILL.md",
+        ".agents/skills/qbank-deliver/agents/openai.yaml": (
+            ".agents/skills/qbank-deliver/agents/openai.yaml"
+        ),
+        ".agents/skills/qbank-deliver/references/selection.md": (
+            ".agents/skills/qbank-deliver/references/selection.md"
+        ),
+        ".agents/skills/qbank-deliver/references/tex-workflow.md": (
+            ".agents/skills/qbank-deliver/references/tex-workflow.md"
+        ),
+        ".agents/skills/qbank-deliver/scripts/build_delivery.py": (
+            ".agents/skills/qbank-deliver/scripts/build_delivery.py"
+        ),
+        ".agents/skills/qbank-deliver/assets/tex/main.tex": (
+            ".agents/skills/qbank-deliver/assets/tex/main.tex"
+        ),
+        ".agents/skills/qbank-deliver/assets/tex/qbankexam.cls": (
+            ".agents/skills/qbank-deliver/assets/tex/qbankexam.cls"
+        ),
         "templates/paper.md.j2": "templates/paper.md.j2",
         "templates/paper.html.j2": "templates/paper.html.j2",
         "papers/demo-paper.yaml": "papers/demo-paper.yaml",
@@ -438,7 +463,10 @@ def test_built_wheel_initializes_outside_source_tree(tmp_path: Path) -> None:
         "assert (root/'templates/paper.md.j2').is_file(); "
         "assert (root/'assets/images/interference.svg').is_file(); "
         "assert (root/'AGENTS.md').is_file(); "
-        "assert (root/'.agents/skills/qbank/SKILL.md').is_file()"
+        "assert (root/'.agents/skills/qbank/SKILL.md').is_file(); "
+        "assert (root/'.agents/skills/qbank-digitize/scripts/check_exchange.py').is_file(); "
+        "assert (root/'.agents/skills/qbank-deliver/scripts/build_delivery.py').is_file(); "
+        "assert (root/'.agents/skills/qbank-deliver/assets/tex/qbankexam.cls').is_file()"
     )
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(target)

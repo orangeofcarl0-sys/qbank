@@ -20,7 +20,7 @@ Questions are durable Markdown files with YAML front matter; JSON and JSONL are 
 SQLite is only a rebuildable search projection; and `paper.yaml` describes reviewable, reproducible
 papers.
 
-> **Current version:** the current pre-release is `0.3.0-beta.1` (Python package `0.3.0b1`).
+> **Current version:** the current pre-release is `0.3.0-beta.2` (Python package `0.3.0b2`).
 > `0.2.x` remains the previous compatibility-maintenance line, with its Qt desktop application now
 > classified as QBank Studio Legacy. `0.1.x` is unsupported. Question, Asset, and Paper Schemas
 > remain at `1.0`.
@@ -103,11 +103,11 @@ qbank doctor --format json
 material. Verify a Release wheel against the Release checksum before installing it:
 
 ```powershell
-Get-FileHash .\qbank-0.3.0b1-py3-none-any.whl -Algorithm SHA256
-pip install .\qbank-0.3.0b1-py3-none-any.whl
+Get-FileHash .\qbank-0.3.0b2-py3-none-any.whl -Algorithm SHA256
+pip install .\qbank-0.3.0b2-py3-none-any.whl
 ```
 
-Windows desktop users can download `QBank-Studio-0.3.0-beta.1-x64-setup.exe` or the portable ZIP.
+Windows desktop users can download `QBank-Studio-0.3.0-beta.2-x64-setup.exe` or the portable ZIP.
 See the [installation and upgrade guide](docs/en/installation.md) for verification, upgrades, and
 the Legacy fallback.
 
@@ -143,8 +143,8 @@ The layers in the diagram also describe source dependency direction:
    presentation adapters.
 2. They call `src/qbank/application/`, domain models, and infrastructure ports without duplicating
    question rules.
-3. `$qbank` and `$qbank-digitize` provide agent guidance and authority protocol; they never access
-   a bank directly.
+3. `$qbank`, `$qbank-digitize`, and `$qbank-deliver` provide protocol and domain workflows;
+   authoritative access still goes through the shared CLI/MCP services.
 4. The shared core operates authoritative files only inside a confirmed bank root.
 
 Within that root, `questions/` contains authoritative question Markdown, `assets/` contains managed
@@ -182,8 +182,9 @@ DOCX uses the system Pandoc executable; Markdown and HTML remain available when 
 
 ## Codex integration
 
-New banks include `$qbank`, the deterministic repository communication protocol, and the separate
-optional `$qbank-digitize` domain guide for PDF/scan field policy and calibration. Codex Desktop,
+New banks include `$qbank`, the deterministic repository communication protocol, plus separate
+`$qbank-digitize` and `$qbank-deliver` domain guides for source calibration and read-only formal
+document construction. Codex Desktop,
 IDE, or CLI can use these rules with local commands, or call the same services through optional
 STDIO MCP. qbank itself needs no OpenAI API key.
 
@@ -192,9 +193,20 @@ qbank codex check --format json
 qbank codex instructions --format markdown
 qbank codex install-skill --skill qbank --user --dry-run --format json
 qbank codex install-skill --skill qbank-digitize --user --dry-run --format json
+qbank codex install-skill --skill qbank-deliver --user --dry-run --format json
 qbank codex install-mcp --project --dry-run --format json
 qbank codex integration-status --format json
 ```
+
+For source digitization, `$qbank-digitize` organizes existing MinerU output into
+`questions.jsonl`, Asset packages, and a `review.md` containing only unresolved items. `$qbank`
+then uses existing MCP operations to prepare, inspect, commit, and validate the authoritative
+changes. `$qbank-deliver` freezes Question JSONL and Asset manifests from the same MCP read tools,
+then uses the original `qbank-zh-exam-v1` template for student, answer, or solution PDFs.
+The fully synthetic
+[lightweight end-to-end example](examples/workflows/lightweight/README.md)
+demonstrates checking, MCP import, query, snapshot, and TeX build in a new directory without
+reading an existing bank.
 
 MCP requires the separate `qbank[mcp]` extra. Its absence or lack of registration does not affect
 CLI, Studio, or Skills. It is a local STDIO adapter bound to one bank, not a remote backend: read
@@ -208,21 +220,21 @@ catalog, complete read/write examples, diagnostics, and the security boundary.
 
 ## Roadmap
 
-![qbank roadmap from the unified bank core to broader agent interoperability, an OCR candidate layer, a complete digitization workflow, and MCP observability](docs/assets/readme/roadmap.en.svg)
+![qbank roadmap from the unified bank core to agent interoperability, lightweight source ingestion, and lightweight TeX delivery workflows](docs/assets/readme/roadmap.en.svg)
 
-Planned work follows three dependent directions:
+Planned work follows three lightweight, independent directions:
 
 - test real configuration, discovery, authority, conflict, and recovery with more agent hosts that
   support local tool protocols;
-- build a replaceable OCR/layout candidate layer between documents, images, PDF, and qbank exchange
-  formats while retaining page, region, confidence, and provenance;
-- connect `$qbank-digitize` field policy and sample calibration to segmentation, taxonomy mapping,
-  formula/figure handling, human review, draft import, and batch acceptance.
+- reuse existing MinerU output in source projects so AI and `$qbank-digitize` can generate Question
+  JSONL, Asset packages, and a `review.md` containing only unresolved items before existing
+  two-phase MCP writes;
+- query and read through existing MCP, then let AI and `$qbank-deliver` generate `selection.yaml`
+  and TeX for a fixed template and `latexmk` / XeLaTeX.
 
-OCR will never write authoritative Markdown directly; low-confidence or unconfirmed content remains
-a candidate or `draft`. Completion requires public synthetic fixtures, deterministic contracts,
-and failure-recovery evidence rather than a promised date. See the
-[project roadmap](docs/en/roadmap.md) for scope and acceptance criteria.
+qbank does not embed MinerU, build a generic Candidate database, job-state platform, or complete
+publishing system, or change Schemas, MCP tools, or core architecture for this work. Unconfirmed
+content remains `draft`. See the [project roadmap](docs/en/roadmap.md) for scope and acceptance.
 
 ## Documentation
 
@@ -233,9 +245,10 @@ and failure-recovery evidence rather than a promised date. See the
 | [CLI reference](docs/en/cli-reference.md) | Public commands and automation boundaries |
 | [Studio guide](docs/en/desktop-editor.md) | Desktop interaction and resource behavior |
 | [Monorepo development](docs/monorepo-development.md) | Repository layout, tiered checks, impact mapping, and unified builds |
-| [Codex and MCP](docs/en/codex-integration.md) | Skills, cross-project context, MCP, and authorization |
+| [Codex and MCP](docs/en/codex-integration.md) | Communication, digitization/delivery Skills, cross-project context, MCP, and authorization |
 | [MCP guide](docs/en/mcp-guide.md) | MCP role, setup, tools and resources, two-phase writes, diagnostics, and security |
-| [Project roadmap](docs/en/roadmap.md) | Multi-agent tests, OCR mediation, complete digitization, and future MCP work |
+| [Project roadmap](docs/en/roadmap.md) | Multi-agent tests, lightweight source ingestion, TeX delivery, and future MCP work |
+| [Source → qbank → formal deliverables](docs/en/source-qbank-deliverables.md) | Lightweight requirements built from MinerU, AI, existing MCP, and fixed TeX templates |
 | [0.2.0 compatibility reference](docs/en/compatibility-0.2.0.md) | CLI, Schema, MCP, diagnostics, and capabilities for that release |
 | [Compatibility policy](docs/en/compatibility-policy.md) | Stable interfaces and release rules |
 | [0.2.0 known limitations](docs/en/known-limitations-0.2.0.md) | Filesystem, transaction, performance, and product limits |
@@ -257,7 +270,7 @@ on stderr. Use `--format json` for automation.
 - qbank is not an online exam service, OCR engine, automatic question selector, embedded Studio
   chat, or model API wrapper.
 
-See the [0.3.0-beta.1 known limitations](docs/en/known-limitations-0.3.0-beta.1.md) for the complete
+See the [0.3.0-beta.2 known limitations](docs/en/known-limitations-0.3.0-beta.2.md) for the complete
 runtime and deployment boundary.
 
 ## License

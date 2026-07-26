@@ -20,10 +20,12 @@ def test_documentation_sync_gate_passes_repository_contract() -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "PASS localized-document-pairs: 14 locale pairs present" in result.stdout
+    assert "PASS localized-document-pairs: 15 locale pairs present" in result.stdout
     assert (
         "PASS localized-language-purity: localized prose is separated by language" in result.stdout
     )
+    assert "PASS source-delivery-requirements:" in result.stdout
+    assert "bilingual requirement IDs match" in result.stdout
     assert "PASS cli-reference: 53 public commands documented in 2 locales" in result.stdout
     assert "PASS manifest-capability-docs: 22 capabilities documented" in result.stdout
     assert "docs-sync: PASS" in result.stdout
@@ -69,6 +71,7 @@ def test_localized_user_documentation_has_explicit_language_peers() -> None:
         "codex-integration.md",
         "mcp-guide.md",
         "roadmap.md",
+        "source-qbank-deliverables.md",
         "compatibility-0.2.0.md",
         "compatibility-policy.md",
         "known-limitations-0.2.0.md",

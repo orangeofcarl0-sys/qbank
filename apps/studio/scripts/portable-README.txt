@@ -1,4 +1,4 @@
-QBank Studio 0.3.0-beta.1 portable
+QBank Studio 0.3.0-beta.2 portable
 
 Keep qbank-studio.exe, qbank-sidecar.exe, and WebView2Loader.dll in this
 directory. QBank Studio stores no question-bank data inside the application

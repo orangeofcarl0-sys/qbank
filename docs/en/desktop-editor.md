@@ -10,7 +10,7 @@ QBank Studio is qbank's default desktop entry and the modern Tauri presentation 
 index policy used by the CLI and MCP. Question Markdown and logical assets remain authoritative;
 Studio does not maintain a second repository format.
 
-The current pre-release UI is `0.3.0-beta.1`, the Python package is `0.3.0b1`, and the Question,
+The current pre-release UI is `0.3.0-beta.2`, the Python package is `0.3.0b2`, and the Question,
 Asset, and Paper Schemas are `1.0`. The Windows installer is unsigned. Verify the Release SHA-256
 values as described in the [installation and upgrade guide](installation.md).
 
@@ -35,13 +35,26 @@ Studio uses a stable three-region document-editing layout:
 - the right Inspector edits core properties and presents logical assets and recent history. It
   automatically hides at narrow window widths to preserve the editor workspace.
 
-The repository path confirms the active working location and is visually truncated when space is
-limited. Documentation captures use `fixture://synthetic-bank` rather than a maintainer or user
-directory.
+The title bar displays only the repository name by default. The complete path remains available in
+the repository-identity tooltip and can enter the clipboard only through the explicit Copy
+repository path action. Ordinary interface text and public captures do not expose local
+directories.
+
+Repository activation is atomic. The sidecar reads repository status, question summaries, tags,
+and saved views before it changes the active repository. The frontend then replaces navigation
+state and clears the old editor, preview, Inspector, filters, and batch selection in one activation.
+A failed or cancelled read preserves the previous repository and document. When edits are unsaved,
+the user must Save, Discard, or Cancel before switching; a failed save or Cancel never switches.
 
 Opening a question and selecting questions for batch operations are separate states. Opening does
 not implicitly select the question. If filters exclude the open question, Studio keeps its editor
 available so unsaved work is not interrupted.
+
+Navigation filters, the question list, source, preview, and Inspector each own an independent
+vertical scroll region. Wheel input affects only the pane under the pointer and does not chain into
+an adjacent pane at a boundary. Scrollbars remain distinguishable in both themes and with Windows
+overlay-scrollbar settings, while long questions stay bounded by the window. Formula and code
+blocks retain local horizontal scrolling when their content requires it.
 
 ## Editing, validation, and save
 
@@ -52,8 +65,10 @@ disabled. The preview runs in an isolated frame and never writes back to Markdow
 Dirty state, save availability, source snapshot, Inspector values, and preview generation stay
 synchronized. Save and metadata updates ask the sidecar to prepare a dry-run before committing the
 same authoritative transaction. Validation and index synchronization follow a successful commit.
-An index failure does not roll back committed Markdown and history; it marks the index dirty and
-requires:
+An index failure does not roll back committed Markdown and history; it marks the index dirty. When
+opening finds a missing, dirty, stale, or corrupt index, Studio explains the reason and invokes the
+sidecar rebuild only after explicit confirmation. A normal open stays read-only, and a failed
+rebuild preserves the previous repository. The CLI alternative is:
 
 ```powershell
 qbank index rebuild --format json
@@ -90,15 +105,24 @@ supports the operation:
 
 ![Logical-asset capability menu in dark mode](../assets/readme/studio-assets-dark.png)
 
-A local resource loads only when it exists inside the configured repository asset boundary.
-HTTP/HTTPS resources remain read-only and generate warnings. Absolute, invalid, and escaping URIs
-are never read. Ipe editing uses a versioned working copy; a changed source makes derived renders
-stale and rerendering remains explicit.
+Modern Studio and Legacy consume the same application-level resource classifier. `asset.list`
+classifies each reference as logical, local, external, or invalid and returns declaration state,
+existence, diagnostics, a controlled thumbnail, and typed capabilities. A local resource loads
+only when it exists inside the configured asset boundary and passes symlink-aware containment.
+The sidecar returns a bounded data URL rather than an absolute path. HTTP/HTTPS and
+protocol-relative resources remain read-only and generate warnings. Absolute, invalid, and
+escaping URIs are never read. Ipe editing uses a versioned working copy; a changed source makes
+derived renders stale and rerendering remains explicit.
+
+Preview rewriting is limited to Markdown image nodes whose original URI exactly matches the
+inventory; Studio does not replace arbitrary text in rendered HTML. Opening a resource causes the
+sidecar to validate its reference again against the current question inventory.
 
 Dropping onto an existing image requests replacement. Dropping in an eligible editor region creates
 a logical asset and inserts its stable reference. If source is dirty, an asset operation requires
 Save, Discard, or Cancel; only a successful save or an explicit discard allows the operation to
-continue.
+continue. After a successful operation, source, Inspector metadata, resources, history, revision,
+dirty state, and preview are reloaded as one UI state.
 
 ## Themes and accessibility
 
@@ -137,4 +161,4 @@ npm run test:browser
 README captures are generated deterministically from production components and a public synthetic
 fixture in browser acceptance. The packaged application still receives a minimal startup and
 repository-open smoke. Studio does not embed chat, OCR, an online exam system, or a model SDK. See
-the [0.3.0-beta.1 known limitations](known-limitations-0.3.0-beta.1.md).
+the [0.3.0-beta.2 known limitations](known-limitations-0.3.0-beta.2.md).

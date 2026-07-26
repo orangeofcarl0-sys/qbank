@@ -28,8 +28,8 @@ def test_python_and_display_versions_share_the_beta_line() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package = json.loads((ROOT / "apps/studio/package.json").read_text(encoding="utf-8"))
     tauri = json.loads((ROOT / "apps/studio/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
-    assert __version__ == project["project"]["version"] == "0.3.0b1"
-    assert package["version"] == tauri["version"] == "0.3.0-beta.1"
+    assert __version__ == project["project"]["version"] == "0.3.0b2"
+    assert package["version"] == tauri["version"] == "0.3.0-beta.2"
     assert PROTOCOL_VERSION == "1.0"
 
 

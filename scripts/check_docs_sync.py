@@ -24,6 +24,8 @@ from typer.main import get_command  # noqa: E402
 
 from qbank.cli import app  # noqa: E402
 from qbank.codex_manifest import (  # noqa: E402
+    DELIVER_SKILL_FILES,
+    DIGITIZE_SKILL_FILES,
     INTEGRATION_CAPABILITIES,
     REQUIRED_COMMANDS,
     SKILL_FILES,
@@ -48,12 +50,16 @@ PUBLIC_FILES = (
     "docs/en/mcp-guide.md",
     "docs/zh-CN/roadmap.md",
     "docs/en/roadmap.md",
+    "docs/zh-CN/source-qbank-deliverables.md",
+    "docs/en/source-qbank-deliverables.md",
     "docs/features/README.md",
     "docs/features/_template.md",
     "docs/features/capability-matrix.md",
     "docs/features/bilingual-documentation.md",
     "docs/features/unified-studio-monorepo.md",
+    "docs/features/source-qbank-deliverables.md",
     "docs/adr/0006-unified-studio-monorepo.md",
+    "docs/adr/0007-separate-digitization-and-document-publishing.md",
     "docs/monorepo-development.md",
     "protocol/README.md",
     "protocol/studio-protocol-v1.json",
@@ -67,11 +73,12 @@ LOCALIZED_DOCUMENTS = (
     "codex-integration.md",
     "mcp-guide.md",
     "roadmap.md",
+    "source-qbank-deliverables.md",
     "compatibility-0.2.0.md",
-    "compatibility-0.3.0-beta.1.md",
+    "compatibility-0.3.0-beta.2.md",
     "compatibility-policy.md",
     "known-limitations-0.2.0.md",
-    "known-limitations-0.3.0-beta.1.md",
+    "known-limitations-0.3.0-beta.2.md",
 )
 LOCALIZED_ROOT_PAIR = ("README.md", "README.en.md")
 LOCALE_ROOTS = {"zh-CN": "docs/zh-CN", "en": "docs/en"}
@@ -94,6 +101,7 @@ PUBLIC_TEXT_ROOTS = (
     "docs",
     ".agents/skills/qbank",
     ".agents/skills/qbank-digitize",
+    ".agents/skills/qbank-deliver",
     "examples",
 )
 SOURCE_PREFIXES = (
@@ -140,6 +148,7 @@ FENCED_CODE = re.compile(r"```.*?```", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`]*`")
 MARKDOWN_LINK_WITH_LABEL = re.compile(r"!?\[[^\]]*]\([^)]+\)")
 HTML_TAG = re.compile(r"<[^>]+>")
+REQUIREMENT_ID = re.compile(r"\b(?:S2Q|Q2D)-\d{3}\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,6 +283,51 @@ def _cli_documentation(root: Path, leaves: set[tuple[str, ...]]) -> Check:
     )
 
 
+def _source_delivery_requirements(root: Path) -> Check:
+    paths = (
+        root / "docs/zh-CN/source-qbank-deliverables.md",
+        root / "docs/en/source-qbank-deliverables.md",
+    )
+    occurrences = [REQUIREMENT_ID.findall(path.read_text(encoding="utf-8")) for path in paths]
+    failures: list[str] = []
+    required_tokens = (
+        "MinerU",
+        "questions.jsonl",
+        "review.md",
+        "selection.yaml",
+        "latexmk",
+        "CandidateBlock",
+        "BuildManifest",
+    )
+    for path, values in zip(paths, occurrences, strict=True):
+        text = path.read_text(encoding="utf-8")
+        duplicates = sorted(
+            identifier for identifier in set(values) if values.count(identifier) > 1
+        )
+        failures.extend(
+            f"{path.relative_to(root)}: duplicate {identifier}" for identifier in duplicates
+        )
+        failures.extend(
+            f"{path.relative_to(root)}: missing lightweight-workflow marker {token}"
+            for token in required_tokens
+            if token not in text
+        )
+    chinese, english = (set(values) for values in occurrences)
+    failures.extend(
+        f"missing from English: {identifier}" for identifier in sorted(chinese - english)
+    )
+    failures.extend(
+        f"missing from Chinese: {identifier}" for identifier in sorted(english - chinese)
+    )
+    if len(chinese) < 50:
+        failures.append(f"requirements are incomplete: only {len(chinese)} unique IDs")
+    return _check(
+        "source-delivery-requirements",
+        failures,
+        f"{len(chinese)} bilingual requirement IDs match",
+    )
+
+
 def _manifest_consistency(root: Path, nodes: set[tuple[str, ...]]) -> list[Check]:
     matrix = (root / "docs/features/capability-matrix.md").read_text(encoding="utf-8")
     missing_paths: list[str] = []
@@ -298,13 +352,21 @@ def _manifest_consistency(root: Path, nodes: set[tuple[str, ...]]) -> list[Check
 
 
 def _skill_consistency(root: Path) -> list[Check]:
-    packaged = root / "src/qbank/resources/init/codex/skill"
+    selections = (
+        ("qbank", "skill", SKILL_FILES),
+        ("qbank-digitize", "qbank-digitize", DIGITIZE_SKILL_FILES),
+        ("qbank-deliver", "qbank-deliver", DELIVER_SKILL_FILES),
+    )
+    drift: list[str] = []
+    for repository_name, packaged_name, skill_files in selections:
+        packaged = root / "src/qbank/resources/init/codex" / packaged_name
+        repository = root / ".agents/skills" / repository_name
+        drift.extend(
+            f"{repository_name}/{relative}"
+            for relative in skill_files
+            if (packaged / relative).read_bytes() != (repository / relative).read_bytes()
+        )
     repository = root / ".agents/skills/qbank"
-    drift = [
-        relative
-        for relative in SKILL_FILES
-        if (packaged / relative).read_bytes() != (repository / relative).read_bytes()
-    ]
     command_reference = (repository / "references/command-reference.md").read_text(encoding="utf-8")
     missing = [
         "qbank " + " ".join(command)
@@ -320,7 +382,11 @@ def _skill_consistency(root: Path) -> list[Check]:
             agents_match,
             "root and packaged AGENTS.md match" if agents_match else "AGENTS.md mirror drift",
         ),
-        _check("packaged-skill-mirror", drift, f"{len(SKILL_FILES)} Skill files match"),
+        _check(
+            "packaged-skill-mirror",
+            drift,
+            f"{sum(len(item[2]) for item in selections)} Skill files match",
+        ),
         _check("skill-command-reference", missing, "all required workflow commands documented"),
     ]
 
@@ -357,10 +423,10 @@ def _monorepo_contract(root: Path) -> Check:
     package = json.loads((root / "apps/studio/package.json").read_text(encoding="utf-8"))
     tauri = json.loads((root / "apps/studio/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
     protocol = json.loads((root / "protocol/studio-protocol-v1.json").read_text(encoding="utf-8"))
-    if project["project"]["version"] != "0.3.0b1":
-        failures.append("Python package is not 0.3.0b1")
-    if package["version"] != "0.3.0-beta.1" or tauri["version"] != "0.3.0-beta.1":
-        failures.append("Studio display versions are not 0.3.0-beta.1")
+    if project["project"]["version"] != "0.3.0b2":
+        failures.append("Python package is not 0.3.0b2")
+    if package["version"] != "0.3.0-beta.2" or tauri["version"] != "0.3.0-beta.2":
+        failures.append("Studio display versions are not 0.3.0-beta.2")
     if protocol["protocolVersion"] != "1.0":
         failures.append("Studio Protocol is not 1.0")
     for relative in (
@@ -504,6 +570,7 @@ def run_checks(root: Path, *, base: str | None = None, skip_examples: bool = Fal
         _local_links(root),
         _feature_template(root),
         *_localized_documentation(root),
+        _source_delivery_requirements(root),
         _cli_documentation(root, leaves),
         *_manifest_consistency(root, nodes),
         *_skill_consistency(root),

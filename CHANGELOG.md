@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## 0.3.0-beta.2 - 2026-07-27
+
+- Made modern Studio repository activation atomic: the sidecar now returns status, questions, tags,
+  and saved views as one bootstrap snapshot and keeps the previous session intact when opening or
+  explicit index recovery fails. Missing, dirty, stale, or corrupt indexes can be rebuilt only
+  after user confirmation through the least-privilege Tauri message-dialog capability.
+- Unified modern and Legacy resource classification in the application layer. Modern Studio now
+  presents logical, contained local, external, and invalid references with typed capabilities,
+  bounded thumbnails, exact image-node preview binding, and sidecar revalidation without exposing
+  absolute paths.
+- Synchronized question-load and asset-operation state in modern Studio. Stale preview generations
+  cannot replace the current question or theme, Save/Discard/Cancel guards all asset operations,
+  and the title bar hides the complete repository path behind an explicit copy action.
+- Fixed modern Studio long documents expanding the central grid beyond the window and becoming
+  unreachable. Source, secure preview, filters, question navigation, and Inspector now expose
+  theme-aware stable scrollbars, contain wheel input within the pointed pane, and retain bounded
+  scrolling at compact heights and 125% scaling.
+- Added the independent `$qbank-deliver` Skill, its original institution-neutral XeLaTeX template,
+  reproducible Question/Asset snapshots, controlled TeX validation, atomic PDF output, and a
+  synthetic end-to-end runner. Delivery editions coexist below `output/<variant>/`, while
+  `--validate-only` performs no workspace writes. Extended `$qbank-digitize` with a read-only
+  exchange checker for
+  line-level Question validation, embedded cross-project assets, fixed review tables, and logical
+  asset consistency without changing qbank Schemas or MCP tools.
+- Reframed the source-to-qbank and qbank-to-deliverable roadmap around lightweight project-side
+  workflows: existing MinerU output becomes Question JSONL, Asset packages, and focused review
+  notes for current MCP operations, while fixed TeX templates build derived documents from MCP
+  reads. Generic candidate databases, job platforms, Schema changes, new MCP tools, and a complete
+  publishing system are explicitly outside the current goal.
 - Replaced obsolete Qt-based README screenshots with deterministic captures of the current Tauri
   Studio, redrew the bilingual architecture and safe-write diagrams, and aligned the Studio guides,
   design system, screenshot provenance, and repository UI Skill with the modern/Legacy boundary.

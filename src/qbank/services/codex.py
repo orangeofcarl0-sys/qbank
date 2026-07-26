@@ -19,6 +19,7 @@ from qbank.codex_manifest import (
     COMPLETION_HANDOFF_FIELDS,
     CONTEXT_AUTHORIZATION_MODES,
     CONTEXT_REQUIRED_FIELDS,
+    DELIVER_SKILL_FILES,
     DIGITIZE_SKILL_FILES,
     FOREIGN_PROJECT_POLICY,
     INTEGRATION_CAPABILITIES,
@@ -48,7 +49,7 @@ from qbank.yaml_io import load_yaml
 SKILL_DIRECTORY = Path(".agents/skills/qbank")
 REQUIRED_WORKFLOW_COMMANDS = REQUIRED_COMMANDS
 SkillScope = Literal["user", "project"]
-SkillName = Literal["qbank", "qbank-digitize"]
+SkillName = Literal["qbank", "qbank-digitize", "qbank-deliver"]
 CommandProbe = Callable[[tuple[str, ...]], bool]
 
 
@@ -374,8 +375,11 @@ def install_repository_skill(
 
 def canonical_skill_contents(skill_name: SkillName = "qbank") -> dict[str, bytes]:
     """Read one packaged canonical Skill tree in source and wheel installations."""
-    directory = "skill" if skill_name == "qbank" else "qbank-digitize"
-    skill_files = SKILL_FILES if skill_name == "qbank" else DIGITIZE_SKILL_FILES
+    directory, skill_files = {
+        "qbank": ("skill", SKILL_FILES),
+        "qbank-digitize": ("qbank-digitize", DIGITIZE_SKILL_FILES),
+        "qbank-deliver": ("qbank-deliver", DELIVER_SKILL_FILES),
+    }[skill_name]
     root = files("qbank.resources").joinpath("init", "codex", directory)
     return {
         relative: root.joinpath(*PurePosixPath(relative).parts)

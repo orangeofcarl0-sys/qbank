@@ -16,6 +16,8 @@ describe("Tauri capability boundary", () => {
     expect(JSON.stringify(capability)).not.toContain("shell:allow-execute");
     expect(JSON.stringify(capability)).not.toContain("fs:");
     expect(JSON.stringify(capability)).not.toContain("opener:");
+    expect(capability.permissions).toContain("dialog:allow-open");
+    expect(capability.permissions).toContain("dialog:allow-message");
   });
 
   it("uses a non-null CSP without remote origins", () => {
