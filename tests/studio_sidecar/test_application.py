@@ -112,6 +112,27 @@ def test_parameter_helpers_reject_wrong_types(synthetic_bank: Path) -> None:
             },
         ),
         (
+            "taxonomy.update",
+            {"tag": [], "expectedRevision": revision},
+        ),
+        (
+            "asset.open",
+            {
+                "questionId": "OPT-SYN-0001",
+                "reference": "https://example.com/figure.png",
+                "action": "unsupported",
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "paper.save",
+            {
+                "path": "papers/demo.yaml",
+                "paper": [],
+                "expectedRevision": revision,
+            },
+        ),
+        (
             "asset.render",
             {
                 "questionId": "OPT-SYN-0001",
@@ -158,6 +179,27 @@ def test_parameter_helpers_reject_wrong_types(synthetic_bank: Path) -> None:
         with pytest.raises(RpcError) as invalid:
             app.dispatch(method, params)
         assert invalid.value.code == INVALID_PARAMS
+
+    invalid_source = app.dispatch(
+        "question.save",
+        {
+            "id": "OPT-SYN-0001",
+            "source": "",
+            "expectedRevision": revision,
+        },
+    )
+    assert invalid_source["ok"] is False
+
+    import_text = synthetic_bank / "invalid-import.txt"
+    import_text.write_text("{}", encoding="utf-8")
+    import_directory = synthetic_bank / "invalid-import.json"
+    import_directory.mkdir()
+    for path in (import_text, import_directory):
+        with pytest.raises(RpcError, match="JSON or JSONL"):
+            app.dispatch(
+                "question.import",
+                {"path": str(path), "expectedRevision": revision},
+            )
 
 
 def test_protocol_scalar_and_asset_input_helpers_cover_failure_edges() -> None:
@@ -263,6 +305,40 @@ def test_custom_math_configuration_must_be_a_regular_file(synthetic_bank: Path) 
     status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
     assert status["mathMacros"] == {}
     assert status["studioWarnings"] == ["Studio math configuration must be a regular non-link file"]
+
+
+def test_missing_and_oversized_custom_math_configuration(
+    synthetic_bank: Path,
+) -> None:
+    config = synthetic_bank / ".qbank" / "studio-math.json"
+    config.unlink()
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"] == {}
+    assert status["studioWarnings"] == []
+
+    config.write_text(" " * (64 * 1024 + 1), encoding="utf-8")
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"] == {}
+    assert "exceeds 64 KiB" in status["studioWarnings"][0]
+
+
+def test_shared_custom_math_dependency_is_not_a_cycle(synthetic_bank: Path) -> None:
+    config = synthetic_bank / ".qbank" / "studio-math.json"
+    config.write_text(
+        json.dumps(
+            {
+                "macros": {
+                    "left": "\\shared",
+                    "right": "\\shared",
+                    "shared": "value",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"]["shared"] == "value"
+    assert status["studioWarnings"] == []
 
 
 def test_excessively_deep_custom_math_chain_is_rejected(synthetic_bank: Path) -> None:

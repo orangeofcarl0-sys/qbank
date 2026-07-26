@@ -303,11 +303,12 @@ def _build(root: Path, artifacts: Path, skip: bool) -> list[Check]:
 def _reuse_unified_build(root: Path, artifacts: Path) -> list[Check]:
     source = root / "build" / "unified"
     source_artifacts = source / "artifacts"
+    _, python_version, release_version = _metadata(root)
     required = (
-        "qbank-0.3.0b1-py3-none-any.whl",
-        "qbank-0.3.0b1.tar.gz",
-        "QBank-Studio-0.3.0-beta.1-x64-setup.exe",
-        "QBank-Studio-0.3.0-beta.1-portable-x64.zip",
+        f"qbank-{python_version}-py3-none-any.whl",
+        f"qbank-{python_version}.tar.gz",
+        f"QBank-Studio-{release_version}-x64-setup.exe",
+        f"QBank-Studio-{release_version}-portable-x64.zip",
     )
     missing = [name for name in required if not (source_artifacts / name).is_file()]
     manifest = source / "release-manifest.json"
