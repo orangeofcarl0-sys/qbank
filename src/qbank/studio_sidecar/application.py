@@ -762,7 +762,9 @@ class StudioApplication:
             dry_run = opened.services.assets.launcher.open_url(url, execute=False)
             result = opened.services.assets.launcher.open_url(url, execute=True)
         else:
-            raise RpcError(INVALID_PARAMS, "resource action is not supported for this resource kind")
+            raise RpcError(
+                INVALID_PARAMS, "resource action is not supported for this resource kind"
+            )
         return {
             "dryRun": {"command": list(dry_run)},
             "result": {"command": list(result)},
@@ -1191,9 +1193,7 @@ class StudioApplication:
                 "canReplace": item.kind == "logical" and item.capabilities.replace,
                 "canOpen": item.capabilities.open_original or item.capabilities.open_reference,
                 "canRender": item.kind == "logical" and item.capabilities.render,
-                "canReveal": (
-                    item.kind == "logical" and item.capabilities.show_directory
-                )
+                "canReveal": (item.kind == "logical" and item.capabilities.show_directory)
                 or (item.kind == "local" and item.capabilities.open_reference),
             },
             "representations": [

@@ -14,6 +14,7 @@ from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError, QBankError
 from qbank.infrastructure.locking import RepositoryWriteLock
 from qbank.markdown_codec import parse_question_text, render_question
+from qbank.studio_sidecar import application as sidecar_application
 from qbank.studio_sidecar.application import StudioApplication
 from qbank.studio_sidecar.errors import (
     APPLICATION_ERROR,
@@ -88,6 +89,127 @@ def test_parameter_helpers_reject_wrong_types(synthetic_bank: Path) -> None:
     with pytest.raises(RpcError) as identifier:
         app.dispatch("question.get", {"id": 1})
     assert identifier.value.code == INVALID_PARAMS
+    revision = app.dispatch("repository.status", {})["revision"]
+    invalid_calls = [
+        (
+            "question.update",
+            {"id": "OPT-SYN-0001", "set": [], "expectedRevision": revision},
+        ),
+        (
+            "question.update",
+            {"id": "OPT-SYN-0001", "topics": "optics", "expectedRevision": revision},
+        ),
+        (
+            "question.update",
+            {"id": "OPT-SYN-0001", "topics": [1], "expectedRevision": revision},
+        ),
+        (
+            "question.bulkUpdate",
+            {
+                "questionIds": ["OPT-SYN-0001"],
+                "set": {"title": "unsupported"},
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "asset.render",
+            {
+                "questionId": "OPT-SYN-0001",
+                "assetId": "figure-1",
+                "formats": "svg",
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "asset.render",
+            {
+                "questionId": "OPT-SYN-0001",
+                "assetId": "figure-1",
+                "formats": [1],
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "paper.build",
+            {
+                "path": "papers/demo.yaml",
+                "output": 1,
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "paper.build",
+            {
+                "path": "papers/demo.yaml",
+                "options": [],
+                "expectedRevision": revision,
+            },
+        ),
+        (
+            "paper.build",
+            {
+                "path": "papers/demo.yaml",
+                "format": "pdf",
+                "expectedRevision": revision,
+            },
+        ),
+    ]
+    for method, params in invalid_calls:
+        with pytest.raises(RpcError) as invalid:
+            app.dispatch(method, params)
+        assert invalid.value.code == INVALID_PARAMS
+
+
+def test_protocol_scalar_and_asset_input_helpers_cover_failure_edges() -> None:
+    with pytest.raises(RpcError, match="unsupported asset media type"):
+        sidecar_application._asset_representation(
+            {"mediaType": "application/unknown", "dataBase64": ""}, "source"
+        )
+    with pytest.raises(RpcError, match="not valid Base64"):
+        sidecar_application._asset_representation(
+            {"mediaType": "image/png", "dataBase64": "not-base64"}, "source"
+        )
+    png = sidecar_application._asset_representation(
+        {"mediaType": "image/png", "dataBase64": base64.b64encode(b"png").decode()},
+        "source",
+    )
+    ipe = sidecar_application._asset_representation(
+        {
+            "mediaType": "application/x-ipe",
+            "dataBase64": base64.b64encode(b"ipe").decode(),
+        },
+        "source",
+    )
+    assert png.editable is False
+    assert ipe.editable is True
+
+    assert sidecar_application._required_string({"value": ""}, "value", allow_empty=True) == ""
+    with pytest.raises(RpcError, match="value must be a string"):
+        sidecar_application._required_string({}, "value")
+    with pytest.raises(RpcError, match="value must be a string"):
+        sidecar_application._optional_string({"value": 1}, "value", default="")
+    with pytest.raises(RpcError, match="value must be an integer"):
+        sidecar_application._optional_int({"value": "1"}, "value", 0)
+    with pytest.raises(RpcError, match="value must be an integer"):
+        sidecar_application._optional_int({"value": True}, "value", 0)
+
+    with pytest.raises(RpcError, match="array of strings"):
+        sidecar_application._string_list({"value": "one"}, "value")
+    with pytest.raises(RpcError, match="must not be empty"):
+        sidecar_application._string_list({"value": []}, "value", allow_empty=False)
+    with pytest.raises(RpcError, match="array of strings"):
+        sidecar_application._string_list({"value": ["one", ""]}, "value")
+    assert sidecar_application._string_list({"value": [" one ", "one", "two"]}, "value") == [
+        "one",
+        "two",
+    ]
+    assert sidecar_application._optional_string_list({}, "value") == []
+    assert sidecar_application._optional_string_list({"value": ["one"]}, "value") == ["one"]
+    with pytest.raises(RpcError, match="must be an object"):
+        sidecar_application._object_value({"value": []}, "value")
+    assert sidecar_application._object_value({"value": {"key": "value"}}, "value") == {
+        "key": "value"
+    }
 
 
 def test_repository_status_loads_bounded_custom_math_macros(
@@ -113,6 +235,47 @@ def test_invalid_custom_math_configuration_is_a_warning(synthetic_bank: Path) ->
     status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
     assert status["mathMacros"] == {}
     assert status["studioWarnings"][0].startswith("Studio math configuration ignored:")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"macros": []},
+        {"macros": {"oversized": "x" * 1025}},
+        {"macros": {"bad": ["value"]}},
+        {"macros": {"bad": ["value", True]}},
+        {"macros": {"bad": ["value", 10]}},
+    ],
+)
+def test_invalid_custom_math_shapes_are_warnings(synthetic_bank: Path, payload: object) -> None:
+    config = synthetic_bank / ".qbank" / "studio-math.json"
+    config.write_text(json.dumps(payload), encoding="utf-8")
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"] == {}
+    assert status["studioWarnings"][0].startswith("Studio math configuration ignored:")
+
+
+def test_custom_math_configuration_must_be_a_regular_file(synthetic_bank: Path) -> None:
+    config = synthetic_bank / ".qbank" / "studio-math.json"
+    config.unlink()
+    config.mkdir()
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"] == {}
+    assert status["studioWarnings"] == ["Studio math configuration must be a regular non-link file"]
+
+
+def test_excessively_deep_custom_math_chain_is_rejected(synthetic_bank: Path) -> None:
+    names = [f"m{chr(ord('a') + index // 26)}{chr(ord('a') + index % 26)}" for index in range(34)]
+    macros = {
+        name: f"\\{names[index + 1]}" if index + 1 < len(names) else "done"
+        for index, name in enumerate(names)
+    }
+    config = synthetic_bank / ".qbank" / "studio-math.json"
+    config.write_text(json.dumps({"macros": macros}), encoding="utf-8")
+    status = StudioApplication().dispatch("repository.open", {"root": str(synthetic_bank)})
+    assert status["mathMacros"] == {}
+    assert "recursive or excessively deep" in status["studioWarnings"][0]
 
 
 @pytest.mark.parametrize(
@@ -237,9 +400,7 @@ def test_asset_inventory_exposes_safe_local_external_and_invalid_items(
         '<rect width="20" height="10" fill="#4d7898"/></svg>',
         encoding="utf-8",
     )
-    question_path = (
-        synthetic_bank / "questions" / "mathematics" / "MATH-SYN-0002.md"
-    )
+    question_path = synthetic_bank / "questions" / "mathematics" / "MATH-SYN-0002.md"
     question, _, _ = parse_question_text(question_path.read_text(encoding="utf-8"))
     question = question.model_copy(
         update={
@@ -299,6 +460,7 @@ def test_asset_inventory_exposes_safe_local_external_and_invalid_items(
             },
         )
     assert invalid.value.code == INVALID_PARAMS
+
 
 def test_session_reads_reuse_one_snapshot(
     synthetic_bank: Path, monkeypatch: pytest.MonkeyPatch

@@ -339,10 +339,11 @@ def _prepare_asset_state_samples(window: Any) -> None:
 def _studio_window(project: Path, theme: str) -> Any:
     from typing import cast
 
-    from qbank.bootstrap import create_project_services
-    from qbank.context import ProjectContext
     from qbank.desktop.controller import DesktopController, InteractiveRenderer
     from qbank.desktop.main_window import DesktopMainWindow
+
+    from qbank.bootstrap import create_project_services
+    from qbank.context import ProjectContext
     from qbank.presentation.studio.design.palette import ThemeName
 
     context = ProjectContext.from_root(project)

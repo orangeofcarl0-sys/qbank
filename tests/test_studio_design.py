@@ -715,8 +715,8 @@ def test_preview_state_pages_escape_content_and_share_theme() -> None:
 def test_studio_has_no_scattered_hex_colors_outside_design_package() -> None:
     root = Path(__file__).parents[1] / "src/qbank"
     paths = [
-        root / "desktop/main_window.py",
-        root / "desktop/widgets.py",
+        root / "legacy_qt/main_window.py",
+        root / "legacy_qt/widgets.py",
         root / "resources/desktop/editor.html",
         root / "resources/desktop/preview.html.j2",
     ]

@@ -257,7 +257,11 @@ def test_public_docs_and_examples_have_no_machine_paths() -> None:
     )
     paths = [ROOT / "README.md"]
     paths.extend((ROOT / ".agents" / "skills").glob("*/SKILL.md"))
-    paths.extend(path for path in (ROOT / "examples").rglob("*") if path.is_file())
+    paths.extend(
+        path
+        for path in (ROOT / "examples").rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    )
     assert not {
         str(path.relative_to(ROOT)): pattern.findall(
             path.read_text(encoding="utf-8", errors="ignore")

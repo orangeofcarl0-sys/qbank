@@ -156,7 +156,9 @@ class AssetService:
             reference=raw,
             display_name=Path(normalized).name,
             asset_id=stable_legacy_asset_id(raw),
-            preview_path=str(path) if exists and path.suffix.casefold() in _IMAGE_SUFFIXES else None,
+            preview_path=str(path)
+            if exists and path.suffix.casefold() in _IMAGE_SUFFIXES
+            else None,
             exists=exists,
             declared=declared,
             diagnostic=diagnostic,

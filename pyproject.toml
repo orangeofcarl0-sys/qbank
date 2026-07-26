@@ -132,6 +132,7 @@ ignore_missing_imports = true
 known_first_party = ["qbank"]
 optional_dependencies_dev_groups = ["dev", "studio-dev"]
 package_module_name_map = { PySide6 = ["PySide6"] }
+extend_exclude = ["protocol/tests"]
 
 [tool.importlinter]
 root_package = "qbank"
