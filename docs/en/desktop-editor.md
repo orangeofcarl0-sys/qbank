@@ -105,7 +105,7 @@ supports the operation:
 
 ![Logical-asset capability menu in dark mode](../assets/readme/studio-assets-dark.png)
 
-Modern Studio and Legacy consume the same application-level resource classifier. `asset.list`
+Modern Studio consumes the application-level resource classifier. `asset.list`
 classifies each reference as logical, local, external, or invalid and returns declaration state,
 existence, diagnostics, a controlled thumbnail, and typed capabilities. A local resource loads
 only when it exists inside the configured asset boundary and passes symlink-aware containment.
@@ -131,22 +131,8 @@ menus, statuses, and dialogs in both themes. Dark mode retains a light paper sur
 preview so formulas and document content preserve stable contrast.
 
 Buttons, menus, and fields provide accessible names, keyboard focus, tooltips, and explicit disabled
-states. Visual acceptance uses the current Tauri components at 100% and 125% scaling in both themes.
-Qt Legacy captures must not be used as evidence for the current Studio README or interaction model.
-See the [Studio design system](../ui/design-system.md).
-
-## QBank Studio Legacy
-
-`qbank desktop` starts the retained Qt client, QBank Studio Legacy:
-
-```powershell
-pip install "qbank[desktop]"
-qbank desktop
-```
-
-Legacy reads the same repository format but accepts only data-loss, security, or severe
-compatibility fixes. It is not the default desktop entry and does not represent the modern Studio
-interface or interaction model. No repository migration is required between the clients.
+states. Visual acceptance uses the current Tauri components at 100% and 125% scaling in both
+themes. See the [Studio design system](../ui/design-system.md).
 
 ## Development and acceptance
 

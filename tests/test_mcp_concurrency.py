@@ -121,7 +121,7 @@ def test_studio_and_mcp_concurrent_writes_share_one_lock(
     )
     studio = create_project_services(context).studio
     reached = {
-        "qbank desktop save": Event(),
+        "qbank studio save": Event(),
         "mcp_operation_commit": Event(),
     }
     original_hold = RepositoryWriteLock.hold
@@ -154,7 +154,7 @@ def test_studio_and_mcp_concurrent_writes_share_one_lock(
                 prepared.operation_id,
                 prepared.repository_revision,
             )
-            assert reached["qbank desktop save"].wait(timeout=5)
+            assert reached["qbank studio save"].wait(timeout=5)
             assert reached["mcp_operation_commit"].wait(timeout=5)
             assert not studio_future.done()
             assert not mcp_future.done()

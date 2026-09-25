@@ -40,21 +40,6 @@ def test_top_level_help_lists_all_commands(runner: CliRunner) -> None:
         assert command in result.stdout
 
 
-def test_desktop_import_failure_uses_dependency_exit_code(
-    runner: CliRunner,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import qbank.legacy_qt
-
-    def fail_launch(_project: Path | None = None) -> int:
-        raise ImportError("DLL load failed while importing QtWidgets")
-
-    monkeypatch.setattr(qbank.legacy_qt, "launch", fail_launch)
-    result = runner.invoke(app, ["desktop"])
-    assert result.exit_code == 7
-    assert "PySide6 could not be loaded" in result.stderr
-
-
 @pytest.mark.parametrize(
     "arguments",
     [

@@ -14,12 +14,12 @@ from qbank.studio_sidecar import PROTOCOL_VERSION
 ROOT = Path(__file__).parents[1]
 
 
-def test_modern_studio_and_legacy_qt_are_one_product_tree() -> None:
+def test_modern_studio_is_one_product_tree() -> None:
     assert (ROOT / "apps/studio/src").is_dir()
     assert (ROOT / "apps/studio/src-tauri").is_dir()
     assert (ROOT / "apps/studio/tests").is_dir()
     assert (ROOT / "src/qbank/studio_sidecar").is_dir()
-    assert (ROOT / "src/qbank/legacy_qt").is_dir()
+    assert not (ROOT / "src/qbank/legacy_qt").exists()
     assert not (ROOT / "src/qbank/desktop").exists()
     assert (ROOT / "protocol/studio-protocol-v1.json").is_file()
 
@@ -69,7 +69,6 @@ def test_change_impact_map_covers_every_monorepo_surface() -> None:
     impact = json.loads((ROOT / "scripts/change-impact.json").read_text(encoding="utf-8"))
     assert set(impact["scopes"]) == {
         "core",
-        "legacy",
         "sidecar",
         "studio",
         "build",

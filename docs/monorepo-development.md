@@ -11,7 +11,6 @@ qbank/
 │  ├─ commands/          # CLI presentation
 │  ├─ mcp/               # MCP presentation
 │  ├─ studio_sidecar/    # Studio Protocol 本地适配器
-│  └─ legacy_qt/         # QBank Studio Legacy
 ├─ apps/studio/
 │  ├─ src/               # Tauri WebView presentation
 │  ├─ src-tauri/         # Rust 壳、权限和安装配置
@@ -24,7 +23,7 @@ qbank/
 └─ docs/
 ```
 
-现代 Studio、CLI、MCP、Codex Skill 和 Qt Legacy 是同一 qbank 产品的不同入口。
+现代 Studio、CLI、MCP 和 Codex Skill 是同一 qbank 产品的不同入口。
 `qbank.studio_sidecar` 只把 Protocol 请求转换为 qbank application service 调用，不拥有
 Question、Paper、Schema、项目锁、事务、历史或索引实现。
 
@@ -47,7 +46,7 @@ Python wheel、Studio 安装器和便携包必须由同一干净 Git 提交生�
 python scripts/check.py fast
 ```
 
-读取工作区改动并按 `scripts/change-impact.json` 选择受影响的 Python、Qt Legacy、
+读取工作区改动并按 `scripts/change-impact.json` 选择受影响的 Python、
 sidecar、Protocol、Studio、构建或文档单元。普通修改默认只运行这一层；也可用
 `--scope studio` 等参数显式限定。
 
@@ -95,8 +94,8 @@ Tools 与 Windows SDK。构建脚本不会为检测目的自动安装备用工�
 
 项目不使用 Nx、Turborepo 或后台构建服务。Node、Cargo 和 Python 仍使用各自原生锁文件。
 
-## Qt Legacy 维护边界
+## Legacy 客户端移除边界
 
-`qbank desktop` 启动 QBank Studio Legacy。Legacy 与现代 Studio 使用相同题库格式和
-application services，但只接受数据损坏、安全或严重兼容性修复。新交互默认进入现代
-Studio，不对题库执行不可逆迁移。
+Qt 桌面客户端（QBank Studio Legacy）已在 `0.3.0` 中彻底移除，现代 Tauri Studio 是唯一
+桌面客户端。决定与影响范围见 [ADR 0009](adr/0009-remove-qt-legacy-client.md)；描述
+`0.2.x` 历史版本的兼容性文档保留其原始记录。

@@ -91,7 +91,7 @@ qbank codex install-skill --skill qbank-deliver --user --update
 4. 临时 AI 输出写入 `build/ai/`，生成试卷定义写入 `papers/generated/`，最终产物写入 `exports/`。
 5. 保留来源；无法确认的信息保持 `draft`，不得编造答案或来源事实。
 6. 未明确授权不得删除或覆盖。
-7. 无人值守流程不得启动 `qbank preview --serve` 或 `qbank desktop`。
+7. 无人值守流程不得启动 `qbank preview --serve`。
 
 Studio 与 Codex 保持模块隔离：两者并列调用应用服务，桌面控制器不依赖 Codex 服务，Codex
 服务也不依赖 Qt。

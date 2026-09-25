@@ -97,7 +97,7 @@ outer layer has explicitly authorized the write.
 4. Put temporary AI output in `build/ai/`, generated paper definitions in `papers/generated/`, and final artifacts in `exports/`.
 5. Preserve source locations; keep uncertain facts `draft` and never invent answers or provenance.
 6. Do not delete or overwrite without explicit authorization.
-7. Unattended workflows must not launch `qbank preview --serve` or `qbank desktop`.
+7. Unattended workflows must not launch `qbank preview --serve`.
 
 Studio and Codex remain modular presentation adapters. The desktop controller does not depend on
 Codex services, and Codex services do not depend on Qt.

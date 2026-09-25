@@ -38,8 +38,9 @@ pip install -e ".[dev,studio-dev]"
 配置、Schema、示例或限制说明，不需要为未受影响的部分制造占位文字。受管用户文档在
 `docs/zh-CN/` 与 `docs/en/` 成对维护。
 
-`0.1.x` 已不再支持。`0.2.x` 只接受安全、数据损坏和阻断性兼容修复，其中 Qt 桌面端作为
-QBank Studio Legacy 维护；新功能进入当前 `0.3.x` 开发线。已发布 tag 不会移动，修复通过
+`0.1.x` 已不再支持。`0.2.x` 只接受安全、数据损坏和阻断性兼容修复；新功能进入当前
+`0.3.x` 开发线。Qt 桌面客户端（QBank Studio Legacy）已在 `0.3.0` 移除，见
+[ADR 0009](docs/adr/0009-remove-qt-legacy-client.md)。已发布 tag 不会移动，修复通过
 新版本提供。软件版本与 Question、Asset、Paper 等数据 Schema 版本独立演进。
 
 ## 提交前检查

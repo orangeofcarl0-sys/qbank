@@ -149,7 +149,7 @@ qbank preview
 ```
 
 DOCX 由系统 Pandoc 生成。缺失时 DOCX 构建以退出码 7 失败，Markdown 和 HTML 不受影响。
-`qbank preview --serve` 和 `qbank desktop` 是交互式阻塞命令，不得由无人值守自动化启动。
+`qbank preview --serve` 是交互式阻塞命令，不得由无人值守自动化启动。
 
 ## 诊断与索引维护
 

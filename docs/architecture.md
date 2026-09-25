@@ -11,7 +11,7 @@ the question bank.
 The dependency direction is inward:
 
 ```text
-presentation (CLI / MCP / Studio / Legacy Qt) -> application -> domain
+presentation (CLI / MCP / Studio) -> application -> domain
                               ^
                               |
                   infrastructure adapters
@@ -31,8 +31,8 @@ directories and runtime entry points:
 
 Skills are guidance artifacts, not runtime data adapters. An agent follows a Skill
 and then chooses CLI or MCP; it never reaches the Markdown repository through the
-Skill itself. Modern Studio, CLI, MCP, and Legacy are peer adapters, not nested
-products or independent backends.
+Skill itself. Modern Studio, CLI, and MCP are peer adapters, not nested products or
+independent backends.
 
 ## Layers and responsibilities
 
@@ -99,12 +99,9 @@ Protocol v1. The sidecar translates fixed JSON-RPC methods into the same
 application services composed by `bootstrap`; it does not define a second
 Question model, Schema, lock, transaction, history store, or index.
 
-`qbank.legacy_qt` is the retained QBank Studio Legacy presentation adapter. Its
-Qt Widgets shell embeds an offline CodeMirror 6 bundle and a `QWebEngineView`;
-narrow `QWebChannel` bridges carry source changes and a closed set of asset
-actions. Legacy Qt and the modern Studio share repository formats and
-application semantics. Neither has an HTTP backend or desktop-specific
-persistence model.
+The Qt Legacy client (`qbank.legacy_qt`) was removed in `0.3.0`
+(see [ADR 0009](adr/0009-remove-qt-legacy-client.md)); the modern Tauri Studio is the only
+desktop presentation adapter.
 
 ### Bootstrap
 

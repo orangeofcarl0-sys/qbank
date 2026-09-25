@@ -35,7 +35,6 @@ from qbank.commands.codex import (
     codex_mcp_check_command,
     codex_uninstall_mcp_command,
 )
-from qbank.commands.desktop import desktop_command
 from qbank.commands.mcp import mcp_command
 from qbank.commands.project import (
     doctor_command,
@@ -104,7 +103,6 @@ app.command("query")(query_command)
 app.command("search")(search_command)
 app.command("patch")(patch_command)
 app.command("delete")(delete_command)
-app.command("desktop")(desktop_command)
 app.command("mcp")(mcp_command)
 index_app.command("rebuild")(index_rebuild_command)
 app.command("preview")(preview_command)

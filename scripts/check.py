@@ -96,8 +96,6 @@ def python_targets(paths: set[str], scopes: set[str]) -> list[str]:
     targets: list[str] = []
     if "core" in scopes:
         targets.extend(["src/qbank", "tests/test_architecture_contracts.py"])
-    if "legacy" in scopes:
-        targets.append("src/qbank/legacy_qt")
     if "sidecar" in scopes:
         targets.extend(["src/qbank/studio_sidecar", "tests/studio_sidecar", "protocol/tests"])
     if "build" in scopes:
@@ -129,8 +127,6 @@ def run_fast(scopes: set[str], paths: set[str]) -> None:
                 "tests/test_cli.py",
             ]
         )
-    if "legacy" in scopes:
-        run([sys.executable, "-m", "pytest", "-q", "tests/test_desktop_entrypoints.py"])
     if "sidecar" in scopes:
         run(
             [

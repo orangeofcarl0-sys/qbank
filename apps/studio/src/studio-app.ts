@@ -1,7 +1,7 @@
-import { ask, open, save as chooseSavePath } from "@tauri-apps/plugin-dialog";
+import { ask, open } from "@tauri-apps/plugin-dialog";
 import { diff_match_patch } from "diff-match-patch";
 import Vditor from "vditor";
-import { SidecarRpcError, TauriRpcBridge } from "./bridge";
+import { TauriRpcBridge } from "./bridge";
 import { EditorBuffer, type EditorMode } from "./editor-buffer";
 import { icon } from "./icons";
 import {
@@ -12,8 +12,6 @@ import {
 } from "./secure-preview";
 import {
   bodyForPreview,
-  insertAssetReference,
-  nextAssetId,
   rewriteBackslashMathHtml,
 } from "./markdown";
 import {
@@ -25,20 +23,26 @@ import {
   filtersToRpc,
   normalizeFilters,
   removeFilterChip,
-  type QueryFilters,
   type SavedView,
-  type TagOverview,
   type TagUsage,
-  type TaxonomyTag,
 } from "./advanced-management";
+import {
+  escapeHtml,
+  formatTimestamp,
+  isRepairableIndexError,
+} from "./ui-utils";
+import { AssetActions } from "./asset-actions";
+import { TagManagement } from "./tag-management";
+import { PaperManagement } from "./paper-management";
+import {
+  COMMON_MATH_MACROS,
+  EMPTY_STATE,
+  type AppState,
+} from "./app-state";
 import type {
   AssetItem,
   HistoryEntry,
-  InitializeResult,
   JsonValue,
-  PaperDocument,
-  PaperSummary,
-  PaperValidationResult,
   QuestionDocument,
   QuestionMutationResult,
   QuestionSummary,
@@ -49,69 +53,11 @@ import type {
   ValidationResult,
 } from "./protocol";
 
-interface AppState {
-  initialized: InitializeResult | null;
-  repository: RepositoryStatus | null;
-  questions: QuestionSummary[];
-  visibleQuestions: QuestionSummary[];
-  current: QuestionDocument | null;
-  assets: AssetItem[];
-  history: HistoryEntry[];
-  mode: EditorMode;
-  theme: "light" | "dark";
-  loading: boolean;
-  validation: ValidationResult | null;
-  selectedQuestionIds: Set<string>;
-  currentPaper: PaperDocument | null;
-  papers: PaperSummary[];
-  searchText: string;
-  filters: QueryFilters;
-  views: SavedView[];
-  tags: TagUsage[];
-  selectedView: string;
-  selectedViewBaseline: QueryFilters | null;
-  specialViewIds: Set<string> | null;
-}
-
-const EMPTY_STATE: AppState = {
-  initialized: null,
-  repository: null,
-  questions: [],
-  visibleQuestions: [],
-  current: null,
-  assets: [],
-  history: [],
-  mode: "split",
-  theme: "light",
-  loading: false,
-  validation: null,
-  selectedQuestionIds: new Set(),
-  currentPaper: null,
-  papers: [],
-  searchText: "",
-  filters: normalizeFilters(EMPTY_FILTERS),
-  views: [],
-  tags: [],
-  selectedView: "all",
-  selectedViewBaseline: normalizeFilters(EMPTY_FILTERS),
-  specialViewIds: null,
-};
-
-const COMMON_MATH_MACROS: Record<string, string | [string, number]> = {
-  RR: "\\mathbb{R}",
-  NN: "\\mathbb{N}",
-  ZZ: "\\mathbb{Z}",
-  QQ: "\\mathbb{Q}",
-  CC: "\\mathbb{C}",
-  abs: ["\\left|#1\\right|", 1],
-  norm: ["\\left\\lVert#1\\right\\rVert", 1],
-  qbankasset: "\\mathrm{asset}",
-};
 
 export class StudioApp {
-  private readonly bridge: RpcBridge;
-  private readonly buffer = new EditorBuffer();
-  private state: AppState = { ...EMPTY_STATE, selectedQuestionIds: new Set() };
+  readonly bridge: RpcBridge;
+  readonly buffer = new EditorBuffer();
+  state: AppState = { ...EMPTY_STATE, selectedQuestionIds: new Set() };
   private editor: Vditor | null = null;
   private editorReady = false;
   private editorGeneration = 0;
@@ -124,6 +70,9 @@ export class StudioApp {
   private previewTimer = 0;
   private searchTimer = 0;
   private repositoryGeneration = 0;
+  private readonly tagManagement = new TagManagement(this);
+  private readonly paperManagement = new PaperManagement(this);
+  private readonly assetActions = new AssetActions(this);
 
   constructor(
     private readonly root: HTMLElement,
@@ -523,7 +472,7 @@ export class StudioApp {
     }
   }
 
-  private async refreshFilteredQuestions(): Promise<void> {
+  async refreshFilteredQuestions(): Promise<void> {
     if (this.state.repository === null) return;
     const requested = normalizeFilters(this.state.filters);
     try {
@@ -542,13 +491,13 @@ export class StudioApp {
     }
   }
 
-  private repositoryRevision(): string {
+  repositoryRevision(): string {
     const revision = this.state.current?.revision ?? this.state.repository?.revision;
     if (revision === undefined) throw new Error("题库尚未就绪");
     return revision;
   }
 
-  private async refreshQuestionInventory(selectId?: string): Promise<void> {
+  async refreshQuestionInventory(selectId?: string): Promise<void> {
     this.state.repository = await this.bridge.request<RepositoryStatus>("repository.status");
     this.state.questions = await this.bridge.request<QuestionSummary[]>("question.list", {
       offset: 0,
@@ -641,7 +590,7 @@ export class StudioApp {
     this.state.searchText = this.state.filters.text;
   }
 
-  private writeFilterControls(): void {
+  writeFilterControls(): void {
     const set = (id: string, value: string | number | null): void => {
       const select = this.element(id) as HTMLSelectElement;
       const normalized = value === null ? "" : String(value);
@@ -891,7 +840,7 @@ export class StudioApp {
     await this.refreshFilteredQuestions();
   }
 
-  private async promptTextAction(options: {
+  async promptTextAction(options: {
     title: string;
     description: string;
     primaryLabel: string;
@@ -955,258 +904,13 @@ export class StudioApp {
     return { primary: primary.value.trim(), secondary: secondary.value.trim() };
   }
 
-  private openTagManager(): void {
-    this.renderTagManager();
-    (this.element("tag-manager-dialog") as HTMLDialogElement).showModal();
-  }
-
-  private renderTagManager(): void {
-    const host = this.element("tag-manager-list");
-    const query = (this.element("tag-manager-search") as HTMLInputElement).value
-      .trim()
-      .toLocaleLowerCase("zh-CN");
-    const tags = this.state.tags.filter((tag) => {
-      const values = [
-        tag.slug, tag.metadata?.name_zh, tag.metadata?.name_en,
-        ...(tag.metadata?.aliases ?? []),
-      ].filter((value): value is string => typeof value === "string");
-      return !query || values.some((value) => value.toLocaleLowerCase("zh-CN").includes(query));
-    });
-    host.innerHTML = "";
-    for (const tag of tags) {
-      const row = document.createElement("article");
-      row.className = "management-row";
-      row.innerHTML = `<div><strong>${escapeHtml(displayTag(tag))}</strong><span>${escapeHtml(tag.slug)} · ${tag.count} 题 · ${escapeHtml(tag.metadata?.status ?? "未注册")}</span><small>${escapeHtml(tag.metadata?.description ?? "未填写说明")}</small></div><div class="row-actions"></div>`;
-      const actions = row.querySelector<HTMLElement>(".row-actions");
-      const addAction = (label: string, callback: () => void): void => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = label;
-        button.addEventListener("click", callback);
-        actions?.append(button);
-      };
-      addAction("编辑", () => void this.editTag(tag));
-      addAction("重命名", () => void this.renameTag(tag.slug));
-      addAction("合并", () => void this.mergeTag(tag.slug));
-      addAction("删除", () => void this.deleteTag(tag.slug));
-      host.append(row);
-    }
-    if (tags.length === 0) host.innerHTML = '<p class="muted">没有匹配标签</p>';
-  }
-
-  private async editTag(usage?: TagUsage): Promise<void> {
-    const dialog = this.element("tag-editor-dialog") as HTMLDialogElement;
-    const metadata = usage?.metadata;
-    this.element("tag-editor-title").textContent = metadata === undefined ? "新建标签" : "编辑标签";
-    const slug = this.element("tag-editor-slug") as HTMLInputElement;
-    slug.value = usage?.slug ?? "";
-    slug.readOnly = metadata !== undefined;
-    (this.element("tag-editor-name-zh") as HTMLInputElement).value = metadata?.name_zh ?? "";
-    (this.element("tag-editor-name-en") as HTMLInputElement).value = metadata?.name_en ?? "";
-    (this.element("tag-editor-aliases") as HTMLInputElement).value = metadata?.aliases.join(", ") ?? "";
-    (this.element("tag-editor-description") as HTMLTextAreaElement).value = metadata?.description ?? "";
-    (this.element("tag-editor-status") as HTMLSelectElement).value = metadata?.status ?? "active";
-    dialog.returnValue = "";
-    dialog.showModal();
-    await new Promise<void>((resolve) => dialog.addEventListener("close", () => resolve(), { once: true }));
-    if (dialog.returnValue !== "confirm") return;
-    const tag: TaxonomyTag = {
-      slug: slug.value.trim(),
-      name_zh: (this.element("tag-editor-name-zh") as HTMLInputElement).value.trim() || undefined,
-      name_en: (this.element("tag-editor-name-en") as HTMLInputElement).value.trim() || undefined,
-      aliases: (this.element("tag-editor-aliases") as HTMLInputElement).value
-        .split(",").map((item) => item.trim()).filter(Boolean),
-      description: (this.element("tag-editor-description") as HTMLTextAreaElement).value.trim() || undefined,
-      status: (this.element("tag-editor-status") as HTMLSelectElement).value as TaxonomyTag["status"],
-    };
-    await this.runTaxonomyMutation("taxonomy.update", {
-      tag: {
-        slug: tag.slug,
-        name_zh: tag.name_zh ?? null,
-        name_en: tag.name_en ?? null,
-        aliases: tag.aliases,
-        description: tag.description ?? null,
-        status: tag.status,
-      },
-    });
-  }
-
-  private async renameTag(slug: string): Promise<void> {
-    const values = await this.promptTextAction({
-      title: "重命名标签",
-      description: `将 ${slug} 原子重命名，并在所有已引用题目中同步。`,
-      primaryLabel: "新 slug",
-    });
-    if (values === null) return;
-    await this.runTaxonomyMutation("taxonomy.rename", { old: slug, new: values.primary });
-  }
-
-  private async mergeTag(source: string): Promise<void> {
-    const values = await this.promptTextAction({
-      title: "合并标签",
-      description: `将 ${source} 的全部引用合并到目标标签。`,
-      primaryLabel: "目标 slug",
-      suggestTags: true,
-    });
-    if (values === null) return;
-    await this.runTaxonomyMutation("taxonomy.merge", { source, target: values.primary });
-  }
-
-  private async deleteTag(slug: string): Promise<void> {
-    const confirmed = await ask(
-      `删除标签“${slug}”并从所有题目移除该引用？此操作会写入统一历史。`,
-      { title: "删除标签", kind: "warning" },
-    );
-    if (!confirmed) return;
-    await this.runTaxonomyMutation("taxonomy.delete", { value: slug });
-  }
-
-  private async runTaxonomyMutation(
-    method: string,
-    params: Record<string, JsonValue>,
-  ): Promise<void> {
-    try {
-      const result = await this.bridge.request<QuestionMutationResult>(method, {
-        ...params,
-        expectedRevision: this.repositoryRevision(),
-      });
-      if (!result.ok || result.revision === undefined) return;
-      this.updateRepositoryRevision(result.revision);
-      await this.refreshQuestionInventory();
-      this.renderTagManager();
-      this.toast("标签操作已提交", "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async openTagOverview(): Promise<void> {
-    const overview = await this.bridge.request<TagOverview>("taxonomy.overview", { topN: 20 });
-    const host = this.element("tag-overview-content");
-    host.innerHTML = "";
-    const section = (title: string): HTMLElement => {
-      const wrapper = document.createElement("section");
-      wrapper.innerHTML = `<h3>${escapeHtml(title)}</h3>`;
-      host.append(wrapper);
-      return wrapper;
-    };
-    const frequencies = section("频次");
-    const frequencyGrid = document.createElement("div");
-    frequencyGrid.className = "overview-frequency";
-    for (const tag of overview.frequencies) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.innerHTML = `<span>${escapeHtml(displayTag(tag))}</span><strong>${tag.count}</strong>`;
-      button.addEventListener("click", () => this.applyOverviewTopics([tag.slug]));
-      frequencyGrid.append(button);
-    }
-    frequencies.append(frequencyGrid);
-    const pairs = section("共现");
-    for (const item of overview.cooccurrences.slice(0, 20)) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "overview-cell";
-      button.textContent = `${item.left} + ${item.right} · ${item.count}`;
-      button.addEventListener("click", () => this.applyOverviewTopics([item.left, item.right]));
-      pairs.append(button);
-    }
-    this.renderCoverage(section("年份覆盖"), overview.year_coverage, "year");
-    this.renderCoverage(section("章节覆盖"), overview.chapter_coverage, "chapter");
-    (this.element("tag-overview-dialog") as HTMLDialogElement).showModal();
-  }
-
-  private renderCoverage(
-    host: HTMLElement,
-    cells: TagOverview["year_coverage"],
-    key: "year" | "chapter",
-  ): void {
-    const grid = document.createElement("div");
-    grid.className = "coverage-grid";
-    for (const cell of cells.slice(0, 80)) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "overview-cell";
-      button.textContent = `${cell.axis} · ${cell.tag} · ${cell.count}`;
-      button.addEventListener("click", () => {
-        this.state.selectedView = "all";
-        this.state.specialViewIds = null;
-        this.state.filters = normalizeFilters({
-          ...EMPTY_FILTERS,
-          topics: [cell.tag],
-          [key]: key === "year" ? Number(cell.axis) : cell.axis,
-        });
-        (this.element("tag-overview-dialog") as HTMLDialogElement).close();
-        this.writeFilterControls();
-        void this.refreshFilteredQuestions();
-      });
-      grid.append(button);
-    }
-    host.append(grid);
-  }
-
-  private applyOverviewTopics(topics: string[]): void {
-    this.state.selectedView = "all";
-    this.state.specialViewIds = null;
-    this.state.filters = normalizeFilters({ ...EMPTY_FILTERS, topics, topicMode: "and" });
-    (this.element("tag-overview-dialog") as HTMLDialogElement).close();
-    this.writeFilterControls();
-    void this.refreshFilteredQuestions();
-  }
-
-  private async bulkEditTags(): Promise<void> {
-    if (this.state.selectedQuestionIds.size === 0) return;
-    const values = await this.promptTextAction({
-      title: "批量修改标签",
-      description: `仅修改已明确选择的 ${this.state.selectedQuestionIds.size} 道题。`,
-      primaryLabel: "添加（逗号分隔）",
-      secondaryLabel: "移除（逗号分隔）",
-      suggestTags: true,
-    });
-    if (values === null) return;
-    await this.runBulkMutation("taxonomy.bulkEdit", {
-      add: splitCommaValues(values.primary),
-      remove: splitCommaValues(values.secondary),
-    });
-  }
-
-  private async bulkUpdateField(field: "status" | "chapter"): Promise<void> {
-    if (this.state.selectedQuestionIds.size === 0) return;
-    const values = await this.promptTextAction({
-      title: field === "status" ? "批量修改状态" : "批量修改章节",
-      description: `仅修改已明确选择的 ${this.state.selectedQuestionIds.size} 道题。`,
-      primaryLabel: field === "status" ? "状态" : "章节",
-    });
-    if (values === null) return;
-    await this.runBulkMutation("question.bulkUpdate", { set: { [field]: values.primary } });
-  }
-
-  private async runBulkMutation(
-    method: string,
-    params: Record<string, JsonValue>,
-  ): Promise<void> {
-    try {
-      const count = this.state.selectedQuestionIds.size;
-      const result = await this.bridge.request<QuestionMutationResult>(method, {
-        ...params,
-        questionIds: [...this.state.selectedQuestionIds],
-        expectedRevision: this.repositoryRevision(),
-      });
-      if (!result.ok || result.revision === undefined) return;
-      this.updateRepositoryRevision(result.revision);
-      await this.refreshQuestionInventory();
-      this.toast(`已更新 ${count} 道题`, "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private updateRepositoryRevision(revision: string): void {
+  updateRepositoryRevision(revision: string): void {
     if (this.state.repository !== null) this.state.repository.revision = revision;
     if (this.state.current !== null) this.state.current.revision = revision;
     if (this.state.currentPaper !== null) this.state.currentPaper.revision = revision;
   }
 
-  private async promptQuestionDetails(
+  async promptQuestionDetails(
     title: string,
     defaults: { id?: string; name?: string; idPattern?: boolean; nameVisible?: boolean } = {},
   ): Promise<{ id: string; name: string } | null> {
@@ -1360,157 +1064,6 @@ export class StudioApp {
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
     }
-  }
-
-  private async openPaperManager(): Promise<void> {
-    try {
-      this.state.papers = await this.bridge.request<PaperSummary[]>("paper.list");
-      const select = this.element("paper-select") as HTMLSelectElement;
-      select.innerHTML = '<option value="">选择试卷…</option>' + this.state.papers.map((paper) => `<option value="${escapeHtml(paper.path)}">${escapeHtml(paper.title)}</option>`).join("");
-      this.renderPaperSummary();
-      (this.element("paper-dialog") as HTMLDialogElement).showModal();
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async selectPaper(): Promise<void> {
-    const path = (this.element("paper-select") as HTMLSelectElement).value;
-    if (!path) {
-      this.state.currentPaper = null;
-      this.renderPaperSummary();
-      return;
-    }
-    this.state.currentPaper = await this.bridge.request<PaperDocument>("paper.get", { path });
-    this.renderPaperSummary();
-  }
-
-  private renderPaperSummary(): void {
-    const host = this.element("paper-summary");
-    const paperDocument = this.state.currentPaper;
-    if (paperDocument === null) {
-      host.innerHTML = '<p class="muted">选择现有试卷，或用已勾选题目新建试卷。</p>';
-      return;
-    }
-    host.innerHTML = "";
-    const sections = Array.isArray(paperDocument.paper.sections) ? paperDocument.paper.sections : [];
-    sections.forEach((rawSection, sectionIndex) => {
-      if (rawSection === null || typeof rawSection !== "object" || Array.isArray(rawSection)) return;
-      const section = rawSection as Record<string, JsonValue>;
-      const sectionElement = document.createElement("section");
-      sectionElement.className = "paper-section-editor";
-      sectionElement.innerHTML = `<h3>${escapeHtml(String(section.title ?? `第 ${sectionIndex + 1} 节`))}</h3>`;
-      const questions = Array.isArray(section.questions) ? section.questions : [];
-      questions.forEach((rawQuestion, questionIndex) => {
-        if (rawQuestion === null || typeof rawQuestion !== "object" || Array.isArray(rawQuestion)) return;
-        const question = rawQuestion as Record<string, JsonValue>;
-        const row = document.createElement("div");
-        row.className = "paper-question-row";
-        row.innerHTML = `<span>${escapeHtml(String(question.id))}</span><label>分值 <input type="number" min="0.1" step="0.5" value="${escapeHtml(String(question.score))}" /></label><button type="button" aria-label="上移">↑</button><button type="button" aria-label="下移">↓</button>`;
-        row.querySelector("input")?.addEventListener("change", (event) => {
-          question.score = Number((event.target as HTMLInputElement).value);
-        });
-        const buttons = row.querySelectorAll("button");
-        buttons[0]?.addEventListener("click", () => {
-          if (questionIndex > 0) [questions[questionIndex - 1], questions[questionIndex]] = [questions[questionIndex], questions[questionIndex - 1]];
-          this.renderPaperSummary();
-        });
-        buttons[1]?.addEventListener("click", () => {
-          if (questionIndex + 1 < questions.length) [questions[questionIndex + 1], questions[questionIndex]] = [questions[questionIndex], questions[questionIndex + 1]];
-          this.renderPaperSummary();
-        });
-        sectionElement.append(row);
-      });
-      host.append(sectionElement);
-    });
-  }
-
-  private async createPaper(): Promise<void> {
-    const selected = [...this.state.selectedQuestionIds];
-    if (selected.length === 0) return;
-    const values = await this.promptQuestionDetails("新建试卷", {
-      id: "generated/studio-paper.yaml",
-      name: "新试卷",
-      idPattern: false,
-    });
-    if (values === null) return;
-    try {
-      await this.bridge.request("paper.create", {
-        path: values.id,
-        title: values.name,
-        questionIds: selected,
-        expectedRevision: this.repositoryRevision(),
-      });
-      this.state.papers = await this.bridge.request<PaperSummary[]>("paper.list");
-      const created = this.state.papers.find((paper) => paper.path.endsWith(values.id.replaceAll("\\", "/")) || paper.title === values.name);
-      if (created !== undefined) {
-        (this.element("paper-select") as HTMLSelectElement).value = created.path;
-        this.state.currentPaper = await this.bridge.request<PaperDocument>("paper.get", { path: created.path });
-      }
-      this.renderPaperSummary();
-      this.toast("试卷已创建", "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async addSelectedToPaper(): Promise<void> {
-    const paper = this.state.currentPaper;
-    const selected = [...this.state.selectedQuestionIds];
-    if (paper === null || selected.length === 0) return;
-    await this.bridge.request("paper.addQuestions", {
-      path: paper.path,
-      questionIds: selected,
-      expectedRevision: paper.revision,
-    });
-    this.state.currentPaper = await this.bridge.request<PaperDocument>("paper.get", { path: paper.path });
-    this.renderPaperSummary();
-    this.toast("所选题目已加入试卷", "success");
-  }
-
-  private async savePaper(): Promise<void> {
-    const paper = this.state.currentPaper;
-    if (paper === null) return;
-    const result = await this.bridge.request<{ revision: string; paper: Record<string, JsonValue> }>("paper.save", {
-      path: paper.path,
-      paper: paper.paper,
-      expectedRevision: paper.revision,
-    });
-    this.state.currentPaper = { ...paper, paper: result.paper, revision: result.revision };
-    this.toast("试卷顺序与分值已保存", "success");
-  }
-
-  private async validatePaper(): Promise<void> {
-    const paper = this.state.currentPaper;
-    if (paper === null) return;
-    const report = await this.bridge.request<PaperValidationResult>("paper.validate", { path: paper.path });
-    const host = this.element("paper-diagnostics");
-    host.textContent = report.ok ? "试卷校验通过" : report.issues.map((item) => `${item.code}: ${item.message}`).join("\n");
-    host.className = `paper-diagnostics ${report.ok ? "success" : "error"}`;
-  }
-
-  private async exportPaper(withSolutions: boolean): Promise<void> {
-    const paper = this.state.currentPaper;
-    if (paper === null) return;
-    const output = await chooseSavePath({
-      title: withSolutions ? "导出答案版试卷" : "导出学生版试卷",
-      defaultPath: `${paper.path.split("/").at(-1)?.replace(/\.ya?ml$/i, "") ?? "paper"}-${withSolutions ? "solutions" : "student"}.html`,
-      filters: [{ name: "HTML", extensions: ["html"] }],
-    });
-    if (typeof output !== "string") return;
-    await this.bridge.request("paper.build", {
-      path: paper.path,
-      format: "html",
-      output,
-      options: {
-        with_answers: withSolutions,
-        with_solutions: withSolutions,
-        with_rubric: withSolutions,
-        show_ids: false,
-      },
-      expectedRevision: paper.revision,
-    });
-    this.toast(`已导出${withSolutions ? "答案版" : "学生版"}试卷`, "success");
   }
 
   private normalizeSearchRow(row: QuestionSummary): QuestionSummary {
@@ -1873,7 +1426,7 @@ export class StudioApp {
     }
   }
 
-  private async resolveDirtyState(action: string): Promise<boolean> {
+  async resolveDirtyState(action: string): Promise<boolean> {
     if (!this.buffer.snapshot().dirty) return true;
     const dialog = this.element("dirty-state-dialog") as HTMLDialogElement;
     this.element("dirty-state-description").textContent =
@@ -1894,7 +1447,7 @@ export class StudioApp {
     await this.reloadCurrentQuestion(questionId, false, refreshPreview);
   }
 
-  private async reloadCurrentQuestion(
+  async reloadCurrentQuestion(
     questionId: string,
     resetSource: boolean,
     refreshPreview = true,
@@ -1956,124 +1509,6 @@ export class StudioApp {
     await this.createAsset(file);
   }
 
-  private async createAsset(file: File): Promise<void> {
-    if (!(await this.resolveDirtyState("创建图形资产"))) return;
-    const current = this.state.current;
-    if (current === null) return;
-    const snapshot = this.buffer.snapshot();
-    const ids = this.state.assets.map((item) => item.assetId);
-    const assetId = nextAssetId(ids);
-    const source = insertAssetReference(snapshot.source, assetId);
-    const dataBase64 = await fileBase64(file);
-    try {
-      const result = await this.bridge.request<{ ok: boolean; revision: string }>("asset.create", {
-        questionId: current.question.id as string,
-        assetId,
-        source,
-        mediaType: file.type || "image/png",
-        dataBase64,
-        expectedRevision: current.revision,
-      });
-      if (!result.ok) throw new Error("资产创建未通过校验");
-      await this.reloadCurrentQuestion(current.question.id as string, true);
-      this.toast(`已创建图形资产 ${assetId}`, "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async assetAction(asset: AssetItem, action: string): Promise<void> {
-    if (!(await this.resolveDirtyState("执行资源操作"))) return;
-    const current = this.state.current;
-    const questionId = current?.question.id;
-    if (current === null || typeof questionId !== "string") return;
-    const expectedRevision = current.revision;
-    const assetId = asset.assetId;
-    try {
-      if (action === "replace") {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "image/*,.ipe,.pdf";
-        input.addEventListener("change", () => {
-          const file = input.files?.[0];
-          if (file !== undefined) void this.replaceAsset(questionId, assetId, file);
-        });
-        input.click();
-        return;
-      }
-      if (action === "replace_clipboard") {
-        await this.replaceAssetFromClipboard(questionId, assetId);
-        return;
-      }
-      if (action === "render") {
-        await this.bridge.request("asset.render", {
-          questionId,
-          assetId,
-          formats: ["svg", "png", "pdf"],
-          expectedRevision,
-        });
-      } else if (action === "reconcile") {
-        await this.bridge.request("asset.reconcile", {
-          questionId,
-          assetId,
-          expectedRevision,
-        });
-      } else {
-        await this.bridge.request("asset.open", {
-          questionId,
-          assetId,
-          action,
-          reference: asset.kind === "logical" ? "" : asset.reference,
-          expectedRevision,
-        });
-      }
-      if (action === "render" || action === "reconcile") {
-        await this.reloadCurrentQuestion(questionId, true);
-      }
-      this.toast("资产操作已完成", "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async replaceAsset(questionId: string, assetId: string, file: File): Promise<void> {
-    const current = this.state.current;
-    if (current === null || current.question.id !== questionId) return;
-    try {
-      await this.bridge.request("asset.replace", {
-        questionId,
-        assetId,
-        mediaType: file.type || "image/png",
-        dataBase64: await fileBase64(file),
-        expectedRevision: current.revision,
-      });
-      await this.reloadCurrentQuestion(questionId, true);
-      this.toast("已添加新的资源版本", "success");
-    } catch (error) {
-      this.toast(error instanceof Error ? error.message : String(error), "error");
-    }
-  }
-
-  private async replaceAssetFromClipboard(questionId: string, assetId: string): Promise<void> {
-    if (navigator.clipboard?.read === undefined) {
-      throw new Error("当前 WebView 不支持读取剪贴板图片");
-    }
-    const items = await navigator.clipboard.read();
-    for (const item of items) {
-      const mediaType = item.types.find((type) => type.startsWith("image/"));
-      if (mediaType === undefined) continue;
-      const blob = await item.getType(mediaType);
-      const extension = mediaType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
-      await this.replaceAsset(
-        questionId,
-        assetId,
-        new File([blob], `clipboard.${extension}`, { type: mediaType }),
-      );
-      return;
-    }
-    throw new Error("剪贴板中没有可用图片");
-  }
-
   private showFormulaMenu(event: MouseEvent): void {
     if (!(event.target instanceof Element)) return;
     const formula = event.target.closest<HTMLElement>("[data-math]");
@@ -2125,6 +1560,67 @@ export class StudioApp {
     } catch (error) {
       this.toast(error instanceof Error ? error.message : String(error), "error");
     }
+  }
+
+
+  private openTagManager(): void {
+    this.tagManagement.openTagManager();
+  }
+
+  private renderTagManager(): void {
+    this.tagManagement.renderTagManager();
+  }
+
+  private editTag(usage?: TagUsage): Promise<void> {
+    return this.tagManagement.editTag(usage);
+  }
+
+  private openTagOverview(): Promise<void> {
+    return this.tagManagement.openTagOverview();
+  }
+
+  private async bulkEditTags(): Promise<void> {
+    return this.tagManagement.bulkEditTags();
+  }
+
+  private async bulkUpdateField(field: "status" | "chapter"): Promise<void> {
+    return this.tagManagement.bulkUpdateField(field);
+  }
+
+  private async openPaperManager(): Promise<void> {
+    return this.paperManagement.openPaperManager();
+  }
+
+  private async selectPaper(): Promise<void> {
+    return this.paperManagement.selectPaper();
+  }
+
+  private async createPaper(): Promise<void> {
+    return this.paperManagement.createPaper();
+  }
+
+  private async addSelectedToPaper(): Promise<void> {
+    return this.paperManagement.addSelectedToPaper();
+  }
+
+  private async savePaper(): Promise<void> {
+    return this.paperManagement.savePaper();
+  }
+
+  private async validatePaper(): Promise<void> {
+    return this.paperManagement.validatePaper();
+  }
+
+  private async exportPaper(withSolutions: boolean): Promise<void> {
+    return this.paperManagement.exportPaper(withSolutions);
+  }
+
+  private async createAsset(file: File): Promise<void> {
+    return this.assetActions.createAsset(file);
+  }
+
+  private async assetAction(asset: AssetItem, action: string): Promise<void> {
+    return this.assetActions.assetAction(asset, action);
   }
 
   private renderRepository(): void {
@@ -2345,7 +1841,7 @@ export class StudioApp {
     this.setEnabled("validate", false);
   }
 
-  private toast(message: string, kind: "success" | "warning" | "error", duration = 4200): void {
+  toast(message: string, kind: "success" | "warning" | "error", duration = 4200): void {
     const toast = document.createElement("div");
     toast.className = `toast ${kind}`;
     toast.textContent = message;
@@ -2353,42 +1849,19 @@ export class StudioApp {
     if (duration > 0) window.setTimeout(() => toast.remove(), duration);
   }
 
-  private setEnabled(id: string, enabled: boolean): void {
+  setEnabled(id: string, enabled: boolean): void {
     const element = this.element(id) as HTMLButtonElement | HTMLInputElement;
     element.disabled = !enabled;
   }
 
-  private element(id: string): HTMLElement {
+  element(id: string): HTMLElement {
     const element = this.root.querySelector<HTMLElement>(`#${id}`);
     if (element === null) throw new Error(`missing element: ${id}`);
     return element;
   }
 }
 
-async function fileBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
 
-function splitCommaValues(value: string): string[] {
-  return [...new Set(value.split(/[,，]/).map((item) => item.trim()).filter(Boolean))];
-}
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
-}
 
-function formatTimestamp(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toLocaleString("zh-CN", { hour12: false });
-}
 
-function isRepairableIndexError(error: unknown): boolean {
-  if (!(error instanceof SidecarRpcError) || error.data === null || typeof error.data !== "object") {
-    return false;
-  }
-  const data = error.data as { canRebuildIndex?: unknown };
-  return data.canRebuildIndex === true;
-}

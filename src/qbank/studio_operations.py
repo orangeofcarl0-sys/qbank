@@ -69,7 +69,7 @@ class StudioProjectAdapter:
             question,
             services=self.mutations,
             dry_run=dry_run,
-            command="qbank desktop new question",
+            command="qbank studio new question",
         )
 
     def copy_question(self, source_id: str, new_id: str, *, dry_run: bool) -> AddQuestionResult:
@@ -89,7 +89,7 @@ class StudioProjectAdapter:
             copy,
             services=self.mutations,
             dry_run=dry_run,
-            command="qbank desktop copy question",
+            command="qbank studio copy question",
         )
 
     def import_questions(self, path: Path, *, dry_run: bool) -> IngestResult:
@@ -101,7 +101,7 @@ class StudioProjectAdapter:
             self.context,
             questions,
             services=self.mutations,
-            options=IngestOptions(dry_run=dry_run, command="qbank desktop import"),
+            options=IngestOptions(dry_run=dry_run, command="qbank studio import"),
         )
 
     def delete_question(self, question_id: str, *, dry_run: bool) -> DeleteQuestionResult:
@@ -110,7 +110,7 @@ class StudioProjectAdapter:
             question_id,
             services=self.mutations,
             dry_run=dry_run,
-            command="qbank desktop delete question",
+            command="qbank studio delete question",
         )
 
     def list_papers(self) -> list[Path]:
@@ -133,7 +133,7 @@ class StudioProjectAdapter:
             title,
             question_ids,
             dry_run=dry_run,
-            command="qbank desktop create paper",
+            command="qbank studio create paper",
         )
 
     def add_to_paper(self, path: Path, question_ids: list[str], *, dry_run: bool) -> Paper:
@@ -141,7 +141,7 @@ class StudioProjectAdapter:
             path,
             question_ids,
             dry_run=dry_run,
-            command="qbank desktop add to paper",
+            command="qbank studio add to paper",
         )
 
     def validate_paper(self, path: Path) -> PaperValidationReport:

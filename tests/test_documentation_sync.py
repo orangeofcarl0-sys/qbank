@@ -26,7 +26,7 @@ def test_documentation_sync_gate_passes_repository_contract() -> None:
     )
     assert "PASS source-delivery-requirements:" in result.stdout
     assert "bilingual requirement IDs match" in result.stdout
-    assert "PASS cli-reference: 53 public commands documented in 2 locales" in result.stdout
+    assert "PASS cli-reference: 52 public commands documented in 2 locales" in result.stdout
     assert "PASS manifest-capability-docs: 22 capabilities documented" in result.stdout
     assert "docs-sync: PASS" in result.stdout
 

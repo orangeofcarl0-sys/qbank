@@ -39,8 +39,7 @@
 | 版本历史 | `CHANGELOG.md` | Release notes |
 
 镜像必须由生成器产生或接受逐字节一致性测试；不得长期维护未校验的第二份规则。
-现代 Studio 的公开截图只使用 Tauri 生产组件与公开合成 fixture；Qt 捕获只作为
-QBank Studio Legacy 维护证据，不得替代当前 README 截图。
+现代 Studio 的公开截图只使用 Tauri 生产组件与公开合成 fixture。
 
 ## 变更记录要求
 

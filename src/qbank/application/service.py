@@ -110,7 +110,7 @@ class QuestionService:
         patch: QuestionPatch,
         *,
         dry_run: bool,
-        command: str = "qbank desktop",
+        command: str = "qbank studio",
     ) -> PatchQuestionResult:
         """Apply one structured mutation through the injected application port."""
         if self.mutations is None:

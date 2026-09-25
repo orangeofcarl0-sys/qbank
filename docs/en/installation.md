@@ -34,10 +34,9 @@ Skills work independently and do not require a local Codex CLI.
 
 - Installer: run `QBank-Studio-0.3.0-beta.2-x64-setup.exe` for a per-user installation.
 - Portable: extract the complete ZIP and run `qbank-studio.exe`; do not copy only the executable.
-- Legacy: install `qbank[desktop]` and run `qbank desktop`.
 
-Modern Studio and Legacy use the same Markdown repository format and perform no data migration.
-Back up the bank or place it under version control before first use.
+Modern Studio uses the Markdown repository format. Back up the bank or place it under version
+control before first use.
 
 ## Upgrade from 0.2.0
 

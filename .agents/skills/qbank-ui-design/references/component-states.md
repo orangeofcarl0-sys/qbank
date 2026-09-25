@@ -19,4 +19,3 @@ Review title bar, navigation, saved views, filter chips, question rows, batch se
 toolbar, Vditor focus and selection, secure preview, Inspector forms, asset cards and menu, formula
 menu, platform dialogs, toasts, and loading/error states in both themes.
 
-Qt widget composites are reviewed separately only for explicitly scoped QBank Studio Legacy work.

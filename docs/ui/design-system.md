@@ -1,8 +1,9 @@
 # QBank Studio design system
 
-This document defines the current Tauri Studio presentation under `apps/studio/`. The retained Qt
-client is QBank Studio Legacy; its Python theme modules and gallery remain maintenance aids for
-Legacy only and are not the authority for current Studio screenshots or interaction decisions.
+This document defines the current Tauri Studio presentation under `apps/studio/`. The Qt Legacy
+client was removed in `0.3.0` (see
+[ADR 0009](../adr/0009-remove-qt-legacy-client.md)); the Tauri Studio is the only desktop client
+and the single authority for Studio screenshots and interaction decisions.
 
 ## Product character
 
@@ -114,5 +115,4 @@ updating public images, inspect light, dark, asset-menu, formula-menu, advanced-
 states at full resolution. Public captures must not contain real questions, account information, or
 machine-local paths.
 
-The root `scripts/capture-ui.py` and `python -m qbank.studio_gallery` exercise QBank Studio Legacy.
-They must be labeled as Legacy evidence and must not replace the Tauri captures above.
+All Studio evidence comes from the Tauri fixture captures above.

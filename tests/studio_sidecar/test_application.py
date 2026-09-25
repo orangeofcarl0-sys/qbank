@@ -14,7 +14,7 @@ from qbank.context import ProjectContext
 from qbank.errors import ConflictError, DataValidationError, QBankError
 from qbank.infrastructure.locking import RepositoryWriteLock
 from qbank.markdown_codec import parse_question_text, render_question
-from qbank.studio_sidecar import application as sidecar_application
+from qbank.studio_sidecar import session as sidecar_session
 from qbank.studio_sidecar.application import StudioApplication
 from qbank.studio_sidecar.errors import (
     APPLICATION_ERROR,
@@ -204,18 +204,18 @@ def test_parameter_helpers_reject_wrong_types(synthetic_bank: Path) -> None:
 
 def test_protocol_scalar_and_asset_input_helpers_cover_failure_edges() -> None:
     with pytest.raises(RpcError, match="unsupported asset media type"):
-        sidecar_application._asset_representation(
+        sidecar_session.asset_representation(
             {"mediaType": "application/unknown", "dataBase64": ""}, "source"
         )
     with pytest.raises(RpcError, match="not valid Base64"):
-        sidecar_application._asset_representation(
+        sidecar_session.asset_representation(
             {"mediaType": "image/png", "dataBase64": "not-base64"}, "source"
         )
-    png = sidecar_application._asset_representation(
+    png = sidecar_session.asset_representation(
         {"mediaType": "image/png", "dataBase64": base64.b64encode(b"png").decode()},
         "source",
     )
-    ipe = sidecar_application._asset_representation(
+    ipe = sidecar_session.asset_representation(
         {
             "mediaType": "application/x-ipe",
             "dataBase64": base64.b64encode(b"ipe").decode(),
@@ -225,31 +225,31 @@ def test_protocol_scalar_and_asset_input_helpers_cover_failure_edges() -> None:
     assert png.editable is False
     assert ipe.editable is True
 
-    assert sidecar_application._required_string({"value": ""}, "value", allow_empty=True) == ""
+    assert sidecar_session.required_string({"value": ""}, "value", allow_empty=True) == ""
     with pytest.raises(RpcError, match="value must be a string"):
-        sidecar_application._required_string({}, "value")
+        sidecar_session.required_string({}, "value")
     with pytest.raises(RpcError, match="value must be a string"):
-        sidecar_application._optional_string({"value": 1}, "value", default="")
+        sidecar_session.optional_string({"value": 1}, "value", default="")
     with pytest.raises(RpcError, match="value must be an integer"):
-        sidecar_application._optional_int({"value": "1"}, "value", 0)
+        sidecar_session.optional_int({"value": "1"}, "value", 0)
     with pytest.raises(RpcError, match="value must be an integer"):
-        sidecar_application._optional_int({"value": True}, "value", 0)
+        sidecar_session.optional_int({"value": True}, "value", 0)
 
     with pytest.raises(RpcError, match="array of strings"):
-        sidecar_application._string_list({"value": "one"}, "value")
+        sidecar_session.string_list({"value": "one"}, "value")
     with pytest.raises(RpcError, match="must not be empty"):
-        sidecar_application._string_list({"value": []}, "value", allow_empty=False)
+        sidecar_session.string_list({"value": []}, "value", allow_empty=False)
     with pytest.raises(RpcError, match="array of strings"):
-        sidecar_application._string_list({"value": ["one", ""]}, "value")
-    assert sidecar_application._string_list({"value": [" one ", "one", "two"]}, "value") == [
+        sidecar_session.string_list({"value": ["one", ""]}, "value")
+    assert sidecar_session.string_list({"value": [" one ", "one", "two"]}, "value") == [
         "one",
         "two",
     ]
-    assert sidecar_application._optional_string_list({}, "value") == []
-    assert sidecar_application._optional_string_list({"value": ["one"]}, "value") == ["one"]
+    assert sidecar_session.optional_string_list({}, "value") == []
+    assert sidecar_session.optional_string_list({"value": ["one"]}, "value") == ["one"]
     with pytest.raises(RpcError, match="must be an object"):
-        sidecar_application._object_value({"value": []}, "value")
-    assert sidecar_application._object_value({"value": {"key": "value"}}, "value") == {
+        sidecar_session.object_value({"value": []}, "value")
+    assert sidecar_session.object_value({"value": {"key": "value"}}, "value") == {
         "key": "value"
     }
 

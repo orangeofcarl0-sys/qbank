@@ -88,7 +88,7 @@ qbank index rebuild --format json
 
 ![深色模式下的逻辑资产能力菜单](../assets/readme/studio-assets-dark.png)
 
-现代 Studio 与 Legacy 共用应用层资源分类服务。`asset.list` 将引用分类为 logical、local、
+现代 Studio 使用应用层资源分类服务。`asset.list` 将引用分类为 logical、local、
 external 或 invalid，并返回声明状态、存在状态、诊断、受控缩略图和类型化能力。本地资源
 只有在位于配置的 assets 边界内、通过符号链接感知的 containment 检查且实际存在时才会
 加载；sidecar 只返回受限 data URL，不向前端发送绝对路径。HTTP/HTTPS 与协议相对资源
@@ -110,20 +110,8 @@ external 或 invalid，并返回声明状态、存在状态、诊断、受控缩
 文档内容的稳定对比度。
 
 按钮、菜单和表单提供可访问名称、键盘焦点、tooltip 和明确禁用状态。视觉验收以当前 Tauri
-组件为准，在 100% 与 125% 缩放下检查两种主题；Qt Legacy 截图不得用作当前 Studio 的
-README 或功能证据。详细规则见 [Studio 设计系统](../ui/design-system.md)。
-
-## QBank Studio Legacy
-
-`qbank desktop` 启动保留的 Qt 客户端 QBank Studio Legacy：
-
-```powershell
-pip install "qbank[desktop]"
-qbank desktop
-```
-
-Legacy 与现代 Studio 读取同一题库格式，但只接受数据丢失、安全或严重兼容性修复。它不是
-默认桌面入口，也不代表现代 Studio 的界面和交互。两者之间不需要题库迁移。
+组件为准，在 100% 与 125% 缩放下检查两种主题。详细规则见
+[Studio 设计系统](../ui/design-system.md)。
 
 ## 开发与验收
 

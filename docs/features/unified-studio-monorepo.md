@@ -8,7 +8,7 @@
 
 ## 用户目标
 
-让命令行、MCP、Codex Skill、现代 QBank Studio 与 Qt Legacy 客户端共享同一套 qbank
+让命令行、MCP、Codex Skill 和现代 QBank Studio 共享同一套 qbank
 数据模型和应用服务，同时允许现代 Studio 独立打包、安装和启动。
 
 ## 使用入口
@@ -16,11 +16,10 @@
 - 桌面用户通过 QBank Studio 安装器或便携包启动现代 Tauri 客户端。
 - 自动化用户继续使用 `qbank` CLI。
 - Codex 用户继续使用仓库 Skill 或可选 MCP。
-- `qbank desktop` 保留为 QBank Studio Legacy 回退入口。
 
 ## CLI / Studio / MCP 对应关系
 
-四个入口属于同一产品。CLI、MCP、Tauri sidecar 与 Qt Legacy 都调用
+四个入口属于同一产品。CLI、MCP 与 Tauri sidecar 都调用
 `qbank.application` 及同一 composition root，不复制题目解析、Schema、项目锁、事务、
 历史、索引或资产生命周期规则。Studio Protocol v1 只负责 Tauri 前端与本地 sidecar
 之间的展示层通信。
@@ -49,8 +48,8 @@ sidecar 仍只接受固定 JSON-RPC 方法，stdout 只输出协议消息。所�
 ## 兼容性与迁移
 
 `v0.2.0` tag 永久不变。统一开发线从 Python 版本 `0.3.0b2` 开始，对外显示为
-`0.3.0-beta.2`。现有题库无需迁移；Qt 客户端仅更名为 QBank Studio Legacy，并保留
-原 `qbank desktop` 入口。
+`0.3.0-beta.2`。现有题库无需迁移；Qt 客户端已在 `0.3.0` 中彻底移除
+（[ADR 0009](../adr/0009-remove-qt-legacy-client.md)）。
 
 ## 测试与验收
 
@@ -68,4 +67,4 @@ wheel、安装器和便携包。未改变行为的发布级 UAT 与万题基准�
 ## 当前限制
 
 现代 Studio 仍是 Windows Tauri 应用；代码签名、完整安装矩阵和真实大规模 UAT 只在
-release 级门禁执行。Qt Legacy 仅接受数据损坏、安全或严重兼容性修复。
+release 级门禁执行。

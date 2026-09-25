@@ -21,9 +21,10 @@ SQLite is only a rebuildable search projection; and `paper.yaml` describes revie
 papers.
 
 > **Current version:** the current pre-release is `0.3.0-beta.2` (Python package `0.3.0b2`).
-> `0.2.x` remains the previous compatibility-maintenance line, with its Qt desktop application now
-> classified as QBank Studio Legacy. `0.1.x` is unsupported. Question, Asset, and Paper Schemas
-> remain at `1.0`.
+> `0.2.x` remains the previous compatibility-maintenance line, and `0.1.x` is unsupported.
+> Question, Asset, and Paper Schemas remain at `1.0`. The Qt desktop client (QBank Studio
+> Legacy) was removed in `0.3.0`; the modern Tauri Studio is the only desktop client
+> (see [ADR 0009](docs/adr/0009-remove-qt-legacy-client.md)).
 
 > **Unsigned beta:** the Windows installer and portable package are not code-signed. SmartScreen
 > may warn. Download only from this repository's Release and verify SHA-256 against
@@ -41,7 +42,6 @@ papers.
 | QBank Studio | Browsing, editing, tags, assets, and paper composition | Windows installer or portable archive |
 | CLI | Batch import, validation, queries, export, and automation | `qbank --help` |
 | Codex Skill / MCP | Codex collaboration under the same data boundary | `qbank codex integration-status --format json` |
-| QBank Studio Legacy | Qt fallback for severe compatibility, security, or data-loss defects | `qbank desktop` |
 
 ## Purpose and capabilities
 
@@ -64,16 +64,13 @@ application for offline Markdown/TeX editing and formula rendering.
 
 <p align="center"><sub>The logical-asset menu enables operations from actual capabilities and keeps unsupported actions visibly disabled.</sub></p>
 
-The Qt client is now named QBank Studio Legacy and remains available through `qbank desktop`.
-Both clients share repository formats, locks, transactions, history, and indexes without an
-irreversible migration. Legacy is a maintenance fallback; it does not represent the current
-Studio interface, screenshots, or default workflow. See the [Studio guide](docs/en/desktop-editor.md), the
+See the [Studio guide](docs/en/desktop-editor.md), the
 [monorepo development guide](docs/monorepo-development.md), and the
 [design system](docs/ui/design-system.md).
 
 ## Unified repository development
 
-The Python package, CLI, MCP, Skills, Studio sidecar, Tauri app, and Qt Legacy client live in one
+The Python package, CLI, MCP, Skills, Studio sidecar, and Tauri app live in one
 Git repository. Ordinary changes run affected fast checks. Integration checks run only when
 Protocol, writes, editor, permissions, or installation boundaries change. Release checks are
 reserved for a version freeze or formal publication.
@@ -109,10 +106,10 @@ pip install .\qbank-0.3.0b2-py3-none-any.whl
 
 Windows desktop users can download `QBank-Studio-0.3.0-beta.2-x64-setup.exe` or the portable ZIP.
 See the [installation and upgrade guide](docs/en/installation.md) for verification, upgrades, and
-the Legacy fallback.
+the verification workflow.
 
 For development, install all quality and Studio test dependencies with
-`pip install -e ".[dev,studio-dev]"`.
+`pip install -e ".[dev]"`.
 
 ## Safe write workflow
 
@@ -139,7 +136,7 @@ Ordinary writes and `--upsert` do not overwrite damaged Markdown.
 
 The layers in the diagram also describe source dependency direction:
 
-1. `apps/studio/`, `src/qbank/commands/`, `src/qbank/mcp/`, and `qbank.legacy_qt` are peer
+1. `apps/studio/`, `src/qbank/commands/`, and `src/qbank/mcp/` are peer
    presentation adapters.
 2. They call `src/qbank/application/`, domain models, and infrastructure ports without duplicating
    question rules.
@@ -276,8 +273,7 @@ runtime and deployment boundary.
 ## License
 
 qbank is released under the [MIT License](LICENSE). Licenses for embedded resources are documented
-separately in the [Tauri Studio notices](apps/studio/THIRD_PARTY_NOTICES.md) and
-[Qt Legacy notices](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md).
+separately in the [Tauri Studio notices](apps/studio/THIRD_PARTY_NOTICES.md).
 
 ## Open-source acknowledgements
 
@@ -294,10 +290,6 @@ the authority for exact versions and transitive dependencies.
 - [SQLite](https://www.sqlite.org/), [Pandoc](https://github.com/jgm/pandoc), and
   [Ipe](https://github.com/otfried/ipe) provide rebuildable search, document conversion, and
   editable-graphics workflows.
-- [PySide6 / Qt for Python](https://doc.qt.io/qtforpython-6/),
-  [CodeMirror](https://github.com/codemirror/dev/), and
-  [QtAwesome](https://github.com/spyder-ide/qtawesome) support QBank Studio Legacy.
-
 Product design also learned from the public question organization, reuse, and authoring practices
 of [Moodle Question Bank](https://github.com/moodle/moodle) and
 [Open edX](https://github.com/openedx/openedx-platform). Those projects neither endorse nor are

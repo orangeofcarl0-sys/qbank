@@ -157,7 +157,7 @@ qbank preview
 ```
 
 The system Pandoc executable produces DOCX. If unavailable, DOCX exits with code 7 while Markdown
-and HTML remain available. `qbank preview --serve` and `qbank desktop` are interactive blocking
+and HTML remain available. `qbank preview --serve` is an interactive blocking
 commands and must not be launched silently by unattended automation.
 
 ## Diagnostics and index maintenance

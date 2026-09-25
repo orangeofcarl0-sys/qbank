@@ -12,13 +12,6 @@
       "tests/test_architecture_*.py",
       "tests/test_cli.py"
     ],
-    "legacy": [
-      "src/qbank/legacy_qt/**",
-      "src/qbank/presentation/studio/**",
-      "tests/test_desktop*.py",
-      "tests/test_studio*.py",
-      "scripts/capture-ui.py"
-    ],
     "sidecar": [
       "src/qbank/studio_sidecar/**",
       "tests/studio_sidecar/**",
@@ -47,7 +40,10 @@
     ]
   },
   "integrationTriggers": {
-    "protocol": ["protocol/**", "src/qbank/studio_sidecar/**"],
+    "protocol": [
+      "protocol/**",
+      "src/qbank/studio_sidecar/**"
+    ],
     "writing": [
       "src/qbank/application/**",
       "src/qbank/transaction.py",

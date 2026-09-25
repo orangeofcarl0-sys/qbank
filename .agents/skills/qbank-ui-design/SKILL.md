@@ -3,15 +3,15 @@ name: qbank-ui-design
 description: >
   Design, implement, document, or audit the modern Tauri QBank Studio interface
   and its Vditor, Markdown/MathJax preview, navigation, Inspector, dialogs,
-  assets, themes, screenshots, and accessibility. Use Qt guidance only for
-  explicitly scoped QBank Studio Legacy maintenance.
+  assets, themes, screenshots, and accessibility. The Qt Legacy client was
+  removed in 0.3.0.
 ---
 
 # qbank UI design
 
 Treat the current Studio as a compact scientific document editor: stable library-like navigation,
 a dominant Markdown/TeX source and preview workspace, and a secondary Inspector. The modern product
-lives under `apps/studio/`; `src/qbank/legacy_qt/` is a maintenance fallback, not a second product.
+lives under `apps/studio/` and is the only desktop client.
 
 ## Required workflow
 
@@ -20,8 +20,7 @@ lives under `apps/studio/`; `src/qbank/legacy_qt/` is a maintenance fallback, no
    [component-states.md](references/component-states.md).
 2. Read [reference-projects.md](references/reference-projects.md) before selecting dependencies,
    controls, icons, or global styling approaches.
-3. Confirm whether the request targets modern Tauri Studio or explicitly targets QBank Studio
-   Legacy. Default to modern Tauri Studio.
+3. All Studio work targets the modern Tauri Studio under `apps/studio/`.
 4. Inspect the current production components, public synthetic fixture, both themes, and the
    affected 100%/125% states before editing.
 5. State one concrete visual direction covering palette, typography, density, spacing, radii,
@@ -40,17 +39,6 @@ lives under `apps/studio/`; `src/qbank/legacy_qt/` is a maintenance fallback, no
 9. Review navigation, editor, Inspector, asset menu, formula menu, dialogs, loading/error states,
    both themes, and 100%/125% scaling at full resolution.
 10. Run `python scripts/check.py fast --scope studio` and the affected browser tests.
-
-## QBank Studio Legacy
-
-Legacy lives in `src/qbank/legacy_qt/` and is launched by `qbank desktop`. Apply Legacy-specific Qt,
-CodeMirror, gallery, QSS, and `scripts/capture-ui.py` guidance only for data-loss, security, or severe
-compatibility fixes explicitly scoped to Legacy. Never use Legacy screenshots to document the
-current Studio.
-
-On Windows, Legacy Qt inspection requires standard CPython 3.11+ and an isolated runtime when the
-active environment inherits conflicting Qt DLLs. Modern Tauri work does not require installing
-PySide6.
 
 ## Non-negotiable constraints
 

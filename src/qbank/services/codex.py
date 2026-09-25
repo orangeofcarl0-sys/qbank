@@ -272,7 +272,7 @@ def instructions_markdown(instructions: CodexInstructionsResult) -> str:
             "- Exit code 3 means validation failed; fix the input before retrying.",
             "- Exit code 5 means a conflict; never bypass it by overwriting authoritative data.",
             "- If search reports a missing, dirty, corrupt, or stale index, rebuild it only when authorized.",
-            "- Never launch `qbank preview --serve` or `qbank desktop` in unattended automation.",
+            "- Never launch `qbank preview --serve` in unattended automation.",
             "",
             "## Data paths",
             "",

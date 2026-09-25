@@ -96,5 +96,5 @@ Saved views affect query results only. Never infer a taxonomy rename from spelli
   dirty, corrupt, or stale.
 - Delete only an exact user-confirmed ID, starting with
   `qbank delete <id> --dry-run --format json`.
-- `qbank preview --serve` and `qbank desktop` are blocking interactive commands. Do not
-  launch them unless the user explicitly asks for an interactive session.
+- `qbank preview --serve` is a blocking interactive command. Do not launch it unless the
+  user explicitly asks for an interactive session.

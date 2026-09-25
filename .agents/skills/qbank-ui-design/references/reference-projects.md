@@ -13,7 +13,4 @@ Use reference products for principles, not copied code, assets, or visual identi
   second editor or remote renderer for visual convenience.
 
 Qt-specific libraries such as Qlementine, qt-material, PyQt-Fluent-Widgets, QtAwesome, and superqt
-are relevant only to QBank Studio Legacy. They must not be introduced into the Tauri frontend.
-
-The maintained evaluation history is in `docs/ui/reference-evaluation.md`; its Qt entries are
-Legacy context rather than modern dependency recommendations.
+were used only by the removed Qt Legacy client and must not be introduced into the Tauri frontend.

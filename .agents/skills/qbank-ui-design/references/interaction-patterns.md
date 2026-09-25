@@ -40,8 +40,3 @@
   indicators as the only position or overflow cue.
 - Keep horizontal scrolling local to wide formulas, code, and tables instead of moving the whole
   workspace.
-
-## Legacy boundary
-
-Qt `QMenu`, `QMessageBox`, QSS, CodeMirror, and component-gallery instructions apply only when the
-task explicitly targets QBank Studio Legacy.

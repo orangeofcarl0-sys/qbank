@@ -384,12 +384,6 @@ WORKFLOWS = (
                 "preview",
                 behavior=INTERACTIVE,
             ),
-            _step(
-                "qbank desktop",
-                "Launch Studio only when the user asks to open it.",
-                "desktop",
-                behavior=INTERACTIVE,
-            ),
         ),
     ),
 )

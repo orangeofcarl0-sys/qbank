@@ -98,10 +98,9 @@ qbank asset render OPT-INT-0001 figure-1 --dry-run --format json
 qbank asset render OPT-INT-0001 figure-1 --format json
 qbank asset validate --format json
 qbank preview --serve
-qbank desktop
 ```
 
-`preview --serve` and `desktop` are blocking interactive commands. Do not launch either
+`preview --serve` is a blocking interactive command. Do not launch it
 from unattended automation or without an explicit user request.
 
 Use `qbank-asset:<asset-id>` in new Markdown and `\qbankasset{<asset-id>}` in
@@ -110,10 +109,6 @@ TeX. Legacy `asset:<asset-id>` remains readable after an explicit
 Keep old path assets readable until their source relationship is confirmed.  The local
 management page is bound only to localhost and delegates to the same registered-asset
 operations as the CLI.
-
-Install `qbank[desktop]` for the optional Qt editor. Its save path performs the
-same structured patch dry-run and validation workflow. Ipe edits create a
-versioned working copy; rerender and finalization remain explicit.
 
 ## Paper and export
 

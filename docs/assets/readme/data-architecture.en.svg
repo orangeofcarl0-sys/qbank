@@ -6,8 +6,8 @@
       <path d="M0 0 10 5 0 10Z" fill="context-stroke"/>
     </marker>
     <style>
-      .bg{fill:#f6f7f5}.surface{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.entry{fill:#e7f0f7;stroke:#7596b0;stroke-width:1.6}.core{fill:#dfeaf3;stroke:#668ba8;stroke-width:1.9}.authority{fill:#e8f1eb;stroke:#73917c;stroke-width:1.7}.derived{fill:#f0f2f4;stroke:#a8b2bb;stroke-width:1.4}.guide{fill:#fff4dc;stroke:#b58b48;stroke-width:1.5;stroke-dasharray:6 4}.legacy{fill:none;stroke:#9ba6af;stroke-width:1.4;stroke-dasharray:6 4}.boundary{fill:none;stroke:#73917c;stroke-width:2}.line{fill:none;stroke:#70899c;stroke-width:2;marker-end:url(#arrow)}.dash{stroke-dasharray:6 5}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
-      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.surface{fill:#282f36;stroke:#46515b}.entry{fill:#293d4c;stroke:#739bb8}.core{fill:#29475c;stroke:#80a8c4}.authority{fill:#293c32;stroke:#79a087}.derived{fill:#252c32;stroke:#4c5862}.guide{fill:#3d3526;stroke:#c09a58}.legacy{stroke:#697680}.boundary{stroke:#79a087}.line{stroke:#7f9bb1}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
+      .bg{fill:#f6f7f5}.surface{fill:#fff;stroke:#cbd3da;stroke-width:1.5}.entry{fill:#e7f0f7;stroke:#7596b0;stroke-width:1.6}.core{fill:#dfeaf3;stroke:#668ba8;stroke-width:1.9}.authority{fill:#e8f1eb;stroke:#73917c;stroke-width:1.7}.derived{fill:#f0f2f4;stroke:#a8b2bb;stroke-width:1.4}.guide{fill:#fff4dc;stroke:#b58b48;stroke-width:1.5;stroke-dasharray:6 4}.boundary{fill:none;stroke:#73917c;stroke-width:2}.line{fill:none;stroke:#70899c;stroke-width:2;marker-end:url(#arrow)}.dash{stroke-dasharray:6 5}.title{fill:#25313b;font:700 27px 'Segoe UI',sans-serif}.heading{fill:#25313b;font:600 17px 'Segoe UI',sans-serif}.body{fill:#4d5c68;font:14px 'Segoe UI',sans-serif}.small{fill:#687682;font:12px 'Segoe UI',sans-serif}.label{fill:#315d7e;font:600 13px 'Segoe UI',sans-serif}
+      @media(prefers-color-scheme:dark){.bg{fill:#1e242a}.surface{fill:#282f36;stroke:#46515b}.entry{fill:#293d4c;stroke:#739bb8}.core{fill:#29475c;stroke:#80a8c4}.authority{fill:#293c32;stroke:#79a087}.derived{fill:#252c32;stroke:#4c5862}.guide{fill:#3d3526;stroke:#c09a58}.boundary{stroke:#79a087}.line{stroke:#7f9bb1}.title,.heading{fill:#edf1f4}.body{fill:#c4cdd5}.small{fill:#a2aeb8}.label{fill:#9cc3df}}
     </style>
   </defs>
   <rect class="bg" width="1200" height="760" rx="18"/>
@@ -43,15 +43,10 @@
   <text class="heading" x="574" y="252">Local STDIO MCP</text>
   <text class="small" x="574" y="274">src/qbank/mcp/</text>
   <text class="small" x="574" y="293">Read tools + prepare/commit</text>
-  <rect class="legacy" x="810" y="226" width="342" height="84" rx="10"/>
-  <text class="heading" x="830" y="252">QBank Studio Legacy</text>
-  <text class="small" x="830" y="274">qbank.legacy_qt</text>
-  <text class="small" x="830" y="293">Severe compatibility, security, and data fixes only</text>
 
   <path class="line" d="M173 310V340"/>
   <path class="line" d="M426 310V340"/>
   <path class="line" d="M672 310V340"/>
-  <path class="line" d="M981 310V340"/>
 
   <text class="label" x="48" y="337">3 · Shared business core (src/qbank/)</text>
   <rect class="core" x="48" y="352" width="1104" height="130" rx="12"/>

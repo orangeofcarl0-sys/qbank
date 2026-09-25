@@ -1,6 +1,7 @@
 # ADR 0006：QBank Studio 归并到 qbank 单仓库
 
-- 状态：已接受
+- 状态：已接受（其中“Qt 客户端迁入 `src/qbank/legacy_qt/` 作为维护回退”一项已被
+  [ADR 0009](0009-remove-qt-legacy-client.md) 部分取代：该客户端已在 `0.3.0` 中彻底移除）
 - 日期：2026-07-26
 - 目标版本：0.3.0
 

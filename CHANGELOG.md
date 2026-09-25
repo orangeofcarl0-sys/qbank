@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Removed QBank Studio Legacy, the Qt/PySide6 desktop client, entirely: `src/qbank/legacy_qt/`, its
+  Qt design system, the `qbank-studio-gallery` entry point, the `qbank desktop` CLI command, the
+  Legacy screenshot capture script, and the `qbank[desktop]`/`qbank[studio-dev]` extras. The modern
+  Tauri Studio is now the only desktop client. Repository formats, Schemas, history, indexes, and
+  Studio Protocol v1 are unchanged; no data migration is required. History records written by
+  interactive Studio flows now use `qbank studio …` command labels, while older
+  `qbank desktop …` records still display as Studio-sourced. See
+  `docs/adr/0009-remove-qt-legacy-client.md` for the decision and consequences.
+- Internal: converged the complexity hotspots identified by the 2026-09 structure audit
+  (`docs/features/internal-structure-refactor.md`). Extracted the Studio sidecar math
+  configuration loader into `qbank.studio_sidecar.studio_math` and removed the last per-file
+  ruff exemptions; reorganized `qbank.operations` into a package with unchanged public
+  imports; split the sidecar application and `qbank.application.assets` helpers into focused
+  modules; and split the Tauri `studio-app.ts` monolith into feature modules. No CLI, MCP,
+  Studio Protocol, Schema, or authoritative data behavior changes. Fixed the synthetic Studio
+  fixture missing its tracked `.qbank/studio-math.json` on fresh clones, which made two
+  sidecar tests fail before any local run.
+
 ## 0.3.0-beta.2 - 2026-07-27
 
 - Made modern Studio repository activation atomic: the sidecar now returns status, questions, tags,

@@ -21,10 +21,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-desktop = [
-  "PySide6>=6.8,<7",
-  "QtAwesome>=1.4,<2",
-]
 mcp = [
   "mcp>=1.28.1,<2",
 ]
@@ -41,11 +37,6 @@ dev = [
   "pytest-cov>=5.0,<8",
   "pyright>=1.1,<2",
   "ruff>=0.6,<1",
-]
-studio-dev = [
-  "pytest-qt>=4.4,<5",
-  "QtAwesome>=1.4,<2",
-  "PySide6>=6.8,<7",
 ]
 
 [project.scripts]
@@ -109,7 +100,6 @@ max-statements = 40
 
 [tool.ruff.lint.per-file-ignores]
 "src/qbank/commands/*.py" = ["PLR0913"]
-"src/qbank/studio_sidecar/application.py" = ["C901", "PLR0912", "PLR0915"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -123,15 +113,9 @@ venvPath = "."
 venv = ".venv"
 reportUnnecessaryTypeIgnoreComment = "error"
 
-[[tool.mypy.overrides]]
-# Qt for Python does not publish a PEP 561 marker; keep this exception scoped to Qt.
-module = ["PySide6", "PySide6.*"]
-ignore_missing_imports = true
-
 [tool.deptry]
 known_first_party = ["qbank"]
-optional_dependencies_dev_groups = ["dev", "studio-dev"]
-package_module_name_map = { PySide6 = ["PySide6"] }
+optional_dependencies_dev_groups = ["dev"]
 extend_exclude = ["protocol/tests"]
 
 [tool.importlinter]
@@ -157,29 +141,24 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "MCP remains independent from CLI and Studio presentation"
+name = "MCP remains independent from CLI and Studio frontends"
 type = "forbidden"
 source_modules = ["qbank.mcp"]
 forbidden_modules = [
   "qbank.commands",
   "qbank.cli",
   "qbank.bootstrap",
-  "qbank.presentation",
-  "qbank.legacy_qt",
   "qbank.studio_sidecar",
   "qbank.services.codex",
   "typer",
   "rich",
-  "PySide6",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Application does not depend on presentation or concrete infrastructure"
+name = "Application does not depend on frontends or concrete infrastructure"
 type = "forbidden"
 source_modules = ["qbank.application"]
 forbidden_modules = [
-  "qbank.presentation",
-  "qbank.legacy_qt",
   "qbank.studio_sidecar",
   "qbank.bootstrap",
   "qbank.commands",
@@ -193,40 +172,17 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Studio presentation does not depend on storage, CLI, or infrastructure adapters"
-type = "forbidden"
-source_modules = ["qbank.presentation", "qbank.legacy_qt"]
-allow_indirect_imports = true
-forbidden_modules = [
-  "qbank.infrastructure",
-  "qbank.repository",
-  "qbank.search_index",
-  "qbank.storage",
-  "qbank.commands",
-  "qbank.cli",
-  "qbank.mcp",
-  "qbank.services.codex",
-  "qbank.services.mcp_config",
-  "sqlite3",
-  "typer",
-  "rich",
-]
-
-[[tool.importlinter.contracts]]
-name = "Studio sidecar is independent from other presentation adapters"
+name = "Studio sidecar is independent from other frontends"
 type = "forbidden"
 source_modules = ["qbank.studio_sidecar"]
 forbidden_modules = [
   "qbank.commands",
   "qbank.cli",
   "qbank.mcp",
-  "qbank.presentation",
-  "qbank.legacy_qt",
   "qbank.services.codex",
   "qbank.services.mcp_config",
   "typer",
   "rich",
-  "PySide6",
 ]
 
 [[tool.importlinter.contracts]]
@@ -249,21 +205,19 @@ allow_indirect_imports = true
 forbidden_modules = ["qbank.repository", "qbank.search_index", "sqlite3"]
 
 [[tool.importlinter.contracts]]
-name = "Infrastructure adapters do not depend on presentation"
+name = "Infrastructure adapters do not depend on frontends"
 type = "forbidden"
 source_modules = ["qbank.infrastructure"]
 forbidden_modules = [
   "qbank.commands",
   "qbank.cli",
-  "qbank.presentation",
-  "qbank.legacy_qt",
   "qbank.studio_sidecar",
   "typer",
   "rich",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Application, domain, and presentation follow inward dependencies"
+name = "Application, domain, and CLI follow inward dependencies"
 type = "layers"
 layers = [
   "qbank.commands",

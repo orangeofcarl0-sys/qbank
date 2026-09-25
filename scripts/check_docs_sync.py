@@ -431,7 +431,6 @@ def _monorepo_contract(root: Path) -> Check:
         failures.append("Studio Protocol is not 1.0")
     for relative in (
         "src/qbank/studio_sidecar",
-        "src/qbank/legacy_qt",
         "apps/studio/src",
         "apps/studio/src-tauri",
         "apps/studio/tests",

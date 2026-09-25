@@ -8,27 +8,46 @@ from typing import Any
 
 import pytest
 
-from qbank.application.assets import (
-    AssetApplicationService,
-    NormalizedAssetInput,
-    PureSuffix,
+from qbank.application.asset_edits import (
     _editable_parent,
-    _editor_representation,
-    _ipe_source,
-    _merge_rendered,
     _next_edit_identifier,
-    _optional_representation,
-    _reconciled_editor_manifest,
     _render_parent,
-    _render_preference,
-    _representation,
-    _restored_manifest,
-    _versioned_replacement,
 )
+from qbank.application.asset_edits import (
+    reconciled_editor_manifest as _reconciled_editor_manifest,
+)
+from qbank.application.asset_edits import (
+    restored_manifest as _restored_manifest,
+)
+from qbank.application.asset_manifest import (
+    PureSuffix,
+)
+from qbank.application.asset_manifest import (
+    editor_representation as _editor_representation,
+)
+from qbank.application.asset_manifest import (
+    find_representation as _representation,
+)
+from qbank.application.asset_manifest import (
+    ipe_source as _ipe_source,
+)
+from qbank.application.asset_manifest import (
+    optional_representation as _optional_representation,
+)
+from qbank.application.asset_manifest import (
+    versioned_replacement as _versioned_replacement,
+)
+from qbank.application.asset_render import (
+    _render_preference,
+)
+from qbank.application.asset_render import (
+    merge_rendered as _merge_rendered,
+)
+from qbank.application.assets import AssetApplicationService
 from qbank.application.service import QuestionService
 from qbank.bootstrap import create_project_services
 from qbank.context import ProjectContext
-from qbank.domain import AssetHistoryEvent, RenderedAsset
+from qbank.domain import AssetHistoryEvent, NormalizedAssetInput, RenderedAsset
 from qbank.errors import AssetConflictError, AssetNotFoundError, ConflictError, DataValidationError
 from qbank.models import (
     AssetFormat,

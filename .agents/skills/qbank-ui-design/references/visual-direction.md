@@ -4,7 +4,7 @@
 
 Modern QBank Studio is a dense scientific question-document editor, not a dashboard. The Tauri
 workspace follows three stable levels: compact navigation, dominant Vditor source/secure preview,
-and a secondary Inspector. QBank Studio Legacy is not the visual reference for modern work.
+and a secondary Inspector. It is the only desktop client and the single visual reference.
 
 ## Palette
 

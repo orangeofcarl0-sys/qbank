@@ -25,9 +25,8 @@
 | `docs/*/known-limitations-0.3.0-beta.2.md` | beta 部署者 | unsigned beta 与运行边界 | beta 限制变化 |
 | `docs/localization.md` | 文档维护者 | 语言范围、编写与同步门禁 | 支持语言或本地化范围 |
 | `docs/architecture.md` | 维护者 | 分层、数据和事务边界 | 架构边界 |
-| `docs/monorepo-development.md` | 开发者 | Studio/CLI/MCP/Legacy 目录、三级检查与统一构建 | 仓库结构、版本或构建入口 |
-| `docs/ui/design-system.md` | Studio 维护者 | 当前 Tauri Studio 的视觉、状态、截图与 Legacy 边界 | Studio 视觉或交互 |
-| `docs/ui/reference-evaluation.md` | Legacy 维护者 | 历史 Qt/PySide6 参考与依赖决策 | Legacy 严重兼容修复 |
+| `docs/monorepo-development.md` | 开发者 | Studio/CLI/MCP 目录、三级检查与统一构建 | 仓库结构、版本或构建入口 |
+| `docs/ui/design-system.md` | Studio 维护者 | 当前 Tauri Studio 的视觉、状态与截图 | Studio 视觉或交互 |
 | `docs/adr/` | 维护者 | 重要决定及其后果 | 架构、权威源、事务、安全、依赖 |
 | `docs/features/` | 产品与实现人员 | 单项功能的完整契约 | 功能生命周期状态 |
 | `.agents/skills/qbank/` | Codex | 确定性操作协议 | 工作流、命令、授权 |

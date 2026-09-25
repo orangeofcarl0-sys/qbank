@@ -20,7 +20,7 @@ class StudioQuestionService:
         patch: QuestionPatch,
         *,
         dry_run: bool,
-        command: str = "qbank desktop save",
+        command: str = "qbank studio save",
     ) -> PatchQuestionResult:
         return self.mutations.save_question(
             question_id,

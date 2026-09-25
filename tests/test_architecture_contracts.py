@@ -332,43 +332,6 @@ def test_cli_usage_uses_only_public_click_apis() -> None:
     assert "typer import _click" not in source
 
 
-def test_desktop_presentation_has_no_direct_authoritative_storage_access() -> None:
-    package_root = Path(__file__).parents[1] / "src/qbank"
-    presentation_roots = [package_root / "legacy_qt", package_root / "presentation"]
-    source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for root in presentation_roots
-        for path in sorted(root.rglob("*.py"))
-    )
-    for forbidden in (
-        "qbank.infrastructure",
-        "qbank.repository",
-        "qbank.search_index",
-        "qbank.storage",
-        "sqlite3",
-        "asset.yaml",
-        "index.sqlite",
-        ".write_text(",
-        ".write_bytes(",
-    ):
-        assert forbidden not in source
-
-
-def test_desktop_controller_delegates_project_workflows() -> None:
-    source = (Path(__file__).parents[1] / "src/qbank/legacy_qt/controller.py").read_text(
-        encoding="utf-8"
-    )
-    for forbidden in (
-        "qbank.application.exchange",
-        "qbank.diagnostics",
-        "qbank.operations",
-        "qbank.papers",
-        "qbank.transaction",
-        "qbank.yaml_io",
-    ):
-        assert forbidden not in source
-
-
 def test_diagnostic_codes_have_one_closed_machine_contract() -> None:
     assert len({item.value for item in DiagnosticCode}) == len(DiagnosticCode)
     for code in DiagnosticCode:

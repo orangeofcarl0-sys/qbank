@@ -2,8 +2,8 @@
 
 - QBank Studio is the modern presentation adapter in `apps/studio/`, not a separate product or
   repository. Its sidecar lives in `qbank.studio_sidecar` and must reuse qbank application services.
-- `qbank desktop` launches QBank Studio Legacy from `qbank.legacy_qt`. Legacy accepts only
-  data-loss, security, or severe compatibility fixes.
+- The Qt Legacy client was removed in `0.3.0` (ADR 0009); the modern Tauri Studio is the
+  only desktop client.
 - Use `python scripts/check.py fast` for ordinary changes, `integration` only for affected
   boundaries, and `release` only for a version freeze or publication.
 - Build wheel and Studio artifacts through `python scripts/build.py`; artifacts from one release
@@ -27,7 +27,7 @@
 - Preserve source locations and distinguish source content from AI inference.
 - If a question, answer, or source cannot be confirmed, keep it `draft`; do not invent facts.
 - Run destructive operations only after an explicit user request.
-- Do not launch `qbank preview --serve` or `qbank desktop` in unattended automation.
+- Do not launch `qbank preview --serve` in unattended automation.
 - When the project MCP server is available, broad reads use `question_search` before
   `question_get`; every write must use a `*_prepare` tool followed by `operation_commit`.
 - Never commit an MCP operation after its `repository_revision` changes. Prepare it again.

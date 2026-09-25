@@ -4,9 +4,9 @@
 `src/qbank/codex_manifest.py`；文档同步门禁验证名称、CLI、MCP tool 和 resource 均在此
 出现。
 
-Studio 列现在指 `apps/studio/` 下的现代 QBank Studio。`qbank desktop` 启动
-QBank Studio Legacy；Legacy 只作为严重兼容、安全或数据损坏回退，不形成独立能力或
-发布路线。两种桌面入口都复用相同 qbank application services。
+Studio 列指 `apps/studio/` 下的现代 QBank Studio。Qt 桌面客户端（QBank Studio
+Legacy）已在 `0.3.0` 移除（见 [ADR 0009](../adr/0009-remove-qt-legacy-client.md)）；
+现代 Studio 复用相同 qbank application services。
 
 `0.3.0-beta.2` 冻结值为 Python 包 `0.3.0b2`、Studio Protocol `1.0`，Question、Asset、
 Paper Schema `1.0`；本矩阵不引入另一条 Studio 版本线。

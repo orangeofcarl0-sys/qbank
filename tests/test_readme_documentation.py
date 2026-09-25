@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 import struct
-import subprocess
-import sys
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -97,7 +95,7 @@ def test_readmes_disclose_ai_coding_and_acknowledge_current_studio() -> None:
         assert "coding agent" in text
         assert "docs/assets/readme/ai-first-badge.svg" in text
         assert "apps/studio/THIRD_PARTY_NOTICES.md" in text
-        assert "src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md" in text
+        assert "src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md" not in text
         assert "https://github.com/tauri-apps/tauri" in text
         assert "https://github.com/moodle/moodle" in text
         assert "mcp-guide.md" in text
@@ -119,15 +117,6 @@ def test_modern_readme_capture_uses_tauri_fixture_and_legacy_script_is_labeled()
     ):
         assert expected in capture_spec
 
-    completed = subprocess.run(
-        [sys.executable, "scripts/capture-ui.py", "--help"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert "Legacy" in completed.stdout
-    assert "--scale {1,1.25}" in completed.stdout
 
 
 def test_020_compatibility_document_freezes_runtime_manifests() -> None:

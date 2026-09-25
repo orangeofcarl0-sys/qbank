@@ -96,7 +96,11 @@ def _history_entry(
         timestamp=str(payload.get("timestamp") or ""),
         operation=str(payload.get("operation") or "unknown"),
         question_id=question_id,
-        source="Studio" if "desktop" in command.casefold() else command,
+        source=(
+            "Studio"
+            if "desktop" in command.casefold() or "qbank studio" in command.casefold()
+            else command
+        ),
         fields=list(dict.fromkeys(fields)) or ["题目"],
         changes=changes,
     )

@@ -34,10 +34,8 @@ MCP 是可选组件。需要时安装 `qbank[mcp]`，再按
 
 - 安装器：运行 `QBank-Studio-0.3.0-beta.2-x64-setup.exe`，按当前用户安装。
 - 便携包：解压整个 ZIP 后运行 `qbank-studio.exe`，不要只复制主程序。
-- Legacy：安装 `qbank[desktop]` 后运行 `qbank desktop`。
 
-现代 Studio 与 Legacy 使用同一 Markdown 题库格式，不执行数据迁移。首次使用前建议备份
-题库或置于版本控制中。
+现代 Studio 使用 Markdown 题库格式；首次使用前建议备份题库或置于版本控制中。
 
 ## 从 0.2.0 升级
 

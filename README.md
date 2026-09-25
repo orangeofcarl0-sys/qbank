@@ -17,8 +17,9 @@ Schema、校验与事务规则下工作。
 `paper.yaml` 用于描述可审查、可复现的试卷结构。
 
 > **当前版本：** 当前预发布为 `0.3.0-beta.2`（Python 包 `0.3.0b2`）。
-> `0.2.x` 作为上一兼容维护线保留，其中 Qt 桌面端已归入 QBank Studio Legacy；
-> `0.1.x` 不再提供支持。Question、Asset、Paper Schema 仍为 `1.0`。
+> `0.2.x` 作为上一兼容维护线保留；`0.1.x` 不再提供支持。Question、Asset、Paper
+> Schema 仍为 `1.0`。Qt 桌面客户端（QBank Studio Legacy）已在 `0.3.0` 移除，
+> 现代 Tauri Studio 是唯一桌面客户端（见 [ADR 0009](docs/adr/0009-remove-qt-legacy-client.md)）。
 > Markdown 是题目内容的唯一权威来源，索引、预览和导出产物均可重建。
 
 > **Unsigned beta：** 本版 Windows 安装器和便携包尚未代码签名，SmartScreen 可能显示
@@ -36,7 +37,6 @@ Schema、校验与事务规则下工作。
 | QBank Studio | 日常浏览、编辑、标签整理、资源管理和组卷 | Windows 安装器或便携包 |
 | CLI | 批量导入、校验、查询、导出和自动化 | `qbank --help` |
 | Codex Skill / MCP | 让 Codex 在相同数据边界内协作 | `qbank codex integration-status --format json` |
-| QBank Studio Legacy | Qt 维护回退，仅处理严重兼容、安全或数据损坏问题 | `qbank desktop` |
 
 ## 项目定位
 
@@ -70,16 +70,14 @@ Vditor、MathJax 和预览所需资源随应用打包，可离线完成 Markdown
 
 <p align="center"><sub>深色模式下的逻辑资产菜单按实际能力启用操作；不可用操作保持可见并明确禁用。</sub></p>
 
-Qt 客户端已明确更名为 QBank Studio Legacy，并继续通过 `qbank desktop` 启动；两者共享
-相同题库格式、锁、事务、历史和索引，不执行不可逆迁移。Legacy 是维护回退，不代表当前
-Studio 的界面、截图或默认工作流。完整交互说明见
+完整交互说明见
 [Studio 用户文档](docs/zh-CN/desktop-editor.md)，统一构建方式见
 [单仓库开发指南](docs/monorepo-development.md)，视觉规范见
 [Studio 设计系统](docs/ui/design-system.md)。
 
 ## 统一仓库开发
 
-Python 包、CLI、MCP、Skill、Studio sidecar、Tauri 应用和 Qt Legacy 位于同一 Git 仓库。
+Python 包、CLI、MCP、Skill、Studio sidecar 和 Tauri 应用位于同一 Git 仓库。
 普通改动先运行受影响模块的 fast 检查；只有 Protocol、写入、编辑器、权限或安装边界发生
 变化时运行 integration；release 仅用于版本冻结和正式发布。
 
@@ -115,12 +113,12 @@ pip install .\qbank-0.3.0b2-py3-none-any.whl
 ```
 
 Windows 桌面用户可下载 `QBank-Studio-0.3.0-beta.2-x64-setup.exe` 或便携 ZIP。安装、
-升级、校验和 Legacy 回退见[安装与升级指南](docs/zh-CN/installation.md)。
+升级与校验见[安装与升级指南](docs/zh-CN/installation.md)。
 
 参与开发时安装完整质量检查和 Studio 测试依赖：
 
 ```powershell
-pip install -e ".[dev,studio-dev]"
+pip install -e ".[dev]"
 ```
 
 ## 安全操作流程
@@ -158,7 +156,7 @@ qbank validate --format json
 
 图中的层次也是源码依赖方向：
 
-1. `apps/studio/`、`src/qbank/commands/`、`src/qbank/mcp/` 与 `qbank.legacy_qt` 是并列的
+1. `apps/studio/`、`src/qbank/commands/` 与 `src/qbank/mcp/` 是并列的
    presentation adapter；
 2. 它们共同调用 `src/qbank/application/`、领域模型和基础设施端口，不复制题目规则；
 3. `$qbank`、`$qbank-digitize` 与 `$qbank-deliver` 向 agent 提供协议和领域工作流；
@@ -331,9 +329,8 @@ qbank 不内置 MinerU，不建设通用 Candidate 数据库、作业状态平�
 
 ## 许可证
 
-qbank 以 [MIT License](LICENSE) 发布。现代 Studio 与 Legacy 内嵌资源的许可信息分别见
-[Tauri Studio 第三方声明](apps/studio/THIRD_PARTY_NOTICES.md)和
-[Qt Legacy 第三方声明](src/qbank/resources/desktop/THIRD_PARTY_NOTICES.md)。
+qbank 以 [MIT License](LICENSE) 发布。现代 Studio 内嵌资源的许可信息见
+[Tauri Studio 第三方声明](apps/studio/THIRD_PARTY_NOTICES.md)。
 
 ## 开源项目与致谢
 
@@ -348,10 +345,6 @@ qbank 的实现直接使用了以下开源项目；完整版本与传递依赖�
   支撑解析、模板、数据契约与 CLI。
 - [SQLite](https://www.sqlite.org/)、[Pandoc](https://github.com/jgm/pandoc) 和
   [Ipe](https://github.com/otfried/ipe) 分别用于可重建检索、文档转换和可编辑图形工作流。
-- [PySide6 / Qt for Python](https://doc.qt.io/qtforpython-6/)、
-  [CodeMirror](https://github.com/codemirror/dev/) 和
-  [QtAwesome](https://github.com/spyder-ide/qtawesome) 支撑 QBank Studio Legacy。
-
 产品设计也参考了 [Moodle Question Bank](https://github.com/moodle/moodle) 与
 [Open edX](https://github.com/openedx/openedx-platform) 对题目组织、复用和内容编写的公开实践。
 这些项目与 qbank 无隶属或背书关系；此处表示尊重与致谢，不表示复制其代码或数据格式。
